@@ -50,31 +50,24 @@ export default function ListaCotacoes() {
   }
 
   async function confirmarCotacao(id: string) {
-    if (!confirm('Confirmar esta cotação?')) return
-    
-    console.log('Confirmando cotação:', id)
-    
-    const { data, error } = await supabase
-      .from('cotacoes')
-      .update({ status: 'confirmada' })
-      .eq('id', id)
-    
-    console.log('Resultado:', { data, error })
-    
-    if (error) {
-      console.error('Erro ao atualizar:', error)
-      toast({
-        title: 'Erro ao confirmar cotação',
-        description: error.message,
-        variant: 'destructive'
-      })
-    } else {
-      console.log('Cotação confirmada com sucesso, recarregando lista...')
-      toast({
-        title: 'Cotação confirmada!',
-        description: 'O status foi atualizado com sucesso.'
-      })
-      await fetchCotacoes()
+    try {
+      const { error } = await supabase
+        .from('cotacoes')
+        .update({ status: 'confirmada' })
+        .eq('id', id)
+      
+      if (error) {
+        console.error('Erro:', error)
+        alert('Erro ao confirmar: ' + error.message)
+        return
+      }
+      
+      alert('Cotação confirmada com sucesso!')
+      window.location.reload()
+      
+    } catch (err) {
+      console.error('Erro catch:', err)
+      alert('Erro: ' + err)
     }
   }
 
@@ -197,7 +190,11 @@ export default function ListaCotacoes() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         {cotacao.status === 'enviada' && (
                           <button
-                            onClick={() => confirmarCotacao(cotacao.id)}
+                            onClick={() => {
+                              if (confirm('Confirmar esta cotação?')) {
+                                confirmarCotacao(cotacao.id)
+                              }
+                            }}
                             className="text-green-600 hover:text-green-800 font-medium mr-4"
                           >
                             Confirmar
