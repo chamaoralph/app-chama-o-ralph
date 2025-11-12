@@ -7,6 +7,7 @@ import Signup from '@/pages/Signup'
 import AdminDashboard from '@/pages/admin/Dashboard'
 import InstaladorDashboard from '@/pages/instalador/Dashboard'
 import ServicosDisponiveis from '@/pages/instalador/ServicosDisponiveis'
+import MinhaAgenda from '@/pages/instalador/MinhaAgenda'
 import ListaCotacoes from '@/pages/admin/cotacoes/Lista'
 import NovaCotacao from '@/pages/admin/cotacoes/Nova'
 import ListaServicos from '@/pages/admin/servicos/Lista'
@@ -25,6 +26,7 @@ function App() {
           <Route path="/admin/servicos" element={<ProtectedRoute requiredType="admin"><ListaServicos /></ProtectedRoute>} />
           <Route path="/instalador" element={<ProtectedRoute requiredType="instalador"><InstaladorDashboard /></ProtectedRoute>} />
           <Route path="/instalador/disponiveis" element={<ProtectedRoute requiredType="instalador"><ServicosDisponiveis /></ProtectedRoute>} />
+          <Route path="/instalador/agenda" element={<ProtectedRoute requiredType="instalador"><MinhaAgenda /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
         <Toaster position="top-right" />
