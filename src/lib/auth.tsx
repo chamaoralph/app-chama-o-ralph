@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { User, Session } from '@supabase/supabase-js'
-import { supabase } from './supabase'
+import { supabase } from '@/integrations/supabase/client'
 
 interface AuthContextType {
   user: User | null
