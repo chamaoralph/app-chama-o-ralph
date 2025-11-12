@@ -3,6 +3,7 @@ import { AdminLayout } from '@/components/layout/AdminLayout'
 import { supabase } from '@/integrations/supabase/client'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/auth'
+import { useToast } from '@/hooks/use-toast'
 
 interface Cotacao {
   id: string
@@ -20,34 +21,56 @@ interface Cotacao {
 export default function ListaCotacoes() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { toast } = useToast()
   const [cotacoes, setCotacoes] = useState<Cotacao[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    async function fetchCotacoes() {
-      try {
-        setLoading(true)
-        const { data, error } = await supabase
-          .from('cotacoes')
-          .select('*, clientes(*)')
-          .order('created_at', { ascending: false })
+    fetchCotacoes()
+  }, [user])
 
-        if (error) throw error
-        
-        setCotacoes(data || [])
-      } catch (err) {
-        console.error('Erro ao buscar cotações:', err)
-        setError('Erro ao carregar cotações')
-      } finally {
-        setLoading(false)
-      }
+  async function fetchCotacoes() {
+    try {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('cotacoes')
+        .select('*, clientes(*)')
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      
+      setCotacoes(data || [])
+    } catch (err) {
+      console.error('Erro ao buscar cotações:', err)
+      setError('Erro ao carregar cotações')
+    } finally {
+      setLoading(false)
     }
+  }
 
-    if (user) {
+  async function confirmarCotacao(id: string) {
+    if (!confirm('Confirmar esta cotação?')) return
+    
+    const { error } = await supabase
+      .from('cotacoes')
+      .update({ status: 'confirmada' })
+      .eq('id', id)
+    
+    if (error) {
+      toast({
+        title: 'Erro ao confirmar cotação',
+        description: error.message,
+        variant: 'destructive'
+      })
+    } else {
+      toast({
+        title: 'Cotação confirmada!',
+        description: 'O status foi atualizado com sucesso.'
+      })
       fetchCotacoes()
     }
-  }, [user])
+  }
 
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { bg: string; text: string; label: string }> = {
@@ -166,6 +189,14 @@ export default function ListaCotacoes() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {cotacao.status === 'enviada' && (
+                          <button
+                            onClick={() => confirmarCotacao(cotacao.id)}
+                            className="text-green-600 hover:text-green-800 font-medium mr-4"
+                          >
+                            Confirmar
+                          </button>
+                        )}
                         <button
                           onClick={() => navigate(`/admin/cotacoes/${cotacao.id}`)}
                           className="text-blue-600 hover:text-blue-800 font-medium mr-4"
