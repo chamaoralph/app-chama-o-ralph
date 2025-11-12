@@ -8,6 +8,7 @@ import AdminDashboard from '@/pages/admin/Dashboard'
 import InstaladorDashboard from '@/pages/instalador/Dashboard'
 import ListaCotacoes from '@/pages/admin/cotacoes/Lista'
 import NovaCotacao from '@/pages/admin/cotacoes/Nova'
+import ListaServicos from '@/pages/admin/servicos/Lista'
 
 function App() {
   return (
@@ -20,7 +21,8 @@ function App() {
           <Route path="/admin" element={<ProtectedRoute requiredType="admin"><AdminDashboard /></ProtectedRoute>} />
           <Route path="/admin/cotacoes" element={<ProtectedRoute requiredType="admin"><ListaCotacoes /></ProtectedRoute>} />
           <Route path="/admin/cotacoes/nova" element={<ProtectedRoute requiredType="admin"><NovaCotacao /></ProtectedRoute>} />
-          <Route path="/instalador" element={<ProtectedRoute requiredType="instalador"><InstaladorDashboard /></ProtectedRoute>} />
+          <Route path="/admin/servicos" element={<ProtectedRoute requiredType="admin"><ListaServicos /></ProtectedRoute>} />
+          <Route path="/instalador" element={<ProtectedRoute requiredType="admin"><InstaladorDashboard /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
         <Toaster position="top-right" />
