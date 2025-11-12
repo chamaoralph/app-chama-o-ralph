@@ -55,9 +55,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .from('usuarios')
         .select('tipo')
         .eq('id', userId)
-        .single()
+        .maybeSingle()
 
       if (error) throw error
+      
+      if (!data) {
+        console.error('Usuário não encontrado na tabela usuarios')
+        await supabase.auth.signOut()
+        setUserType(null)
+        return
+      }
+      
       setUserType(data.tipo as 'admin' | 'instalador')
     } catch (error) {
       console.error('Erro ao buscar tipo de usuário:', error)
