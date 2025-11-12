@@ -52,23 +52,29 @@ export default function ListaCotacoes() {
   async function confirmarCotacao(id: string) {
     if (!confirm('Confirmar esta cotação?')) return
     
-    const { error } = await supabase
+    console.log('Confirmando cotação:', id)
+    
+    const { data, error } = await supabase
       .from('cotacoes')
       .update({ status: 'confirmada' })
       .eq('id', id)
     
+    console.log('Resultado:', { data, error })
+    
     if (error) {
+      console.error('Erro ao atualizar:', error)
       toast({
         title: 'Erro ao confirmar cotação',
         description: error.message,
         variant: 'destructive'
       })
     } else {
+      console.log('Cotação confirmada com sucesso, recarregando lista...')
       toast({
         title: 'Cotação confirmada!',
         description: 'O status foi atualizado com sucesso.'
       })
-      fetchCotacoes()
+      await fetchCotacoes()
     }
   }
 
