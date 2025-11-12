@@ -64,13 +64,23 @@ export default function ServicosDisponiveis() {
 
   async function pegarServico(servicoId: string) {
     try {
+      if (!user) {
+        toast({
+          title: "Erro",
+          description: "Você precisa estar autenticado",
+          variant: "destructive",
+        })
+        return
+      }
+
       const { error } = await supabase
         .from('servicos')
         .update({ 
           status: 'atribuido',
-          instalador_id: user?.id 
+          instalador_id: user.id 
         })
         .eq('id', servicoId)
+        .eq('status', 'disponivel')
 
       if (error) throw error
 
@@ -84,7 +94,7 @@ export default function ServicosDisponiveis() {
       console.error('Erro ao pegar serviço:', err)
       toast({
         title: "Erro",
-        description: "Não foi possível pegar o serviço",
+        description: "Não foi possível pegar o serviço. Ele pode já ter sido atribuído.",
         variant: "destructive",
       })
     }
