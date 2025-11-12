@@ -23,7 +23,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     <div className="flex h-screen bg-gray-100">
       <aside className="w-64 bg-gray-900 text-white flex flex-col">
         <div className="p-4 border-b border-gray-700">
-          <h1 className="text-2xl font-bold">Ralph & Ray</h1>
+          <h1 className="text-2xl font-bold">Chama o Ralph</h1>
           <p className="text-sm text-gray-400 mt-1">Administração</p>
         </div>
 

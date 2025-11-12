@@ -40,7 +40,7 @@ export function LoginForm() {
       <div className="bg-white shadow-lg rounded-lg p-8">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Ralph & Ray
+            Chama o Ralph
           </h1>
           <p className="text-gray-600">Sistema de Gestão de Serviços</p>
         </div>

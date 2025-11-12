@@ -61,7 +61,7 @@ export function SignupForm() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             Criar Conta
           </h1>
-          <p className="text-gray-600">Ralph & Ray - Sistema de Gestão</p>
+          <p className="text-gray-600">Chama o Ralph - Sistema de Gestão</p>
         </div>
 
         {error && (
