@@ -64,6 +64,31 @@ export default function ListaServicos() {
     }
   }
 
+  async function disponibilizarServico(servicoId: string) {
+    try {
+      const { error } = await supabase
+        .from('servicos')
+        .update({ status: 'disponivel' })
+        .eq('id', servicoId)
+
+      if (error) throw error
+
+      toast({
+        title: "Serviço disponibilizado",
+        description: "O serviço foi disponibilizado para os instaladores",
+      })
+
+      fetchServicos()
+    } catch (err) {
+      console.error('Erro ao disponibilizar serviço:', err)
+      toast({
+        title: "Erro",
+        description: "Não foi possível disponibilizar o serviço",
+        variant: "destructive",
+      })
+    }
+  }
+
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { bg: string; text: string; label: string }> = {
       aguardando_distribuicao: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Aguardando Distribuição' },
@@ -189,9 +214,17 @@ export default function ListaServicos() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {servico.status === 'aguardando_distribuicao' && (
+                          <button
+                            onClick={() => disponibilizarServico(servico.id)}
+                            className="text-blue-600 hover:text-blue-800 font-medium mr-4"
+                          >
+                            Disponibilizar
+                          </button>
+                        )}
                         <button
                           onClick={() => navigate(`/admin/servicos/${servico.id}`)}
-                          className="text-blue-600 hover:text-blue-800 font-medium mr-4"
+                          className="text-blue-600 hover:text-blue-800 font-medium"
                         >
                           Ver Detalhes
                         </button>
