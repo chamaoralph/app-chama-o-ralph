@@ -34,7 +34,7 @@ export function SignupForm() {
     setLoading(true)
 
     try {
-      const EMPRESA_ID = 'COLE-AQUI-O-UUID-DA-SUA-EMPRESA'
+      const EMPRESA_ID = 'a5006ac5-230b-4687-bb88-e49ebc7811a2'
 
       await signUp(formData.email, formData.password, {
         empresa_id: EMPRESA_ID,
