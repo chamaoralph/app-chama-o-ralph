@@ -14,6 +14,122 @@ export type Database = {
   }
   public: {
     Tables: {
+      clientes: {
+        Row: {
+          ativo: boolean | null
+          bairro: string | null
+          cep: string | null
+          created_at: string | null
+          empresa_id: string
+          endereco_completo: string | null
+          id: string
+          idade: number | null
+          nome: string
+          origem_lead: string
+          telefone: string
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          bairro?: string | null
+          cep?: string | null
+          created_at?: string | null
+          empresa_id: string
+          endereco_completo?: string | null
+          id?: string
+          idade?: number | null
+          nome: string
+          origem_lead: string
+          telefone: string
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          bairro?: string | null
+          cep?: string | null
+          created_at?: string | null
+          empresa_id?: string
+          endereco_completo?: string | null
+          id?: string
+          idade?: number | null
+          nome?: string
+          origem_lead?: string
+          telefone?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clientes_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cotacoes: {
+        Row: {
+          cliente_id: string
+          created_at: string | null
+          data_servico_desejada: string | null
+          descricao_servico: string | null
+          empresa_id: string
+          id: string
+          observacoes: string | null
+          ocasiao: string | null
+          origem_lead: string | null
+          status: string
+          tipo_servico: string[] | null
+          updated_at: string | null
+          valor_estimado: number | null
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string | null
+          data_servico_desejada?: string | null
+          descricao_servico?: string | null
+          empresa_id: string
+          id?: string
+          observacoes?: string | null
+          ocasiao?: string | null
+          origem_lead?: string | null
+          status?: string
+          tipo_servico?: string[] | null
+          updated_at?: string | null
+          valor_estimado?: number | null
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string | null
+          data_servico_desejada?: string | null
+          descricao_servico?: string | null
+          empresa_id?: string
+          id?: string
+          observacoes?: string | null
+          ocasiao?: string | null
+          origem_lead?: string | null
+          status?: string
+          tipo_servico?: string[] | null
+          updated_at?: string | null
+          valor_estimado?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cotacoes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotacoes_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       empresas: {
         Row: {
           ativo: boolean | null
