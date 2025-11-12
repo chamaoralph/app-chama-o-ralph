@@ -64,39 +64,28 @@ export default function ServicosDisponiveis() {
 
   async function pegarServico(servicoId: string) {
     try {
-      if (!user) {
-        toast({
-          title: "Erro",
-          description: "Você precisa estar autenticado",
-          variant: "destructive",
-        })
-        return
-      }
+      // 1. Buscar usuário logado
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Não autenticado')
 
+      // 2. Atualizar serviço (FIFO - primeiro que pegar ganha)
       const { error } = await supabase
         .from('servicos')
-        .update({ 
-          status: 'atribuido',
-          instalador_id: user.id 
+        .update({
+          instalador_id: user.id,
+          status: 'atribuido'
         })
         .eq('id', servicoId)
-        .eq('status', 'disponivel')
+        .eq('status', 'disponivel') // Só atualiza se ainda estiver disponível
 
       if (error) throw error
 
-      toast({
-        title: "Serviço atribuído!",
-        description: "O serviço foi adicionado à sua agenda",
-      })
-
-      fetchServicos()
-    } catch (err) {
-      console.error('Erro ao pegar serviço:', err)
-      toast({
-        title: "Erro",
-        description: "Não foi possível pegar o serviço. Ele pode já ter sido atribuído.",
-        variant: "destructive",
-      })
+      alert('✅ Serviço adicionado à sua agenda!')
+      window.location.reload()
+      
+    } catch (error: any) {
+      console.error('Erro ao pegar serviço:', error)
+      alert('❌ Erro: ' + error.message)
     }
   }
 
