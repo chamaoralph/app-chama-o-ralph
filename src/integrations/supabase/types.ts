@@ -207,6 +207,89 @@ export type Database = {
           },
         ]
       }
+      servicos: {
+        Row: {
+          cliente_id: string
+          codigo: string
+          cotacao_id: string | null
+          created_at: string | null
+          data_servico_agendada: string
+          descricao: string | null
+          empresa_id: string
+          endereco_completo: string
+          id: string
+          instalador_id: string | null
+          status: string | null
+          tipo_servico: string[]
+          updated_at: string | null
+          valor_mao_obra_instalador: number | null
+          valor_total: number
+        }
+        Insert: {
+          cliente_id: string
+          codigo: string
+          cotacao_id?: string | null
+          created_at?: string | null
+          data_servico_agendada: string
+          descricao?: string | null
+          empresa_id: string
+          endereco_completo: string
+          id?: string
+          instalador_id?: string | null
+          status?: string | null
+          tipo_servico: string[]
+          updated_at?: string | null
+          valor_mao_obra_instalador?: number | null
+          valor_total: number
+        }
+        Update: {
+          cliente_id?: string
+          codigo?: string
+          cotacao_id?: string | null
+          created_at?: string | null
+          data_servico_agendada?: string
+          descricao?: string | null
+          empresa_id?: string
+          endereco_completo?: string
+          id?: string
+          instalador_id?: string | null
+          status?: string | null
+          tipo_servico?: string[]
+          updated_at?: string | null
+          valor_mao_obra_instalador?: number | null
+          valor_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "servicos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "servicos_cotacao_id_fkey"
+            columns: ["cotacao_id"]
+            isOneToOne: false
+            referencedRelation: "cotacoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "servicos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "servicos_instalador_id_fkey"
+            columns: ["instalador_id"]
+            isOneToOne: false
+            referencedRelation: "instaladores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       usuarios: {
         Row: {
           ativo: boolean
