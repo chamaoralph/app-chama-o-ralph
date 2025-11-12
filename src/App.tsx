@@ -22,7 +22,7 @@ function App() {
           <Route path="/admin/cotacoes" element={<ProtectedRoute requiredType="admin"><ListaCotacoes /></ProtectedRoute>} />
           <Route path="/admin/cotacoes/nova" element={<ProtectedRoute requiredType="admin"><NovaCotacao /></ProtectedRoute>} />
           <Route path="/admin/servicos" element={<ProtectedRoute requiredType="admin"><ListaServicos /></ProtectedRoute>} />
-          <Route path="/instalador" element={<ProtectedRoute requiredType="admin"><InstaladorDashboard /></ProtectedRoute>} />
+          <Route path="/instalador" element={<ProtectedRoute requiredType="instalador"><InstaladorDashboard /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
         <Toaster position="top-right" />
