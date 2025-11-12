@@ -1,37 +1,63 @@
 import { useNavigate } from 'react-router-dom'
 import { AdminLayout } from '@/components/layout/AdminLayout'
+import { supabase } from '@/integrations/supabase/client'
+import { useEffect, useState } from 'react'
+import { useAuth } from '@/lib/auth'
+
+interface Cotacao {
+  id: string
+  cliente_id: string
+  tipo_servico: string[]
+  status: string
+  created_at: string
+  data_servico_desejada: string | null
+  valor_estimado: number | null
+  clientes: {
+    nome: string
+  }
+}
 
 export default function ListaCotacoes() {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const [cotacoes, setCotacoes] = useState<Cotacao[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Dados mockados para exemplo
-  const cotacoes = [
-    {
-      id: '1',
-      cliente_nome: 'João Silva',
-      servico_tipo: 'Instalação de Ar Condicionado',
-      status: 'pendente',
-      urgencia: 'normal',
-      created_at: '2025-01-10',
-    },
-    {
-      id: '2',
-      cliente_nome: 'Maria Santos',
-      servico_tipo: 'Manutenção Elétrica',
-      status: 'em_analise',
-      urgencia: 'alta',
-      created_at: '2025-01-09',
-    },
-  ]
+  useEffect(() => {
+    async function fetchCotacoes() {
+      try {
+        setLoading(true)
+        const { data, error } = await supabase
+          .from('cotacoes')
+          .select('*, clientes(*)')
+          .order('created_at', { ascending: false })
+
+        if (error) throw error
+        
+        setCotacoes(data || [])
+      } catch (err) {
+        console.error('Erro ao buscar cotações:', err)
+        setError('Erro ao carregar cotações')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (user) {
+      fetchCotacoes()
+    }
+  }, [user])
 
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { bg: string; text: string; label: string }> = {
+      enviada: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Enviada' },
       pendente: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Pendente' },
       em_analise: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Em Análise' },
       aprovada: { bg: 'bg-green-100', text: 'text-green-800', label: 'Aprovada' },
       recusada: { bg: 'bg-red-100', text: 'text-red-800', label: 'Recusada' },
     }
-    const badge = badges[status] || badges.pendente
+    const badge = badges[status] || badges.enviada
     return (
       <span className={`px-3 py-1 rounded-full text-xs font-medium ${badge.bg} ${badge.text}`}>
         {badge.label}
@@ -39,17 +65,23 @@ export default function ListaCotacoes() {
     )
   }
 
-  const getUrgenciaBadge = (urgencia: string) => {
-    const badges: Record<string, { bg: string; text: string }> = {
-      baixa: { bg: 'bg-gray-100', text: 'text-gray-800' },
-      normal: { bg: 'bg-blue-100', text: 'text-blue-800' },
-      alta: { bg: 'bg-red-100', text: 'text-red-800' },
-    }
-    const badge = badges[urgencia] || badges.normal
+  if (loading) {
     return (
-      <span className={`px-2 py-1 rounded text-xs font-medium ${badge.bg} ${badge.text}`}>
-        {urgencia.toUpperCase()}
-      </span>
+      <AdminLayout>
+        <div className="flex justify-center items-center h-64">
+          <div className="text-gray-500">Carregando cotações...</div>
+        </div>
+      </AdminLayout>
+    )
+  }
+
+  if (error) {
+    return (
+      <AdminLayout>
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+          {error}
+        </div>
+      </AdminLayout>
     )
   }
 
@@ -84,7 +116,7 @@ export default function ListaCotacoes() {
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Urgência
+                    Valor
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Data
@@ -111,16 +143,22 @@ export default function ListaCotacoes() {
                   cotacoes.map((cotacao) => (
                     <tr key={cotacao.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{cotacao.cliente_nome}</div>
+                        <div className="text-sm font-medium text-gray-900">{cotacao.clientes.nome}</div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900">{cotacao.servico_tipo}</div>
+                        <div className="text-sm text-gray-900">
+                          {cotacao.tipo_servico?.join(', ') || '-'}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {getStatusBadge(cotacao.status)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {getUrgenciaBadge(cotacao.urgencia)}
+                        <div className="text-sm text-gray-900">
+                          {cotacao.valor_estimado 
+                            ? `R$ ${Number(cotacao.valor_estimado).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` 
+                            : '-'}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
