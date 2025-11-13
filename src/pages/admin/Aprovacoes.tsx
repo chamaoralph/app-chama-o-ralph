@@ -45,9 +45,8 @@ export default function Aprovacoes() {
         .from('servicos')
         .select(`
           *,
-          cliente_nome:clientes(nome),
-          cliente_telefone:clientes(telefone),
-          instalador_nome:usuarios(nome)
+          clientes!cliente_id(nome, telefone),
+          instaladores!instalador_id(usuarios!id(nome))
         `)
         .eq('status', 'aguardando_aprovacao')
         .order('created_at', { ascending: false })
@@ -57,9 +56,9 @@ export default function Aprovacoes() {
       // Transformar os dados para o formato correto
       const servicosFormatados = data?.map(servico => ({
         ...servico,
-        cliente_nome: (servico.cliente_nome as any)?.nome || '',
-        cliente_telefone: (servico.cliente_telefone as any)?.telefone || '',
-        instalador_nome: (servico.instalador_nome as any)?.nome || null
+        cliente_nome: (servico.clientes as any)?.nome || '',
+        cliente_telefone: (servico.clientes as any)?.telefone || '',
+        instalador_nome: (servico.instaladores as any)?.usuarios?.nome || null
       })) || []
 
       setServicos(servicosFormatados)
