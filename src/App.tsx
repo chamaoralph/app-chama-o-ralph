@@ -1,3 +1,4 @@
+import FinalizarServico from "@/pages/instalador/FinalizarServico";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/lib/auth";
