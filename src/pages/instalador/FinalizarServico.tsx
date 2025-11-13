@@ -4,7 +4,7 @@ import { InstaladorLayout } from "@/components/layout/InstaladorLayout";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function FinalizarServico() {
-  const { servicoId } = useParams();
+  const { id: servicoId } = useParams();
   const navigate = useNavigate();
   const [servico, setServico] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -17,19 +17,39 @@ export default function FinalizarServico() {
   const [observacoes, setObservacoes] = useState("");
 
   useEffect(() => {
-    carregarServico();
+    console.log("servicoId da URL:", servicoId);
+    if (servicoId) {
+      carregarServico();
+    }
   }, [servicoId]);
 
   async function carregarServico() {
     try {
-      const { data, error } = await supabase.from("servicos").select("*, clientes(*)").eq("id", servicoId).single();
+      console.log("Buscando serviço com ID:", servicoId);
+      
+      const { data, error } = await supabase
+        .from("servicos")
+        .select("*, clientes(*)")
+        .eq("id", servicoId)
+        .maybeSingle();
 
-      if (error) throw error;
+      console.log("Resposta da query:", { data, error });
+
+      if (error) {
+        console.error("Erro na query:", error);
+        throw error;
+      }
+      
+      if (!data) {
+        console.error("Nenhum serviço encontrado com ID:", servicoId);
+        throw new Error("Serviço não encontrado");
+      }
+      
       setServico(data);
-    } catch (error) {
-      console.error("Erro:", error);
-      alert("Erro ao carregar serviço");
-      navigate("/instalador/agenda");
+    } catch (error: any) {
+      console.error("Erro ao carregar serviço:", error);
+      alert(`Erro ao carregar serviço: ${error.message || 'Desconhecido'}`);
+      navigate("/instalador/minha-agenda");
     } finally {
       setLoading(false);
     }
@@ -101,7 +121,7 @@ export default function FinalizarServico() {
       if (updateError) throw updateError;
 
       alert("✅ Serviço finalizado! Aguardando aprovação do gestor.");
-      navigate("/instalador/agenda");
+      navigate("/instalador/minha-agenda");
     } catch (error: any) {
       console.error("Erro:", error);
       alert("❌ Erro: " + error.message);
@@ -224,7 +244,7 @@ export default function FinalizarServico() {
           <div className="flex gap-3">
             <button
               type="button"
-              onClick={() => navigate("/instalador/agenda")}
+              onClick={() => navigate("/instalador/minha-agenda")}
               className="px-6 py-2 border rounded-md hover:bg-gray-50"
             >
               Cancelar
