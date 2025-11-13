@@ -74,17 +74,26 @@ export default function Aprovacoes() {
 
   async function fetchInstaladores(ids: string[]) {
     try {
+      console.log("Buscando instaladores com IDs:", ids);
+      
       const { data, error } = await supabase
         .from('usuarios')
         .select('id, nome')
         .in('id', ids)
 
-      if (error) throw error
+      console.log("Resultado da busca de instaladores:", { data, error });
+
+      if (error) {
+        console.error("Erro ao buscar instaladores:", error);
+        throw error;
+      }
 
       const instaladoresMap: Record<string, string> = {}
       data?.forEach(user => {
         instaladoresMap[user.id] = user.nome
       })
+      
+      console.log("Mapa de instaladores:", instaladoresMap);
       setInstaladores(instaladoresMap)
     } catch (error) {
       console.error('Erro ao buscar instaladores:', error)
