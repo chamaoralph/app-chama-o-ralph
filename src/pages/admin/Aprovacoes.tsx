@@ -145,7 +145,7 @@ export default function Aprovacoes() {
                 {/* Nota Fiscal */}
                 {servico.nota_fiscal_url && (
                   <div className="mb-4">
-                    
+                    <a
                       href={servico.nota_fiscal_url}
                       target="_blank"
                       className="text-blue-600 hover:underline"
