@@ -1,21 +1,21 @@
-import { ReactNode } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '@/lib/auth'
+import { ReactNode } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/lib/auth";
 
 interface InstaladorLayoutProps {
-  children: ReactNode
+  children: ReactNode;
 }
 
 export function InstaladorLayout({ children }: InstaladorLayoutProps) {
-  const { user, signOut } = useAuth()
-  const navigate = useNavigate()
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
 
   async function handleSignOut() {
     try {
-      await signOut()
-      navigate('/login')
+      await signOut();
+      navigate("/login");
     } catch (error) {
-      console.error('Erro ao sair:', error)
+      console.error("Erro ao sair:", error);
     }
   }
 
@@ -31,7 +31,10 @@ export function InstaladorLayout({ children }: InstaladorLayoutProps) {
           <Link to="/instalador" className="block px-4 py-2 rounded hover:bg-blue-800 transition-colors">
             📊 Meu Dashboard
           </Link>
-          <Link to="/instalador/disponiveis" className="block px-4 py-2 rounded hover:bg-blue-800 transition-colors">
+          <Link
+            to="/instalador/servicos-disponiveis"
+            className="block px-4 py-2 rounded hover:bg-blue-800 transition-colors"
+          >
             🆕 Serviços Disponíveis
           </Link>
           <Link to="/instalador/agenda" className="block px-4 py-2 rounded hover:bg-blue-800 transition-colors">
@@ -50,7 +53,10 @@ export function InstaladorLayout({ children }: InstaladorLayoutProps) {
 
         <div className="p-4 border-t border-blue-800">
           <div className="text-sm text-blue-200 mb-2">{user?.email}</div>
-          <button onClick={handleSignOut} className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition-colors">
+          <button
+            onClick={handleSignOut}
+            className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition-colors"
+          >
             Sair
           </button>
         </div>
@@ -60,5 +66,5 @@ export function InstaladorLayout({ children }: InstaladorLayoutProps) {
         <div className="p-8">{children}</div>
       </main>
     </div>
-  )
+  );
 }
