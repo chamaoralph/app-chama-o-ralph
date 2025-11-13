@@ -207,6 +207,63 @@ export type Database = {
           },
         ]
       }
+      lancamentos_caixa: {
+        Row: {
+          categoria: string
+          created_at: string | null
+          data_lancamento: string
+          descricao: string | null
+          empresa_id: string
+          forma_pagamento: string | null
+          id: string
+          observacoes: string | null
+          servico_id: string | null
+          tipo: string
+          valor: number
+        }
+        Insert: {
+          categoria: string
+          created_at?: string | null
+          data_lancamento?: string
+          descricao?: string | null
+          empresa_id: string
+          forma_pagamento?: string | null
+          id?: string
+          observacoes?: string | null
+          servico_id?: string | null
+          tipo: string
+          valor: number
+        }
+        Update: {
+          categoria?: string
+          created_at?: string | null
+          data_lancamento?: string
+          descricao?: string | null
+          empresa_id?: string
+          forma_pagamento?: string | null
+          id?: string
+          observacoes?: string | null
+          servico_id?: string | null
+          tipo?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lancamentos_caixa_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lancamentos_caixa_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: false
+            referencedRelation: "servicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       servicos: {
         Row: {
           cliente_id: string
