@@ -1,6 +1,22 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
+import { z } from 'zod'
+
+const signupSchema = z.object({
+  nome: z.string().trim().min(2, 'Nome muito curto').max(100, 'Nome muito longo'),
+  email: z.string().email('Email inválido').max(255),
+  telefone: z.string().regex(/^\d{10,11}$/, 'Telefone deve ter 10 ou 11 dígitos'),
+  password: z.string()
+    .min(8, 'Senha deve ter no mínimo 8 caracteres')
+    .regex(/[A-Z]/, 'Senha deve ter pelo menos uma letra maiúscula')
+    .regex(/[0-9]/, 'Senha deve ter pelo menos um número'),
+  confirmPassword: z.string(),
+  tipo: z.enum(['admin', 'instalador'])
+}).refine((data) => data.password === data.confirmPassword, {
+  message: 'As senhas não coincidem',
+  path: ['confirmPassword']
+})
 
 export function SignupForm() {
   const [formData, setFormData] = useState({
@@ -21,13 +37,10 @@ export function SignupForm() {
     e.preventDefault()
     setError('')
 
-    if (formData.password !== formData.confirmPassword) {
-      setError('As senhas não coincidem')
-      return
-    }
-
-    if (formData.password.length < 6) {
-      setError('A senha deve ter pelo menos 6 caracteres')
+    // Validate form data
+    const result = signupSchema.safeParse(formData)
+    if (!result.success) {
+      setError(result.error.errors[0].message)
       return
     }
 
@@ -47,7 +60,6 @@ export function SignupForm() {
       navigate('/login')
       
     } catch (error: any) {
-      console.error('Erro no cadastro:', error)
       setError(error.message || 'Erro ao criar conta')
     } finally {
       setLoading(false)

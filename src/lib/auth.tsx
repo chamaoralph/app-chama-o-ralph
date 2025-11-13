@@ -52,21 +52,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function fetchUserType(userId: string) {
     try {
       const { data, error } = await supabase
-        .from('usuarios')
-        .select('tipo')
-        .eq('id', userId)
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
         .maybeSingle()
 
       if (error) throw error
       
       if (!data) {
-        console.error('Usuário não encontrado na tabela usuarios')
+        console.error('Usuário não encontrado na tabela user_roles')
         await supabase.auth.signOut()
         setUserType(null)
         return
       }
       
-      setUserType(data.tipo as 'admin' | 'instalador')
+      setUserType(data.role as 'admin' | 'instalador')
     } catch (error) {
       console.error('Erro ao buscar tipo de usuário:', error)
       setUserType(null)
@@ -88,6 +88,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/`
+      }
     })
 
     if (authError) throw authError
@@ -103,6 +106,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
 
     if (userError) throw userError
+
+    // Insert user role
+    const { error: roleError } = await supabase.from('user_roles').insert({
+      user_id: authData.user.id,
+      role: userData.tipo,
+    })
+
+    if (roleError) throw roleError
 
     if (userData.tipo === 'instalador') {
       const { error: instaladorError } = await supabase

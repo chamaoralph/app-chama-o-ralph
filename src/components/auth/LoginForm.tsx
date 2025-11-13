@@ -1,6 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
+import { z } from 'zod'
+
+const loginSchema = z.object({
+  email: z.string().email('Email inválido'),
+  password: z.string().min(1, 'Senha é obrigatória')
+})
 
 export function LoginForm() {
   const [email, setEmail] = useState('')
@@ -14,6 +20,14 @@ export function LoginForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    
+    // Validate form data
+    const result = loginSchema.safeParse({ email, password })
+    if (!result.success) {
+      setError(result.error.errors[0].message)
+      return
+    }
+    
     setLoading(true)
 
     try {
@@ -28,7 +42,6 @@ export function LoginForm() {
       }, 500)
       
     } catch (error: any) {
-      console.error('Erro no login:', error)
       setError(error.message || 'Email ou senha incorretos')
     } finally {
       setLoading(false)
