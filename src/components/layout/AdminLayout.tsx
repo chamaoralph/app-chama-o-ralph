@@ -1,21 +1,21 @@
-import { ReactNode } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '@/lib/auth'
+import { ReactNode } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/lib/auth";
 
 interface AdminLayoutProps {
-  children: ReactNode
+  children: ReactNode;
 }
 
 export function AdminLayout({ children }: AdminLayoutProps) {
-  const { user, signOut } = useAuth()
-  const navigate = useNavigate()
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
 
   async function handleSignOut() {
     try {
-      await signOut()
-      navigate('/login')
+      await signOut();
+      navigate("/login");
     } catch (error) {
-      console.error('Erro ao sair:', error)
+      console.error("Erro ao sair:", error);
     }
   }
 
@@ -40,7 +40,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           <Link to="/admin/instaladores" className="block px-4 py-2 rounded hover:bg-gray-800 transition-colors">
             👥 Instaladores
           </Link>
-          <Link to="/admin/financeiro" className="block px-4 py-2 rounded hover:bg-gray-800 transition-colors">
+          <Link to="/admin/caixa" className="block px-4 py-2 rounded hover:bg-gray-800 transition-colors">
             💰 Financeiro
           </Link>
           <Link to="/admin/aprovacoes" className="block px-4 py-2 rounded hover:bg-gray-800 transition-colors">
@@ -50,7 +50,10 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
         <div className="p-4 border-t border-gray-700">
           <div className="text-sm text-gray-400 mb-2">{user?.email}</div>
-          <button onClick={handleSignOut} className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition-colors">
+          <button
+            onClick={handleSignOut}
+            className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition-colors"
+          >
             Sair
           </button>
         </div>
@@ -60,5 +63,5 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         <div className="p-8">{children}</div>
       </main>
     </div>
-  )
+  );
 }
