@@ -135,7 +135,7 @@ export default function MinhaAgenda() {
 
                       {servico.status === "em_andamento" && (
                         <button
-                          onClick={() => navigate(`/instalador/finalizar/${servico.id}`)}
+                          onClick={() => navigate(`/instalador/finalizar-servico/${servico.id}`)}
                           className="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
                         >
                           ✅ Finalizar
