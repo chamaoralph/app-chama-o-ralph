@@ -17,7 +17,13 @@ export default function MinhaAgenda() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return;
+      
+      if (!user) {
+        console.error("Usuário não autenticado");
+        return;
+      }
+
+      console.log("Buscando serviços para instalador:", user.id);
 
       const { data, error } = await supabase
         .from("servicos")
@@ -25,16 +31,21 @@ export default function MinhaAgenda() {
           `
           *,
           clientes (nome, telefone, endereco_completo, bairro)
-        `,
+        `
         )
         .eq("instalador_id", user.id)
         .in("status", ["atribuido", "em_andamento"])
         .order("data_servico_agendada", { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Erro ao buscar serviços:", error);
+        throw error;
+      }
+      
+      console.log("Serviços encontrados:", data);
       setServicos(data || []);
     } catch (error) {
-      console.error("Erro:", error);
+      console.error("Erro ao carregar serviços:", error);
     } finally {
       setLoading(false);
     }
