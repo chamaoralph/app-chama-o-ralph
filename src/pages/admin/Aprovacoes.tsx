@@ -1,73 +1,72 @@
-import { useEffect, useState } from 'react'
-import { AdminLayout } from '@/components/layout/AdminLayout'
-import { supabase } from '@/integrations/supabase/client'
+import { useEffect, useState } from "react";
+import { AdminLayout } from "@/components/layout/AdminLayout";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Aprovacoes() {
-  const [servicos, setServicos] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [servicos, setServicos] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    carregarPendentes()
-  }, [])
+    carregarPendentes();
+  }, []);
 
   async function carregarPendentes() {
     try {
       const { data, error } = await supabase
-        .from('servicos')
-        .select(`
+        .from("servicos")
+        .select(
+          `
           *,
           clientes (nome, telefone),
-          instaladores (id, usuarios(nome))
-        `)
-        .eq('status', 'aguardando_aprovacao')
-        .order('created_at', { ascending: false })
+          instaladores!inner (id, usuarios!inner (nome))
+        `,
+        )
+        .eq("status", "aguardando_aprovacao")
+        .order("created_at", { ascending: false });
 
-      if (error) throw error
-      setServicos(data || [])
+      if (error) throw error;
+      setServicos(data || []);
     } catch (error) {
-      console.error('Erro:', error)
+      console.error("Erro:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   async function aprovarServico(servicoId: string) {
-    if (!confirm('Aprovar este serviço?')) return
+    if (!confirm("Aprovar este serviço?")) return;
 
     try {
-      const { error } = await supabase
-        .from('servicos')
-        .update({ status: 'concluido' })
-        .eq('id', servicoId)
+      const { error } = await supabase.from("servicos").update({ status: "concluido" }).eq("id", servicoId);
 
-      if (error) throw error
+      if (error) throw error;
 
-      alert('✅ Serviço aprovado!')
-      carregarPendentes()
+      alert("✅ Serviço aprovado!");
+      carregarPendentes();
     } catch (error: any) {
-      alert('❌ Erro: ' + error.message)
+      alert("❌ Erro: " + error.message);
     }
   }
 
   async function solicitarCorrecao(servicoId: string) {
-    const motivo = prompt('Digite o motivo da correção:')
-    if (!motivo) return
+    const motivo = prompt("Digite o motivo da correção:");
+    if (!motivo) return;
 
     try {
       const { error } = await supabase
-        .from('servicos')
+        .from("servicos")
         .update({
-          status: 'em_andamento',
-          observacoes_gestor: `CORREÇÃO: ${motivo}`
+          status: "em_andamento",
+          observacoes_gestor: `CORREÇÃO: ${motivo}`,
         })
-        .eq('id', servicoId)
+        .eq("id", servicoId);
 
-      if (error) throw error
+      if (error) throw error;
 
-      alert('✅ Correção solicitada!')
-      carregarPendentes()
+      alert("✅ Correção solicitada!");
+      carregarPendentes();
     } catch (error: any) {
-      alert('❌ Erro: ' + error.message)
+      alert("❌ Erro: " + error.message);
     }
   }
 
@@ -78,15 +77,13 @@ export default function Aprovacoes() {
           <div className="text-gray-500">Carregando...</div>
         </div>
       </AdminLayout>
-    )
+    );
   }
 
   return (
     <AdminLayout>
       <div>
-        <h1 className="text-3xl font-bold mb-6">
-          Aprovações Pendentes ({servicos.length})
-        </h1>
+        <h1 className="text-3xl font-bold mb-6">Aprovações Pendentes ({servicos.length})</h1>
 
         {servicos.length === 0 ? (
           <div className="bg-white rounded-lg shadow p-8 text-center">
@@ -98,15 +95,23 @@ export default function Aprovacoes() {
               <div key={servico.id} className="bg-white rounded-lg shadow p-6">
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                      {servico.codigo}
-                    </h2>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">{servico.codigo}</h2>
                     <div className="space-y-1 text-gray-600">
-                      <p><strong>Cliente:</strong> {servico.clientes.nome}</p>
-                      <p><strong>Telefone:</strong> {servico.clientes.telefone}</p>
-                      <p><strong>Instalador:</strong> {servico.instaladores?.usuarios?.nome || 'N/A'}</p>
-                      <p><strong>Serviço:</strong> {servico.tipo_servico?.join(', ')}</p>
-                      <p><strong>Concluído em:</strong> {new Date(servico.updated_at).toLocaleString('pt-BR')}</p>
+                      <p>
+                        <strong>Cliente:</strong> {servico.clientes.nome}
+                      </p>
+                      <p>
+                        <strong>Telefone:</strong> {servico.clientes.telefone}
+                      </p>
+                      <p>
+                        <strong>Instalador:</strong> {servico.instaladores?.usuarios?.nome || "N/A"}
+                      </p>
+                      <p>
+                        <strong>Serviço:</strong> {servico.tipo_servico?.join(", ")}
+                      </p>
+                      <p>
+                        <strong>Concluído em:</strong> {new Date(servico.updated_at).toLocaleString("pt-BR")}
+                      </p>
                       {servico.observacoes_instalador && (
                         <p className="mt-2 text-sm">
                           <strong>Observações:</strong> {servico.observacoes_instalador}
@@ -115,13 +120,24 @@ export default function Aprovacoes() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-lg"><strong>Valor Total:</strong> R$ {servico.valor_total?.toFixed(2)}</p>
-                    <p className="text-sm text-gray-600">Mão de obra: R$ {servico.valor_mao_obra_instalador?.toFixed(2)}</p>
+                    <p className="text-lg">
+                      <strong>Valor Total:</strong> R$ {servico.valor_total?.toFixed(2)}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Mão de obra: R$ {servico.valor_mao_obra_instalador?.toFixed(2)}
+                    </p>
                     {servico.valor_reembolso_despesas > 0 && (
-                      <p className="text-sm text-orange-600">Reembolso: R$ {servico.valor_reembolso_despesas?.toFixed(2)}</p>
+                      <p className="text-sm text-orange-600">
+                        Reembolso: R$ {servico.valor_reembolso_despesas?.toFixed(2)}
+                      </p>
                     )}
                     <p className="text-lg font-bold text-green-600 mt-2">
-                      Lucro: R$ {(servico.valor_total - servico.valor_mao_obra_instalador - (servico.valor_reembolso_despesas || 0)).toFixed(2)}
+                      Lucro: R${" "}
+                      {(
+                        servico.valor_total -
+                        servico.valor_mao_obra_instalador -
+                        (servico.valor_reembolso_despesas || 0)
+                      ).toFixed(2)}
                     </p>
                   </div>
                 </div>
@@ -136,7 +152,7 @@ export default function Aprovacoes() {
                         src={foto}
                         alt={`Foto ${index + 1}`}
                         className="w-full h-32 object-cover rounded cursor-pointer hover:opacity-80"
-                        onClick={() => window.open(foto, '_blank')}
+                        onClick={() => window.open(foto, "_blank")}
                       />
                     ))}
                   </div>
@@ -145,11 +161,7 @@ export default function Aprovacoes() {
                 {/* Nota Fiscal */}
                 {servico.nota_fiscal_url && (
                   <div className="mb-4">
-                    <a
-                      href={servico.nota_fiscal_url}
-                      target="_blank"
-                      className="text-blue-600 hover:underline"
-                    >
+                    <a href={servico.nota_fiscal_url} target="_blank" className="text-blue-600 hover:underline">
                       📄 Ver Nota Fiscal
                     </a>
                   </div>
@@ -176,5 +188,5 @@ export default function Aprovacoes() {
         )}
       </div>
     </AdminLayout>
-  )
+  );
 }
