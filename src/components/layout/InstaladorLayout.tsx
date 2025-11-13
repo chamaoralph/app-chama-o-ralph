@@ -37,7 +37,7 @@ export function InstaladorLayout({ children }: InstaladorLayoutProps) {
           >
             🆕 Serviços Disponíveis
           </Link>
-          <Link to="/instalador/agenda" className="block px-4 py-2 rounded hover:bg-blue-800 transition-colors">
+          <Link to="/instalador/minha-agenda" className="block px-4 py-2 rounded hover:bg-blue-800 transition-colors">
             📅 Minha Agenda
           </Link>
           <Link to="/instalador/ganhos" className="block px-4 py-2 rounded hover:bg-blue-800 transition-colors">
