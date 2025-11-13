@@ -217,12 +217,16 @@ export type Database = {
           descricao: string | null
           empresa_id: string
           endereco_completo: string
+          fotos_conclusao: string[] | null
           id: string
           instalador_id: string | null
+          nota_fiscal_url: string | null
+          observacoes_instalador: string | null
           status: string | null
           tipo_servico: string[]
           updated_at: string | null
           valor_mao_obra_instalador: number | null
+          valor_reembolso_despesas: number | null
           valor_total: number
         }
         Insert: {
@@ -234,12 +238,16 @@ export type Database = {
           descricao?: string | null
           empresa_id: string
           endereco_completo: string
+          fotos_conclusao?: string[] | null
           id?: string
           instalador_id?: string | null
+          nota_fiscal_url?: string | null
+          observacoes_instalador?: string | null
           status?: string | null
           tipo_servico: string[]
           updated_at?: string | null
           valor_mao_obra_instalador?: number | null
+          valor_reembolso_despesas?: number | null
           valor_total: number
         }
         Update: {
@@ -251,12 +259,16 @@ export type Database = {
           descricao?: string | null
           empresa_id?: string
           endereco_completo?: string
+          fotos_conclusao?: string[] | null
           id?: string
           instalador_id?: string | null
+          nota_fiscal_url?: string | null
+          observacoes_instalador?: string | null
           status?: string | null
           tipo_servico?: string[]
           updated_at?: string | null
           valor_mao_obra_instalador?: number | null
+          valor_reembolso_despesas?: number | null
           valor_total?: number
         }
         Relationships: [
