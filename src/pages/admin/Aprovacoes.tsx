@@ -23,15 +23,13 @@ interface Servico {
   nota_fiscal_url: string | null
   observacoes_instalador: string | null
   status: string
-  clientes: {
-    nome: string
-    telefone: string
-  }
+  cliente_nome: string
+  cliente_telefone: string
+  instalador_nome: string | null
 }
 
 export default function Aprovacoes() {
   const [servicos, setServicos] = useState<Servico[]>([])
-  const [instaladores, setInstaladores] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [processingId, setProcessingId] = useState<string | null>(null)
 
@@ -47,56 +45,29 @@ export default function Aprovacoes() {
         .from('servicos')
         .select(`
           *,
-          clientes (
-            nome,
-            telefone
-          )
+          cliente_nome:clientes(nome),
+          cliente_telefone:clientes(telefone),
+          instalador_nome:usuarios(nome)
         `)
         .eq('status', 'aguardando_aprovacao')
         .order('created_at', { ascending: false })
 
       if (error) throw error
 
-      setServicos(data || [])
+      // Transformar os dados para o formato correto
+      const servicosFormatados = data?.map(servico => ({
+        ...servico,
+        cliente_nome: (servico.cliente_nome as any)?.nome || '',
+        cliente_telefone: (servico.cliente_telefone as any)?.telefone || '',
+        instalador_nome: (servico.instalador_nome as any)?.nome || null
+      })) || []
 
-      // Buscar nomes dos instaladores
-      if (data && data.length > 0) {
-        const instaladorIds = [...new Set(data.map(s => s.instalador_id).filter(Boolean))]
-        await fetchInstaladores(instaladorIds)
-      }
+      setServicos(servicosFormatados)
     } catch (error) {
       console.error('Erro ao buscar serviços:', error)
       toast.error('Erro ao carregar serviços')
     } finally {
       setLoading(false)
-    }
-  }
-
-  async function fetchInstaladores(ids: string[]) {
-    try {
-      console.log("Buscando instaladores com IDs:", ids);
-      
-      const { data, error } = await supabase
-        .from('usuarios')
-        .select('id, nome')
-        .in('id', ids)
-
-      console.log("Resultado da busca de instaladores:", { data, error });
-
-      if (error) {
-        console.error("Erro ao buscar instaladores:", error);
-        throw error;
-      }
-
-      const instaladoresMap: Record<string, string> = {}
-      data?.forEach(user => {
-        instaladoresMap[user.id] = user.nome
-      })
-      
-      console.log("Mapa de instaladores:", instaladoresMap);
-      setInstaladores(instaladoresMap)
-    } catch (error) {
-      console.error('Erro ao buscar instaladores:', error)
     }
   }
 
@@ -214,10 +185,10 @@ export default function Aprovacoes() {
                     <div>
                       <CardTitle className="text-xl">{servico.codigo}</CardTitle>
                       <p className="text-sm text-gray-600 mt-1">
-                        Cliente: {servico.clientes.nome}
+                        Cliente: {servico.cliente_nome}
                       </p>
                       <p className="text-sm text-gray-600">
-                        Instalador: {instaladores[servico.instalador_id] || 'Carregando...'}
+                        Instalador: {servico.instalador_nome || 'Não atribuído'}
                       </p>
                     </div>
                     <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
