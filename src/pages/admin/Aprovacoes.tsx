@@ -292,10 +292,7 @@ export default function Aprovacoes() {
                             src={foto}
                             alt={`Foto ${idx + 1}`}
                             className="w-full h-full object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                            onClick={async () => {
-                              const url = await getSignedUrl(foto)
-                              if (url) window.open(url, '_blank')
-                            }}
+                            onClick={() => window.open(foto, '_blank')}
                           />
                         </div>
                       ))}
