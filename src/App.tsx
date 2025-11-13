@@ -1,29 +1,27 @@
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Toaster } from '@/components/ui/toaster'
-import { AuthProvider } from '@/lib/auth'
-import { ProtectedRoute } from '@/components/ProtectedRoute'
-
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/toaster";
+import { AuthProvider } from "@/lib/auth";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 // Pages
-import Index from '@/pages/Index'
-import Login from '@/pages/Login'
-import Signup from '@/pages/Signup'
-import NotFound from '@/pages/NotFound'
-
+import Index from "@/pages/Index";
+import Login from "@/pages/Login";
+import Signup from "@/pages/Signup";
+import NotFound from "@/pages/NotFound";
 // Admin Pages
-import AdminDashboard from '@/pages/admin/Dashboard'
-import AdminCotacoesLista from '@/pages/admin/cotacoes/Lista'
-import AdminCotacoesNova from '@/pages/admin/cotacoes/Nova'
-import AdminServicosLista from '@/pages/admin/servicos/Lista'
-import AdminAprovacoes from '@/pages/admin/Aprovacoes'
-
+import AdminDashboard from "@/pages/admin/Dashboard";
+import AdminCotacoesLista from "@/pages/admin/cotacoes/Lista";
+import AdminCotacoesNova from "@/pages/admin/cotacoes/Nova";
+import AdminServicosLista from "@/pages/admin/servicos/Lista";
+import AdminAprovacoes from "@/pages/admin/Aprovacoes";
+import Caixa from "@/pages/admin/Caixa";
 // Instalador Pages
-import InstaladorDashboard from '@/pages/instalador/Dashboard'
-import InstaladorServicosDisponiveis from '@/pages/instalador/ServicosDisponiveis'
-import InstaladorMinhaAgenda from '@/pages/instalador/MinhaAgenda'
-import InstaladorFinalizarServico from '@/pages/instalador/FinalizarServico'
+import InstaladorDashboard from "@/pages/instalador/Dashboard";
+import InstaladorServicosDisponiveis from "@/pages/instalador/ServicosDisponiveis";
+import InstaladorMinhaAgenda from "@/pages/instalador/MinhaAgenda";
+import InstaladorFinalizarServico from "@/pages/instalador/FinalizarServico";
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient();
 
 function App() {
   return (
@@ -36,7 +34,14 @@ function App() {
             <Route path="/signup" element={<Signup />} />
 
             {/* Admin Routes */}
-            <Route path="/admin" element={<ProtectedRoute requiredType="admin"><Outlet /></ProtectedRoute>}>
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute requiredType="admin">
+                  <Outlet />
+                </ProtectedRoute>
+              }
+            >
               <Route index element={<Navigate to="/admin/dashboard" replace />} />
               <Route path="dashboard" element={<AdminDashboard />} />
               <Route path="cotacoes" element={<AdminCotacoesLista />} />
@@ -46,7 +51,14 @@ function App() {
             </Route>
 
             {/* Instalador Routes */}
-            <Route path="/instalador" element={<ProtectedRoute requiredType="instalador"><Outlet /></ProtectedRoute>}>
+            <Route
+              path="/instalador"
+              element={
+                <ProtectedRoute requiredType="instalador">
+                  <Outlet />
+                </ProtectedRoute>
+              }
+            >
               <Route index element={<Navigate to="/instalador/dashboard" replace />} />
               <Route path="dashboard" element={<InstaladorDashboard />} />
               <Route path="servicos-disponiveis" element={<InstaladorServicosDisponiveis />} />
@@ -60,7 +72,7 @@ function App() {
         </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>
-  )
+  );
 }
 
-export default App
+export default App;
