@@ -48,6 +48,7 @@ function App() {
               <Route path="cotacoes/nova" element={<AdminCotacoesNova />} />
               <Route path="servicos" element={<AdminServicosLista />} />
               <Route path="aprovacoes" element={<AdminAprovacoes />} />
+              <Route path="caixa" element={<Caixa />} />
             </Route>
 
             {/* Instalador Routes */}
