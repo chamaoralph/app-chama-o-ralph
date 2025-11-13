@@ -45,8 +45,8 @@ export default function Aprovacoes() {
         .from('servicos')
         .select(`
           *,
-          clientes!cliente_id(nome, telefone),
-          instaladores!instalador_id(usuarios!id(nome))
+          clientes(nome, telefone),
+          instaladores(usuarios(nome))
         `)
         .eq('status', 'aguardando_aprovacao')
         .order('created_at', { ascending: false })
