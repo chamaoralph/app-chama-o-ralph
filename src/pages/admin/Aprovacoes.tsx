@@ -47,7 +47,7 @@ export default function Aprovacoes() {
         .select(`
           *,
           clientes(nome, telefone),
-          usuarios:instalador_id(nome)
+          usuarios!fk_servicos_instalador(nome)
         `)
 
       // Aplicar filtro
