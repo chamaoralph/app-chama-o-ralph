@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
+import { Toaster as ShadcnToaster } from "@/components/ui/toaster";
+import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/lib/auth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 // Pages
@@ -69,7 +70,8 @@ function App() {
 
             <Route path="*" element={<NotFound />} />
           </Routes>
-          <Toaster />
+          <ShadcnToaster />
+          <SonnerToaster />
         </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>
