@@ -80,8 +80,12 @@ export default function Aprovacoes() {
   }
 
   async function aprovarServico(servicoId: string) {
+    const prevServicos = [...servicos]
     try {
       setProcessingId(servicoId)
+
+      // Otimista: atualiza UI imediatamente
+      setServicos((list) => list.map((s) => (s.id === servicoId ? { ...s, status: 'concluido' } : s)))
 
       console.log('Tentando aprovar serviço:', servicoId)
 
@@ -105,6 +109,8 @@ export default function Aprovacoes() {
       toast.success('Serviço aprovado com sucesso!')
       fetchServicos()
     } catch (error: any) {
+      // Reverte UI em caso de erro
+      setServicos(prevServicos)
       console.error('Erro ao aprovar serviço:', error)
       toast.error(error.message || 'Erro ao aprovar serviço')
     } finally {
