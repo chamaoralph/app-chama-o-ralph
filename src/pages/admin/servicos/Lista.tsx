@@ -45,13 +45,13 @@ export default function ListaServicos() {
         .select(`
           *,
           clientes(nome),
-          usuarios:instalador_id(nome)
+          usuarios!servicos_instalador_id_fkey(nome)
         `)
         .order('created_at', { ascending: false })
 
       if (error) throw error
       
-      setServicos(data || [])
+      setServicos(data as any || [])
     } catch (err) {
       console.error('Erro ao buscar serviços:', err)
       setError('Erro ao carregar serviços')
@@ -193,7 +193,7 @@ export default function ListaServicos() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
-                          {servico.instaladores?.usuarios?.nome || '-'}
+                          {servico.usuarios?.nome || '-'}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
