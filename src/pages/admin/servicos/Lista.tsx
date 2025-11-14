@@ -20,10 +20,8 @@ interface Servico {
   clientes: {
     nome: string
   }
-  instaladores?: {
-    usuarios: {
-      nome: string
-    }
+  usuarios?: {
+    nome: string
   }
 }
 
@@ -47,9 +45,7 @@ export default function ListaServicos() {
         .select(`
           *,
           clientes(nome),
-          instaladores(
-            usuarios(nome)
-          )
+          usuarios:instalador_id(nome)
         `)
         .order('created_at', { ascending: false })
 
