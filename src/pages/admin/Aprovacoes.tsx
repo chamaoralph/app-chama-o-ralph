@@ -83,18 +83,30 @@ export default function Aprovacoes() {
     try {
       setProcessingId(servicoId)
 
-      const { error } = await supabase
+      console.log('Tentando aprovar serviço:', servicoId)
+
+      const { data, error } = await supabase
         .from('servicos')
         .update({ status: 'concluido' })
         .eq('id', servicoId)
+        .select()
 
-      if (error) throw error
+      console.log('Resultado da aprovação:', { data, error })
+
+      if (error) {
+        console.error('Erro detalhado:', error)
+        throw error
+      }
+
+      if (!data || data.length === 0) {
+        throw new Error('Nenhum serviço foi atualizado. Verifique as permissões.')
+      }
 
       toast.success('Serviço aprovado com sucesso!')
       fetchServicos()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao aprovar serviço:', error)
-      toast.error('Erro ao aprovar serviço')
+      toast.error(error.message || 'Erro ao aprovar serviço')
     } finally {
       setProcessingId(null)
     }
