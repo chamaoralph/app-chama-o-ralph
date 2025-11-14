@@ -377,7 +377,11 @@ export default function Aprovacoes() {
                     {servico.status === 'aguardando_aprovacao' ? (
                       <>
                         <Button
-                          onClick={() => aprovarServico(servico.id)}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            console.log('Botão Aprovar clicado para serviço:', servico.id);
+                            aprovarServico(servico.id);
+                          }}
                           disabled={processingId === servico.id}
                           className="flex-1 bg-green-600 hover:bg-green-700"
                         >
@@ -390,7 +394,10 @@ export default function Aprovacoes() {
                         </Button>
 
                         <Button
-                          onClick={() => solicitarCorrecao(servico.id)}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            solicitarCorrecao(servico.id);
+                          }}
                           disabled={processingId === servico.id}
                           variant="destructive"
                           className="flex-1"
@@ -405,7 +412,10 @@ export default function Aprovacoes() {
                       </>
                     ) : servico.status === 'concluido' ? (
                       <Button
-                        onClick={() => desaprovarServico(servico.id)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          desaprovarServico(servico.id);
+                        }}
                         disabled={processingId === servico.id}
                         variant="outline"
                         className="flex-1"
