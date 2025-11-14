@@ -29,7 +29,7 @@ interface ServicoHistorico {
   valor: number
 }
 
-export default function ListaInstaladores() {
+export default function Instaladores() {
   const [instaladores, setInstaladores] = useState<Instalador[]>([])
   const [loading, setLoading] = useState(true)
   const [filtroStatus, setFiltroStatus] = useState('todos')
