@@ -16,11 +16,14 @@ import AdminCotacoesNova from "@/pages/admin/cotacoes/Nova";
 import AdminServicosLista from "@/pages/admin/servicos/Lista";
 import AdminAprovacoes from "@/pages/admin/Aprovacoes";
 import Caixa from "@/pages/admin/Caixa";
+import AdminInstaladores from "@/pages/admin/instaladores/Lista";
+import AdminRelatorios from "@/pages/admin/Relatorios";
 // Instalador Pages
 import InstaladorDashboard from "@/pages/instalador/Dashboard";
 import InstaladorServicosDisponiveis from "@/pages/instalador/ServicosDisponiveis";
 import InstaladorMinhaAgenda from "@/pages/instalador/MinhaAgenda";
 import InstaladorFinalizarServico from "@/pages/instalador/FinalizarServico";
+import InstaladorMeuExtrato from "@/pages/instalador/MeuExtrato";
 
 const queryClient = new QueryClient();
 
@@ -50,6 +53,8 @@ function App() {
               <Route path="servicos" element={<AdminServicosLista />} />
               <Route path="aprovacoes" element={<AdminAprovacoes />} />
               <Route path="caixa" element={<Caixa />} />
+              <Route path="instaladores" element={<AdminInstaladores />} />
+              <Route path="relatorios" element={<AdminRelatorios />} />
             </Route>
 
             {/* Instalador Routes */}
@@ -66,6 +71,7 @@ function App() {
               <Route path="servicos-disponiveis" element={<InstaladorServicosDisponiveis />} />
               <Route path="minha-agenda" element={<InstaladorMinhaAgenda />} />
               <Route path="finalizar-servico/:id" element={<InstaladorFinalizarServico />} />
+              <Route path="extrato" element={<InstaladorMeuExtrato />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
