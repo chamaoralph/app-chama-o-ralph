@@ -46,7 +46,7 @@ export default function Aprovacoes() {
         .select(`
           *,
           clientes(nome, telefone),
-          instaladores(usuarios(nome))
+          usuarios:instalador_id(nome)
         `)
         .eq('status', 'aguardando_aprovacao')
         .order('created_at', { ascending: false })
@@ -58,7 +58,7 @@ export default function Aprovacoes() {
         ...servico,
         cliente_nome: (servico.clientes as any)?.nome || '',
         cliente_telefone: (servico.clientes as any)?.telefone || '',
-        instalador_nome: (servico.instaladores as any)?.usuarios?.nome || null
+        instalador_nome: (servico.usuarios as any)?.nome || null
       })) || []
 
       setServicos(servicosFormatados)
