@@ -32,24 +32,33 @@ export default function Aprovacoes() {
   const [servicos, setServicos] = useState<Servico[]>([])
   const [loading, setLoading] = useState(true)
   const [processingId, setProcessingId] = useState<string | null>(null)
+  const [filtroStatus, setFiltroStatus] = useState<'todos' | 'pendentes' | 'aprovados'>('pendentes')
 
   useEffect(() => {
     fetchServicos()
-  }, [])
+  }, [filtroStatus])
 
   async function fetchServicos() {
     try {
       setLoading(true)
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('servicos')
         .select(`
           *,
           clientes(nome, telefone),
           usuarios:instalador_id(nome)
         `)
-        .eq('status', 'aguardando_aprovacao')
-        .order('created_at', { ascending: false })
+
+      // Aplicar filtro
+      if (filtroStatus === 'pendentes') {
+        query = query.eq('status', 'aguardando_aprovacao')
+      } else if (filtroStatus === 'aprovados') {
+        query = query.eq('status', 'concluido')
+      }
+      // 'todos' não aplica filtro
+
+      const { data, error } = await query.order('created_at', { ascending: false })
 
       if (error) throw error
 
@@ -121,6 +130,27 @@ export default function Aprovacoes() {
     }
   }
 
+  async function desaprovarServico(servicoId: string) {
+    try {
+      setProcessingId(servicoId)
+
+      const { error } = await supabase
+        .from('servicos')
+        .update({ status: 'aguardando_aprovacao' })
+        .eq('id', servicoId)
+
+      if (error) throw error
+
+      toast.success('Serviço desaprovado com sucesso!')
+      fetchServicos()
+    } catch (error) {
+      console.error('Erro ao desaprovar serviço:', error)
+      toast.error('Erro ao desaprovar serviço')
+    } finally {
+      setProcessingId(null)
+    }
+  }
+
   async function getSignedUrl(path: string) {
     try {
       const { data, error } = await supabase.storage
@@ -162,11 +192,47 @@ export default function Aprovacoes() {
   return (
     <AdminLayout>
       <div className="p-6">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Aprovações</h1>
-          <p className="text-gray-600 mt-2">
-            Serviços aguardando aprovação ({servicos.length})
-          </p>
+        <div className="mb-6 flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Aprovações</h1>
+            <p className="text-gray-600 mt-2">
+              Gerenciar serviços ({servicos.length})
+            </p>
+          </div>
+          
+          {/* Filtro de Status */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setFiltroStatus('pendentes')}
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                filtroStatus === 'pendentes'
+                  ? 'bg-yellow-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Pendentes
+            </button>
+            <button
+              onClick={() => setFiltroStatus('aprovados')}
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                filtroStatus === 'aprovados'
+                  ? 'bg-green-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Aprovados
+            </button>
+            <button
+              onClick={() => setFiltroStatus('todos')}
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                filtroStatus === 'todos'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Todos
+            </button>
+          </div>
         </div>
 
         {servicos.length === 0 ? (
@@ -296,32 +362,50 @@ export default function Aprovacoes() {
 
                   {/* Botões de Ação */}
                   <div className="border-t pt-4 flex gap-3">
-                    <Button
-                      onClick={() => aprovarServico(servico.id)}
-                      disabled={processingId === servico.id}
-                      className="flex-1 bg-green-600 hover:bg-green-700"
-                    >
-                      {processingId === servico.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : (
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                      )}
-                      Aprovar
-                    </Button>
+                    {servico.status === 'aguardando_aprovacao' ? (
+                      <>
+                        <Button
+                          onClick={() => aprovarServico(servico.id)}
+                          disabled={processingId === servico.id}
+                          className="flex-1 bg-green-600 hover:bg-green-700"
+                        >
+                          {processingId === servico.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                          )}
+                          Aprovar
+                        </Button>
 
-                    <Button
-                      onClick={() => solicitarCorrecao(servico.id)}
-                      disabled={processingId === servico.id}
-                      variant="destructive"
-                      className="flex-1"
-                    >
-                      {processingId === servico.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : (
-                        <XCircle className="h-4 w-4 mr-2" />
-                      )}
-                      Solicitar Correção
-                    </Button>
+                        <Button
+                          onClick={() => solicitarCorrecao(servico.id)}
+                          disabled={processingId === servico.id}
+                          variant="destructive"
+                          className="flex-1"
+                        >
+                          {processingId === servico.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <XCircle className="h-4 w-4 mr-2" />
+                          )}
+                          Solicitar Correção
+                        </Button>
+                      </>
+                    ) : servico.status === 'concluido' ? (
+                      <Button
+                        onClick={() => desaprovarServico(servico.id)}
+                        disabled={processingId === servico.id}
+                        variant="outline"
+                        className="flex-1"
+                      >
+                        {processingId === servico.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <XCircle className="h-4 w-4 mr-2" />
+                        )}
+                        Desaprovar
+                      </Button>
+                    ) : null}
                   </div>
                 </CardContent>
               </Card>

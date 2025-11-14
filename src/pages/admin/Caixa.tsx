@@ -47,11 +47,15 @@ export default function Caixa() {
     .filter((l) => l.tipo === "receita")
     .reduce((acc, l) => acc + parseFloat(l.valor), 0);
 
-  const totalDespesas = lancamentos
-    .filter((l) => l.tipo === "despesa")
+  const totalDespesasGerais = lancamentos
+    .filter((l) => l.tipo === "despesa" && l.categoria !== "Pagamento Instalador")
     .reduce((acc, l) => acc + parseFloat(l.valor), 0);
 
-  const saldo = totalReceitas - totalDespesas;
+  const totalInstaladores = lancamentos
+    .filter((l) => l.categoria === "Pagamento Instalador" || l.categoria === "Reembolso Materiais")
+    .reduce((acc, l) => acc + parseFloat(l.valor), 0);
+
+  const saldo = totalReceitas - totalDespesasGerais - totalInstaladores;
 
   return (
     <AdminLayout>
@@ -71,15 +75,20 @@ export default function Caixa() {
         </div>
 
         {/* Cards de Resumo */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-4 gap-4 mb-6">
           <div className="bg-green-50 border-2 border-green-200 rounded-lg p-6">
             <p className="text-sm text-green-600 font-medium mb-1">RECEITAS</p>
             <p className="text-3xl font-bold text-green-700">R$ {totalReceitas.toFixed(2)}</p>
           </div>
 
           <div className="bg-red-50 border-2 border-red-200 rounded-lg p-6">
-            <p className="text-sm text-red-600 font-medium mb-1">DESPESAS</p>
-            <p className="text-3xl font-bold text-red-700">R$ {totalDespesas.toFixed(2)}</p>
+            <p className="text-sm text-red-600 font-medium mb-1">DESPESAS GERAIS</p>
+            <p className="text-3xl font-bold text-red-700">R$ {totalDespesasGerais.toFixed(2)}</p>
+          </div>
+
+          <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-6">
+            <p className="text-sm text-purple-600 font-medium mb-1">INSTALADORES</p>
+            <p className="text-3xl font-bold text-purple-700">R$ {totalInstaladores.toFixed(2)}</p>
           </div>
 
           <div
