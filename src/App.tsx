@@ -16,7 +16,7 @@ import AdminCotacoesNova from "@/pages/admin/cotacoes/Nova";
 import AdminServicosLista from "@/pages/admin/servicos/Lista";
 import AdminAprovacoes from "@/pages/admin/Aprovacoes";
 import Caixa from "@/pages/admin/Caixa";
-import AdminInstaladores from "@/pages/admin/instaladores/Lista";
+import AdminInstaladores from "@/pages/admin/Instaladores";
 import AdminRelatorios from "@/pages/admin/Relatorios";
 // Instalador Pages
 import InstaladorDashboard from "@/pages/instalador/Dashboard";
