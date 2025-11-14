@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 
+// Categorias consideradas como custos de instaladores
+const CATEGORIAS_INSTALADORES = new Set(["Pagamento Instalador", "Reembolso Materiais"]);
+
 export default function Caixa() {
   const [lancamentos, setLancamentos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,8 +27,11 @@ export default function Caixa() {
     setLoading(true);
     try {
       const [ano, mes] = filtroMes.split("-");
+      const year = Number(ano);
+      const monthIndex = Number(mes) - 1;
       const primeiroDia = `${ano}-${mes}-01`;
-      const ultimoDia = `${ano}-${mes}-${new Date(parseInt(ano), parseInt(mes), 0).getDate()}`;
+      const lastDay = new Date(year, monthIndex + 1, 0).getDate();
+      const ultimoDia = `${ano}-${mes}-${String(lastDay).padStart(2, "0")}`;
 
       const { data, error } = await supabase
         .from("lancamentos_caixa")
@@ -45,15 +51,15 @@ export default function Caixa() {
 
   const totalReceitas = lancamentos
     .filter((l) => l.tipo === "receita")
-    .reduce((acc, l) => acc + parseFloat(l.valor), 0);
+    .reduce((acc, l) => acc + Number(l.valor), 0);
 
   const totalDespesasGerais = lancamentos
-    .filter((l) => l.tipo === "despesa" && l.categoria !== "Pagamento Instalador")
-    .reduce((acc, l) => acc + parseFloat(l.valor), 0);
+    .filter((l) => l.tipo === "despesa" && !CATEGORIAS_INSTALADORES.has(l.categoria))
+    .reduce((acc, l) => acc + Number(l.valor), 0);
 
   const totalInstaladores = lancamentos
-    .filter((l) => l.categoria === "Pagamento Instalador" || l.categoria === "Reembolso Materiais")
-    .reduce((acc, l) => acc + parseFloat(l.valor), 0);
+    .filter((l) => CATEGORIAS_INSTALADORES.has(l.categoria))
+    .reduce((acc, l) => acc + Number(l.valor), 0);
 
   const saldo = totalReceitas - totalDespesasGerais - totalInstaladores;
 
