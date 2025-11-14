@@ -45,7 +45,7 @@ export default function ListaServicos() {
         .select(`
           *,
           clientes(nome),
-          usuarios!servicos_instalador_id_fkey(nome)
+          usuarios!fk_servicos_instalador(nome)
         `)
         .order('created_at', { ascending: false })
 
