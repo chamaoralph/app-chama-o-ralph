@@ -40,8 +40,8 @@ export function InstaladorLayout({ children }: InstaladorLayoutProps) {
           <Link to="/instalador/minha-agenda" className="block px-4 py-2 rounded hover:bg-blue-800 transition-colors">
             📅 Minha Agenda
           </Link>
-          <Link to="/instalador/ganhos" className="block px-4 py-2 rounded hover:bg-blue-800 transition-colors">
-            💰 Meus Ganhos
+          <Link to="/instalador/extrato" className="block px-4 py-2 rounded hover:bg-blue-800 transition-colors">
+            💰 Meu Extrato
           </Link>
           <Link to="/instalador/treinamentos" className="block px-4 py-2 rounded hover:bg-blue-800 transition-colors">
             🎓 Treinamentos
