@@ -18,6 +18,7 @@ import AdminAprovacoes from "@/pages/admin/Aprovacoes";
 import Caixa from "@/pages/admin/Caixa";
 import AdminInstaladores from "@/pages/admin/Instaladores";
 import AdminRelatorios from "@/pages/admin/Relatorios";
+import AdminDespesas from "@/pages/admin/Despesas";
 // Instalador Pages
 import InstaladorDashboard from "@/pages/instalador/Dashboard";
 import InstaladorServicosDisponiveis from "@/pages/instalador/ServicosDisponiveis";
@@ -53,6 +54,7 @@ function App() {
               <Route path="servicos" element={<AdminServicosLista />} />
               <Route path="aprovacoes" element={<AdminAprovacoes />} />
               <Route path="caixa" element={<Caixa />} />
+              <Route path="despesas" element={<AdminDespesas />} />
               <Route path="instaladores" element={<AdminInstaladores />} />
               <Route path="relatorios" element={<AdminRelatorios />} />
             </Route>
