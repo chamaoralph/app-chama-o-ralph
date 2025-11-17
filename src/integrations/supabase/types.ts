@@ -330,6 +330,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_servicos_instalador"
+            columns: ["instalador_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "servicos_cliente_id_fkey"
             columns: ["cliente_id"]
             isOneToOne: false
@@ -421,6 +428,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_empresa_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
