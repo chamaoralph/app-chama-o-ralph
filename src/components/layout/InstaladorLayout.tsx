@@ -46,6 +46,9 @@ export function InstaladorLayout({ children }: InstaladorLayoutProps) {
           <Link to="/instalador/conhecimento" className="block px-4 py-2 rounded hover:bg-blue-800 transition-colors">
             📚 Base de Conhecimento
           </Link>
+          <Link to="/instalador/meus-certificados" className="block px-4 py-2 rounded hover:bg-blue-800 transition-colors">
+            🏆 Minhas Certificações
+          </Link>
         </nav>
 
         <div className="p-4 border-t border-blue-800">

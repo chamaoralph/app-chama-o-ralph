@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      alternativas: {
+        Row: {
+          correta: boolean
+          created_at: string | null
+          id: string
+          ordem: number
+          pergunta_id: string
+          texto: string
+        }
+        Insert: {
+          correta?: boolean
+          created_at?: string | null
+          id?: string
+          ordem: number
+          pergunta_id: string
+          texto: string
+        }
+        Update: {
+          correta?: boolean
+          created_at?: string | null
+          id?: string
+          ordem?: number
+          pergunta_id?: string
+          texto?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alternativas_pergunta_id_fkey"
+            columns: ["pergunta_id"]
+            isOneToOne: false
+            referencedRelation: "perguntas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       artigos: {
         Row: {
           categoria: string
@@ -54,6 +89,71 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      certificacoes: {
+        Row: {
+          ativa: boolean | null
+          created_at: string | null
+          empresa_id: string
+          id: string
+          instalador_id: string
+          questionario_id: string
+          tentativa_id: string
+          tipos_servico_liberados: string[]
+          validade_ate: string | null
+        }
+        Insert: {
+          ativa?: boolean | null
+          created_at?: string | null
+          empresa_id: string
+          id?: string
+          instalador_id: string
+          questionario_id: string
+          tentativa_id: string
+          tipos_servico_liberados: string[]
+          validade_ate?: string | null
+        }
+        Update: {
+          ativa?: boolean | null
+          created_at?: string | null
+          empresa_id?: string
+          id?: string
+          instalador_id?: string
+          questionario_id?: string
+          tentativa_id?: string
+          tipos_servico_liberados?: string[]
+          validade_ate?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "certificacoes_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificacoes_instalador_id_fkey"
+            columns: ["instalador_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificacoes_questionario_id_fkey"
+            columns: ["questionario_id"]
+            isOneToOne: false
+            referencedRelation: "questionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificacoes_tentativa_id_fkey"
+            columns: ["tentativa_id"]
+            isOneToOne: false
+            referencedRelation: "tentativas"
             referencedColumns: ["id"]
           },
         ]
@@ -308,6 +408,187 @@ export type Database = {
           },
         ]
       }
+      perguntas: {
+        Row: {
+          created_at: string | null
+          enunciado: string
+          id: string
+          ordem: number
+          pontos: number | null
+          questionario_id: string
+          tipo: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          enunciado: string
+          id?: string
+          ordem: number
+          pontos?: number | null
+          questionario_id: string
+          tipo?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          enunciado?: string
+          id?: string
+          ordem?: number
+          pontos?: number | null
+          questionario_id?: string
+          tipo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "perguntas_questionario_id_fkey"
+            columns: ["questionario_id"]
+            isOneToOne: false
+            referencedRelation: "questionarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      progresso_visualizacao: {
+        Row: {
+          conteudo_id: string
+          created_at: string | null
+          id: string
+          instalador_id: string
+          tempo_visualizacao_segundos: number | null
+          tipo_conteudo: string
+          ultima_visualizacao: string | null
+          visualizado_completo: boolean | null
+        }
+        Insert: {
+          conteudo_id: string
+          created_at?: string | null
+          id?: string
+          instalador_id: string
+          tempo_visualizacao_segundos?: number | null
+          tipo_conteudo: string
+          ultima_visualizacao?: string | null
+          visualizado_completo?: boolean | null
+        }
+        Update: {
+          conteudo_id?: string
+          created_at?: string | null
+          id?: string
+          instalador_id?: string
+          tempo_visualizacao_segundos?: number | null
+          tipo_conteudo?: string
+          ultima_visualizacao?: string | null
+          visualizado_completo?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "progresso_visualizacao_instalador_id_fkey"
+            columns: ["instalador_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      questionarios: {
+        Row: {
+          ativo: boolean | null
+          conteudo_id: string
+          created_at: string | null
+          empresa_id: string
+          id: string
+          nota_minima: number | null
+          tempo_limite_minutos: number | null
+          tentativas_maximas: number | null
+          tipo_conteudo: string
+          tipos_servico_liberados: string[]
+          titulo: string
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          conteudo_id: string
+          created_at?: string | null
+          empresa_id: string
+          id?: string
+          nota_minima?: number | null
+          tempo_limite_minutos?: number | null
+          tentativas_maximas?: number | null
+          tipo_conteudo: string
+          tipos_servico_liberados: string[]
+          titulo: string
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          conteudo_id?: string
+          created_at?: string | null
+          empresa_id?: string
+          id?: string
+          nota_minima?: number | null
+          tempo_limite_minutos?: number | null
+          tentativas_maximas?: number | null
+          tipo_conteudo?: string
+          tipos_servico_liberados?: string[]
+          titulo?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "questionarios_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      respostas_tentativa: {
+        Row: {
+          alternativa_escolhida_id: string
+          correta: boolean
+          created_at: string | null
+          id: string
+          pergunta_id: string
+          tentativa_id: string
+        }
+        Insert: {
+          alternativa_escolhida_id: string
+          correta: boolean
+          created_at?: string | null
+          id?: string
+          pergunta_id: string
+          tentativa_id: string
+        }
+        Update: {
+          alternativa_escolhida_id?: string
+          correta?: boolean
+          created_at?: string | null
+          id?: string
+          pergunta_id?: string
+          tentativa_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "respostas_tentativa_alternativa_escolhida_id_fkey"
+            columns: ["alternativa_escolhida_id"]
+            isOneToOne: false
+            referencedRelation: "alternativas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "respostas_tentativa_pergunta_id_fkey"
+            columns: ["pergunta_id"]
+            isOneToOne: false
+            referencedRelation: "perguntas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "respostas_tentativa_tentativa_id_fkey"
+            columns: ["tentativa_id"]
+            isOneToOne: false
+            referencedRelation: "tentativas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       servicos: {
         Row: {
           cliente_id: string
@@ -406,6 +687,73 @@ export type Database = {
             columns: ["instalador_id"]
             isOneToOne: false
             referencedRelation: "instaladores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tentativas: {
+        Row: {
+          acertos: number
+          aprovado: boolean
+          created_at: string | null
+          empresa_id: string
+          finalizada_em: string | null
+          id: string
+          iniciada_em: string | null
+          instalador_id: string
+          nota_obtida: number
+          questionario_id: string
+          tempo_gasto_minutos: number | null
+          total_perguntas: number
+        }
+        Insert: {
+          acertos: number
+          aprovado: boolean
+          created_at?: string | null
+          empresa_id: string
+          finalizada_em?: string | null
+          id?: string
+          iniciada_em?: string | null
+          instalador_id: string
+          nota_obtida: number
+          questionario_id: string
+          tempo_gasto_minutos?: number | null
+          total_perguntas: number
+        }
+        Update: {
+          acertos?: number
+          aprovado?: boolean
+          created_at?: string | null
+          empresa_id?: string
+          finalizada_em?: string | null
+          id?: string
+          iniciada_em?: string | null
+          instalador_id?: string
+          nota_obtida?: number
+          questionario_id?: string
+          tempo_gasto_minutos?: number | null
+          total_perguntas?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tentativas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tentativas_instalador_id_fkey"
+            columns: ["instalador_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tentativas_questionario_id_fkey"
+            columns: ["questionario_id"]
+            isOneToOne: false
+            referencedRelation: "questionarios"
             referencedColumns: ["id"]
           },
         ]
@@ -525,6 +873,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      instalador_certificado_para_tipo: {
+        Args: { _instalador_id: string; _tipos_servico: string[] }
         Returns: boolean
       }
     }

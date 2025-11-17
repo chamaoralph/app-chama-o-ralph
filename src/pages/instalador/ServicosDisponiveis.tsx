@@ -1,10 +1,15 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { InstaladorLayout } from '@/components/layout/InstaladorLayout'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/lib/auth'
 import { useToast } from '@/hooks/use-toast'
+import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Lock } from 'lucide-react'
 
 interface Servico {
   id: string
@@ -21,11 +26,34 @@ interface Servico {
 }
 
 export default function ServicosDisponiveis() {
+  const navigate = useNavigate()
   const [servicos, setServicos] = useState<Servico[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { user } = useAuth()
   const { toast } = useToast()
+
+  // Buscar certificações do instalador
+  const { data: certificacoes } = useQuery({
+    queryKey: ['minhas-certificacoes', user?.id],
+    queryFn: async () => {
+      if (!user) return new Set<string>()
+      
+      const { data } = await supabase
+        .from('certificacoes')
+        .select('tipos_servico_liberados')
+        .eq('instalador_id', user.id)
+        .eq('ativa', true)
+      
+      const tiposCertificados = new Set<string>()
+      data?.forEach(cert => {
+        cert.tipos_servico_liberados.forEach((tipo: string) => tiposCertificados.add(tipo))
+      })
+      
+      return tiposCertificados
+    },
+    enabled: !!user,
+  })
 
   useEffect(() => {
     fetchServicos()

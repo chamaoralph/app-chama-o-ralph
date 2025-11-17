@@ -49,6 +49,12 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           <Link to="/admin/conteudo" className="block px-4 py-2 rounded hover:bg-gray-800 transition-colors">
             📚 Gerenciar Conteúdo
           </Link>
+          <Link to="/admin/questionarios" className="block px-4 py-2 rounded hover:bg-gray-800 transition-colors">
+            📝 Questionários
+          </Link>
+          <Link to="/admin/certificacoes" className="block px-4 py-2 rounded hover:bg-gray-800 transition-colors">
+            🏆 Certificações
+          </Link>
           <Link to="/admin/relatorios" className="block px-4 py-2 rounded hover:bg-gray-800 transition-colors">
             📊 Relatórios
           </Link>
