@@ -28,6 +28,13 @@ import InstaladorMeuExtrato from "@/pages/instalador/MeuExtrato";
 import InstaladorBaseConhecimento from "@/pages/instalador/BaseConhecimento";
 import AdminGerenciarConteudo from "@/pages/admin/GerenciarConteudo";
 
+const AdminQuestionarios = lazy(() => import('./pages/admin/Questionarios'));
+const AdminGerenciarPerguntas = lazy(() => import('./pages/admin/GerenciarPerguntas'));
+const AdminCertificacoes = lazy(() => import('./pages/admin/CertificacoesInstaladores'));
+const InstaladorFazerQuestionario = lazy(() => import('./pages/instalador/FazerQuestionario'));
+const InstaladorResultado = lazy(() => import('./pages/instalador/ResultadoQuestionario'));
+const InstaladorCertificados = lazy(() => import('./pages/instalador/MeusCertificados'));
+
 const queryClient = new QueryClient();
 
 function App() {
@@ -60,6 +67,9 @@ function App() {
               <Route path="instaladores" element={<AdminInstaladores />} />
               <Route path="relatorios" element={<AdminRelatorios />} />
               <Route path="conteudo" element={<AdminGerenciarConteudo />} />
+              <Route path="questionarios" element={<Suspense><AdminQuestionarios /></Suspense>} />
+              <Route path="questionarios/:id/perguntas" element={<Suspense><AdminGerenciarPerguntas /></Suspense>} />
+              <Route path="certificacoes" element={<Suspense><AdminCertificacoes /></Suspense>} />
             </Route>
 
             {/* Instalador Routes */}
@@ -78,6 +88,9 @@ function App() {
               <Route path="finalizar-servico/:id" element={<InstaladorFinalizarServico />} />
               <Route path="extrato" element={<InstaladorMeuExtrato />} />
               <Route path="conhecimento" element={<InstaladorBaseConhecimento />} />
+              <Route path="fazer-questionario/:id" element={<Suspense><InstaladorFazerQuestionario /></Suspense>} />
+              <Route path="resultado-questionario/:tentativaId" element={<Suspense><InstaladorResultado /></Suspense>} />
+              <Route path="meus-certificados" element={<Suspense><InstaladorCertificados /></Suspense>} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
