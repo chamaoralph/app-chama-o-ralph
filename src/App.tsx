@@ -25,6 +25,8 @@ import InstaladorServicosDisponiveis from "@/pages/instalador/ServicosDisponivei
 import InstaladorMinhaAgenda from "@/pages/instalador/MinhaAgenda";
 import InstaladorFinalizarServico from "@/pages/instalador/FinalizarServico";
 import InstaladorMeuExtrato from "@/pages/instalador/MeuExtrato";
+import InstaladorBaseConhecimento from "@/pages/instalador/BaseConhecimento";
+import AdminGerenciarConteudo from "@/pages/admin/GerenciarConteudo";
 
 const queryClient = new QueryClient();
 
@@ -57,6 +59,7 @@ function App() {
               <Route path="despesas" element={<AdminDespesas />} />
               <Route path="instaladores" element={<AdminInstaladores />} />
               <Route path="relatorios" element={<AdminRelatorios />} />
+              <Route path="conteudo" element={<AdminGerenciarConteudo />} />
             </Route>
 
             {/* Instalador Routes */}
@@ -74,6 +77,7 @@ function App() {
               <Route path="minha-agenda" element={<InstaladorMinhaAgenda />} />
               <Route path="finalizar-servico/:id" element={<InstaladorFinalizarServico />} />
               <Route path="extrato" element={<InstaladorMeuExtrato />} />
+              <Route path="conhecimento" element={<InstaladorBaseConhecimento />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
