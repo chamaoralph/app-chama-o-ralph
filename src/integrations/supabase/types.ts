@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      artigos: {
+        Row: {
+          categoria: string
+          conteudo: string
+          created_at: string | null
+          empresa_id: string
+          id: string
+          publicado: boolean | null
+          tags: string[] | null
+          titulo: string
+          updated_at: string | null
+        }
+        Insert: {
+          categoria: string
+          conteudo: string
+          created_at?: string | null
+          empresa_id: string
+          id?: string
+          publicado?: boolean | null
+          tags?: string[] | null
+          titulo: string
+          updated_at?: string | null
+        }
+        Update: {
+          categoria?: string
+          conteudo?: string
+          created_at?: string | null
+          empresa_id?: string
+          id?: string
+          publicado?: boolean | null
+          tags?: string[] | null
+          titulo?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artigos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clientes: {
         Row: {
           ativo: boolean | null
@@ -362,6 +406,53 @@ export type Database = {
             columns: ["instalador_id"]
             isOneToOne: false
             referencedRelation: "instaladores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      treinamentos: {
+        Row: {
+          categoria: string | null
+          created_at: string | null
+          descricao: string | null
+          duracao_minutos: number | null
+          empresa_id: string
+          id: string
+          publicado: boolean | null
+          titulo: string
+          updated_at: string | null
+          video_url: string
+        }
+        Insert: {
+          categoria?: string | null
+          created_at?: string | null
+          descricao?: string | null
+          duracao_minutos?: number | null
+          empresa_id: string
+          id?: string
+          publicado?: boolean | null
+          titulo: string
+          updated_at?: string | null
+          video_url: string
+        }
+        Update: {
+          categoria?: string | null
+          created_at?: string | null
+          descricao?: string | null
+          duracao_minutos?: number | null
+          empresa_id?: string
+          id?: string
+          publicado?: boolean | null
+          titulo?: string
+          updated_at?: string | null
+          video_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "treinamentos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
         ]
