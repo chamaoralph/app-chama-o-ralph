@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react'
 import { InstaladorLayout } from '@/components/layout/InstaladorLayout'
 import { supabase } from '@/integrations/supabase/client'
-import { DollarSign, Package, TrendingUp, CheckCircle } from 'lucide-react'
+import { DollarSign, Package, TrendingUp, CheckCircle, FileDown } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { subDays, format } from 'date-fns'
 
 interface Servico {
   id: string
@@ -20,10 +23,7 @@ export default function MeuExtrato() {
   const [servicos, setServicos] = useState<Servico[]>([])
   const [loading, setLoading] = useState(true)
   const [filtroStatus, setFiltroStatus] = useState('todos')
-  const [filtroPeriodo, setFiltroPeriodo] = useState(() => {
-    const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  })
+  const [tipoPeriodo, setTipoPeriodo] = useState('ultimo_mes')
 
   // Cálculos dos cards
   const aReceber = servicos
@@ -43,7 +43,7 @@ export default function MeuExtrato() {
 
   useEffect(() => {
     carregarServicos()
-  }, [filtroStatus, filtroPeriodo])
+  }, [filtroStatus, tipoPeriodo])
 
   async function carregarServicos() {
     try {
@@ -65,14 +65,31 @@ export default function MeuExtrato() {
       }
 
       // Aplicar filtro de período
-      if (filtroPeriodo) {
-        const [year, month] = filtroPeriodo.split('-')
-        const startDate = new Date(parseInt(year), parseInt(month) - 1, 1)
-        const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59)
-        
+      const hoje = new Date()
+      let dataInicio: Date | null = null
+      
+      switch(tipoPeriodo) {
+        case 'ultima_semana':
+          dataInicio = subDays(hoje, 7)
+          break
+        case 'ultimo_mes':
+          dataInicio = subDays(hoje, 30)
+          break
+        case 'ultimos_3_meses':
+          dataInicio = subDays(hoje, 90)
+          break
+        case 'ultimos_6_meses':
+          dataInicio = subDays(hoje, 180)
+          break
+        case 'todos':
+          dataInicio = null
+          break
+      }
+      
+      if (dataInicio) {
         query = query
-          .gte('data_servico_agendada', startDate.toISOString())
-          .lte('data_servico_agendada', endDate.toISOString())
+          .gte('data_servico_agendada', dataInicio.toISOString())
+          .lte('data_servico_agendada', hoje.toISOString())
       }
 
       const { data, error } = await query.order('data_servico_agendada', { ascending: false })
@@ -108,6 +125,36 @@ export default function MeuExtrato() {
     }
     const config = statusMap[status] || { label: status, variant: 'outline' }
     return <Badge variant={config.variant}>{config.label}</Badge>
+  }
+
+  function exportarCSV() {
+    const headers = ['Data', 'Código', 'Cliente', 'Status', 'Tipo de Serviço', 'Mão de Obra', 'Reembolso', 'Total']
+    
+    const rows = servicosFiltrados.map(s => [
+      format(new Date(s.data_servico_agendada), 'dd/MM/yyyy'),
+      s.codigo,
+      s.cliente_nome,
+      s.status,
+      s.tipo_servico.join('; '),
+      s.valor_mao_obra_instalador.toFixed(2),
+      s.valor_reembolso_despesas.toFixed(2),
+      (s.valor_mao_obra_instalador + s.valor_reembolso_despesas).toFixed(2)
+    ])
+    
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n')
+    
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `extrato_servicos_${format(new Date(), 'yyyy-MM-dd')}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
   const servicosFiltrados = servicos
@@ -158,31 +205,47 @@ export default function MeuExtrato() {
 
         {/* Filtros */}
         <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex flex-wrap gap-4">
+          <div className="flex flex-wrap gap-4 items-end">
             <div className="flex-1 min-w-[200px]">
               <label className="block text-sm font-medium mb-2">Status</label>
-              <select
-                value={filtroStatus}
-                onChange={(e) => setFiltroStatus(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md"
-              >
-                <option value="todos">Todos</option>
-                <option value="atribuido">Atribuído</option>
-                <option value="em_andamento">Em Andamento</option>
-                <option value="aguardando_aprovacao">Aguardando Aprovação</option>
-                <option value="concluido">Concluído</option>
-              </select>
+              <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="atribuido">Atribuído</SelectItem>
+                  <SelectItem value="em_andamento">Em Andamento</SelectItem>
+                  <SelectItem value="aguardando_aprovacao">Aguardando Aprovação</SelectItem>
+                  <SelectItem value="concluido">Concluído</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="flex-1 min-w-[200px]">
               <label className="block text-sm font-medium mb-2">Período</label>
-              <input
-                type="month"
-                value={filtroPeriodo}
-                onChange={(e) => setFiltroPeriodo(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md"
-              />
+              <Select value={tipoPeriodo} onValueChange={setTipoPeriodo}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o período" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ultima_semana">Última Semana</SelectItem>
+                  <SelectItem value="ultimo_mes">Último Mês</SelectItem>
+                  <SelectItem value="ultimos_3_meses">Últimos 3 Meses</SelectItem>
+                  <SelectItem value="ultimos_6_meses">Últimos 6 Meses</SelectItem>
+                  <SelectItem value="todos">Todos os Períodos</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+
+            <Button 
+              onClick={exportarCSV}
+              className="flex items-center gap-2"
+              disabled={servicosFiltrados.length === 0}
+            >
+              <FileDown className="h-4 w-4" />
+              Exportar CSV
+            </Button>
           </div>
         </div>
 
