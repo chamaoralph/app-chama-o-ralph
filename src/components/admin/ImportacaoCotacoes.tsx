@@ -11,7 +11,9 @@ import * as XLSX from 'xlsx'
 interface CotacaoImportada {
   linha: number
   cliente_nome: string
+  cliente_idade?: string
   cliente_telefone: string
+  cliente_bairro?: string
   tipo_servico: string
   data_servico_desejada: string
   valor_estimado: string
@@ -31,12 +33,14 @@ export function ImportacaoCotacoes() {
     const template = [
       {
         'Nome do Cliente': 'João Silva',
+        'Idade': '25',
         'Telefone': '11999999999',
+        'Origem Lead': 'Instagram',
+        'Ocasião': 'Aniversário',
+        'Bairro': 'Centro',
         'Tipo de Serviço': 'Balões, Flores',
         'Data do Serviço (DD/MM/AAAA)': '25/12/2025',
         'Valor Estimado': '500.00',
-        'Ocasião': 'Aniversário',
-        'Origem Lead': 'Instagram',
       }
     ]
 
@@ -71,7 +75,9 @@ export function ImportacaoCotacoes() {
         return {
           linha: index + 2,
           cliente_nome: row['Nome do Cliente'] || '',
+          cliente_idade: row['Idade'] ? String(row['Idade']) : undefined,
           cliente_telefone: String(row['Telefone'] || ''),
+          cliente_bairro: row['Bairro'] || undefined,
           tipo_servico: row['Tipo de Serviço'] || '',
           data_servico_desejada: row['Data do Serviço (DD/MM/AAAA)'] || '',
           valor_estimado: String(row['Valor Estimado'] || ''),
@@ -158,6 +164,8 @@ export function ImportacaoCotacoes() {
               .insert({
                 nome: cotacao.cliente_nome,
                 telefone: cotacao.cliente_telefone,
+                idade: cotacao.cliente_idade ? parseInt(cotacao.cliente_idade) : null,
+                bairro: cotacao.cliente_bairro,
                 empresa_id: userData.empresa_id,
                 origem_lead: cotacao.origem_lead || 'Importação em Massa',
               })
@@ -292,7 +300,9 @@ export function ImportacaoCotacoes() {
                       <TableHead className="w-12">Linha</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Cliente</TableHead>
+                      <TableHead>Idade</TableHead>
                       <TableHead>Telefone</TableHead>
+                      <TableHead>Bairro</TableHead>
                       <TableHead>Serviço</TableHead>
                       <TableHead>Data</TableHead>
                       <TableHead>Valor</TableHead>
@@ -317,7 +327,9 @@ export function ImportacaoCotacoes() {
                           )}
                         </TableCell>
                         <TableCell>{cotacao.cliente_nome}</TableCell>
+                        <TableCell>{cotacao.cliente_idade || '-'}</TableCell>
                         <TableCell>{cotacao.cliente_telefone}</TableCell>
+                        <TableCell>{cotacao.cliente_bairro || '-'}</TableCell>
                         <TableCell className="max-w-[200px] truncate">{cotacao.tipo_servico}</TableCell>
                         <TableCell>{cotacao.data_servico_desejada}</TableCell>
                         <TableCell>R$ {cotacao.valor_estimado}</TableCell>
@@ -351,6 +363,7 @@ export function ImportacaoCotacoes() {
           <ul className="space-y-2 text-sm text-blue-900">
             <li>• Baixe o template para ver o formato correto do arquivo</li>
             <li>• Preencha todas as colunas obrigatórias: Nome, Telefone, Tipo de Serviço, Data e Valor</li>
+            <li>• Colunas opcionais: Idade, Bairro, Ocasião e Origem Lead</li>
             <li>• Use o formato DD/MM/AAAA para datas (exemplo: 25/12/2025)</li>
             <li>• Para múltiplos tipos de serviço, separe por vírgula (exemplo: Balões, Flores)</li>
             <li>• O sistema criará automaticamente os clientes que não existirem</li>
