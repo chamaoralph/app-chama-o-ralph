@@ -71,8 +71,6 @@ export function ImportacaoCotacoes() {
         if (!row['Nome do Cliente']) erros.push('Nome do cliente obrigatório')
         if (!row['Telefone']) erros.push('Telefone obrigatório')
         if (!row['Tipo de Serviço']) erros.push('Tipo de serviço obrigatório')
-        if (!row['Data do Serviço (DD/MM/AAAA)']) erros.push('Data obrigatória')
-        if (!row['Valor Estimado']) erros.push('Valor obrigatório')
 
         return {
           linha: index + 2,
@@ -110,9 +108,21 @@ export function ImportacaoCotacoes() {
     }
   }
 
-  const converterData = (dataStr: string): string => {
-    const partes = dataStr.split('/')
-    if (partes.length !== 3) return new Date().toISOString().split('T')[0]
+  const converterData = (dataStr: string | number): string | null => {
+    if (!dataStr) return null
+    
+    // Se for número (serial do Excel), converter para data
+    if (typeof dataStr === 'number') {
+      const date = new Date((dataStr - 25569) * 86400 * 1000)
+      const dia = String(date.getDate()).padStart(2, '0')
+      const mes = String(date.getMonth() + 1).padStart(2, '0')
+      const ano = date.getFullYear()
+      return `${ano}-${mes}-${dia}`
+    }
+    
+    // Se for string no formato DD/MM/AAAA
+    const partes = String(dataStr).split('/')
+    if (partes.length !== 3) return null
     
     const [dia, mes, ano] = partes
     return `${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`
@@ -189,17 +199,27 @@ export function ImportacaoCotacoes() {
             ? converterData(cotacao.data_cotacao) 
             : new Date().toISOString().split('T')[0]
 
+          const dataServicoDesejada = cotacao.data_servico_desejada 
+            ? converterData(cotacao.data_servico_desejada)
+            : null
+
+          const valorEstimado = cotacao.valor_estimado 
+            ? parseFloat(cotacao.valor_estimado)
+            : 0
+
+          const status = dataServicoDesejada ? 'confirmada' : 'pendente'
+
           const { error: cotacaoError } = await supabase
             .from('cotacoes')
             .insert({
               cliente_id: clienteId,
               empresa_id: userData.empresa_id,
               tipo_servico: tiposServico,
-              data_servico_desejada: converterData(cotacao.data_servico_desejada),
-              valor_estimado: parseFloat(cotacao.valor_estimado),
+              data_servico_desejada: dataServicoDesejada,
+              valor_estimado: valorEstimado,
               ocasiao: cotacao.ocasiao,
               origem_lead: cotacao.origem_lead,
-              status: 'enviada',
+              status: status,
               created_at: dataCotacao,
             })
 
