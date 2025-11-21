@@ -10,6 +10,7 @@ import * as XLSX from 'xlsx'
 
 interface CotacaoImportada {
   linha: number
+  data_cotacao?: string
   cliente_nome: string
   cliente_idade?: string
   cliente_telefone: string
@@ -32,6 +33,7 @@ export function ImportacaoCotacoes() {
   const baixarTemplate = () => {
     const template = [
       {
+        'Data da Cotação (DD/MM/AAAA)': '20/01/2025',
         'Nome do Cliente': 'João Silva',
         'Idade': '25',
         'Telefone': '11999999999',
@@ -74,6 +76,7 @@ export function ImportacaoCotacoes() {
 
         return {
           linha: index + 2,
+          data_cotacao: row['Data da Cotação (DD/MM/AAAA)'] || undefined,
           cliente_nome: row['Nome do Cliente'] || '',
           cliente_idade: row['Idade'] ? String(row['Idade']) : undefined,
           cliente_telefone: String(row['Telefone'] || ''),
@@ -182,6 +185,10 @@ export function ImportacaoCotacoes() {
             .map(t => t.trim())
             .filter(t => t.length > 0)
 
+          const dataCotacao = cotacao.data_cotacao 
+            ? converterData(cotacao.data_cotacao) 
+            : new Date().toISOString().split('T')[0]
+
           const { error: cotacaoError } = await supabase
             .from('cotacoes')
             .insert({
@@ -193,6 +200,7 @@ export function ImportacaoCotacoes() {
               ocasiao: cotacao.ocasiao,
               origem_lead: cotacao.origem_lead,
               status: 'enviada',
+              created_at: dataCotacao,
             })
 
           if (cotacaoError) throw cotacaoError
@@ -299,12 +307,13 @@ export function ImportacaoCotacoes() {
                     <TableRow>
                       <TableHead className="w-12">Linha</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Data Cotação</TableHead>
                       <TableHead>Cliente</TableHead>
                       <TableHead>Idade</TableHead>
                       <TableHead>Telefone</TableHead>
                       <TableHead>Bairro</TableHead>
                       <TableHead>Serviço</TableHead>
-                      <TableHead>Data</TableHead>
+                      <TableHead>Data Serviço</TableHead>
                       <TableHead>Valor</TableHead>
                       <TableHead>Erros</TableHead>
                     </TableRow>
@@ -326,6 +335,7 @@ export function ImportacaoCotacoes() {
                             </Badge>
                           )}
                         </TableCell>
+                        <TableCell>{cotacao.data_cotacao || '-'}</TableCell>
                         <TableCell>{cotacao.cliente_nome}</TableCell>
                         <TableCell>{cotacao.cliente_idade || '-'}</TableCell>
                         <TableCell>{cotacao.cliente_telefone}</TableCell>
@@ -362,9 +372,10 @@ export function ImportacaoCotacoes() {
         <CardContent>
           <ul className="space-y-2 text-sm text-blue-900">
             <li>• Baixe o template para ver o formato correto do arquivo</li>
-            <li>• Preencha todas as colunas obrigatórias: Nome, Telefone, Tipo de Serviço, Data e Valor</li>
-            <li>• Colunas opcionais: Idade, Bairro, Ocasião e Origem Lead</li>
+            <li>• Preencha todas as colunas obrigatórias: Nome, Telefone, Tipo de Serviço, Data do Serviço e Valor</li>
+            <li>• Colunas opcionais: Data da Cotação, Idade, Bairro, Ocasião e Origem Lead</li>
             <li>• Use o formato DD/MM/AAAA para datas (exemplo: 25/12/2025)</li>
+            <li>• Se não informar Data da Cotação, será usada a data de hoje</li>
             <li>• Para múltiplos tipos de serviço, separe por vírgula (exemplo: Balões, Flores)</li>
             <li>• O sistema criará automaticamente os clientes que não existirem</li>
             <li>• Revise os dados na tabela antes de confirmar a importação</li>
