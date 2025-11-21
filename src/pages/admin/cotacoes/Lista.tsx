@@ -6,6 +6,12 @@ import { useAuth } from '@/lib/auth'
 import { useToast } from '@/hooks/use-toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ImportacaoCotacoes } from '@/components/admin/ImportacaoCotacoes'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import { Trash2, XCircle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 
 interface Cotacao {
   id: string
@@ -27,6 +33,10 @@ export default function ListaCotacoes() {
   const [cotacoes, setCotacoes] = useState<Cotacao[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [cotacaoParaExcluir, setCotacaoParaExcluir] = useState<string | null>(null)
+  const [cotacaoParaNaoGerou, setCotacaoParaNaoGerou] = useState<string | null>(null)
+  const [motivoNaoGerou, setMotivoNaoGerou] = useState<string>('')
+  const [observacaoNaoGerou, setObservacaoNaoGerou] = useState<string>('')
 
   useEffect(() => {
     fetchCotacoes()
@@ -73,13 +83,75 @@ export default function ListaCotacoes() {
     }
   }
 
+  async function excluirCotacao(id: string) {
+    try {
+      const { error } = await supabase
+        .from('cotacoes')
+        .delete()
+        .eq('id', id)
+      
+      if (error) throw error
+      
+      toast({
+        title: "Cotação excluída",
+        description: "A cotação foi removida com sucesso.",
+      })
+      
+      fetchCotacoes()
+    } catch (err) {
+      console.error('Erro ao excluir cotação:', err)
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir a cotação.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  async function marcarNaoGerou() {
+    if (!cotacaoParaNaoGerou || !motivoNaoGerou) return
+
+    try {
+      const { error } = await supabase
+        .from('cotacoes')
+        .update({ 
+          status: motivoNaoGerou,
+          observacoes: observacaoNaoGerou || null
+        })
+        .eq('id', cotacaoParaNaoGerou)
+      
+      if (error) throw error
+      
+      toast({
+        title: "Status atualizado",
+        description: "A cotação foi marcada como não gerou serviço.",
+      })
+      
+      setCotacaoParaNaoGerou(null)
+      setMotivoNaoGerou('')
+      setObservacaoNaoGerou('')
+      fetchCotacoes()
+    } catch (err) {
+      console.error('Erro ao atualizar cotação:', err)
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar a cotação.",
+        variant: "destructive"
+      })
+    }
+  }
+
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { bg: string; text: string; label: string }> = {
       enviada: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Enviada' },
+      confirmada: { bg: 'bg-green-100', text: 'text-green-800', label: 'Confirmada' },
       pendente: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Pendente' },
       em_analise: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Em Análise' },
       aprovada: { bg: 'bg-green-100', text: 'text-green-800', label: 'Aprovada' },
       recusada: { bg: 'bg-red-100', text: 'text-red-800', label: 'Recusada' },
+      nao_gerou_longe: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Não Gerou - Longe' },
+      nao_gerou_caro: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Não Gerou - Caro' },
+      nao_gerou_cliente_sumiu: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Não Gerou - Cliente Sumiu' },
     }
     const badge = badges[status] || badges.enviada
     return (
@@ -197,21 +269,41 @@ export default function ListaCotacoes() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            {cotacao.status === 'enviada' && (
-                              <button
-                                onClick={() => {
-                                  if (confirm('Confirmar esta cotação?')) {
-                                    confirmarCotacao(cotacao.id)
-                                  }
-                                }}
-                                className="text-green-600 hover:text-green-800 font-medium mr-4"
+                            <div className="flex items-center gap-2">
+                              {cotacao.status === 'enviada' && (
+                                <Button
+                                  onClick={() => {
+                                    if (confirm('Confirmar esta cotação?')) {
+                                      confirmarCotacao(cotacao.id)
+                                    }
+                                  }}
+                                  size="sm"
+                                  variant="default"
+                                  className="bg-green-600 hover:bg-green-700"
+                                >
+                                  Confirmar
+                                </Button>
+                              )}
+                              {!cotacao.status.startsWith('nao_gerou') && (
+                                <Button
+                                  onClick={() => setCotacaoParaNaoGerou(cotacao.id)}
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-orange-600 hover:text-orange-700"
+                                >
+                                  <XCircle className="w-4 h-4 mr-1" />
+                                  Não Gerou
+                                </Button>
+                              )}
+                              <Button
+                                onClick={() => setCotacaoParaExcluir(cotacao.id)}
+                                size="sm"
+                                variant="ghost"
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
                               >
-                                Confirmar
-                              </button>
-                            )}
-                            <button className="text-blue-600 hover:text-blue-800 font-medium">
-                              Ver detalhes
-                            </button>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -227,6 +319,87 @@ export default function ListaCotacoes() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Dialog de Confirmação de Exclusão */}
+      <AlertDialog open={!!cotacaoParaExcluir} onOpenChange={() => setCotacaoParaExcluir(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta cotação? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (cotacaoParaExcluir) {
+                  excluirCotacao(cotacaoParaExcluir)
+                  setCotacaoParaExcluir(null)
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog de Não Gerou Serviço */}
+      <Dialog open={!!cotacaoParaNaoGerou} onOpenChange={() => setCotacaoParaNaoGerou(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Marcar como Não Gerou Serviço</DialogTitle>
+            <DialogDescription>
+              Selecione o motivo pelo qual esta cotação não gerou um serviço.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Motivo</label>
+              <Select value={motivoNaoGerou} onValueChange={setMotivoNaoGerou}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um motivo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="nao_gerou_longe">Local muito longe</SelectItem>
+                  <SelectItem value="nao_gerou_caro">Cliente achou caro</SelectItem>
+                  <SelectItem value="nao_gerou_cliente_sumiu">Cliente sumiu/não respondeu</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Observações (opcional)</label>
+              <Textarea
+                value={observacaoNaoGerou}
+                onChange={(e) => setObservacaoNaoGerou(e.target.value)}
+                placeholder="Adicione observações adicionais sobre esta cotação..."
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setCotacaoParaNaoGerou(null)
+              setMotivoNaoGerou('')
+              setObservacaoNaoGerou('')
+            }}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={marcarNaoGerou}
+              disabled={!motivoNaoGerou}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   )
 }
