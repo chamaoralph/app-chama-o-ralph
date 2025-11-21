@@ -108,24 +108,40 @@ export function ImportacaoCotacoes() {
     }
   }
 
-  const converterData = (dataStr: string | number): string | null => {
+  const converterData = (dataStr: string | number | undefined): string | null => {
     if (!dataStr) return null
     
-    // Se for número (serial do Excel), converter para data
-    if (typeof dataStr === 'number') {
-      const date = new Date((dataStr - 25569) * 86400 * 1000)
-      const dia = String(date.getDate()).padStart(2, '0')
-      const mes = String(date.getMonth() + 1).padStart(2, '0')
-      const ano = date.getFullYear()
-      return `${ano}-${mes}-${dia}`
+    try {
+      // Se for número (serial do Excel), converter para data
+      if (typeof dataStr === 'number') {
+        // Excel usa 1900-01-01 como base, mas tem um bug do ano 1900
+        // A fórmula correta é: (serial - 25569) * 86400 * 1000
+        const date = new Date((dataStr - 25569) * 86400 * 1000)
+        const ano = date.getFullYear()
+        const mes = String(date.getMonth() + 1).padStart(2, '0')
+        const dia = String(date.getDate()).padStart(2, '0')
+        return `${ano}-${mes}-${dia}`
+      }
+      
+      // Se for string no formato DD/MM/AAAA ou DD/MM/AA
+      const str = String(dataStr).trim()
+      const partes = str.split('/')
+      if (partes.length === 3) {
+        let [dia, mes, ano] = partes
+        
+        // Se o ano tem 2 dígitos, assumir 20XX
+        if (ano.length === 2) {
+          ano = '20' + ano
+        }
+        
+        return `${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`
+      }
+      
+      return null
+    } catch (error) {
+      console.error('Erro ao converter data:', dataStr, error)
+      return null
     }
-    
-    // Se for string no formato DD/MM/AAAA
-    const partes = String(dataStr).split('/')
-    if (partes.length !== 3) return null
-    
-    const [dia, mes, ano] = partes
-    return `${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`
   }
 
   const importarCotacoes = async () => {
@@ -159,6 +175,8 @@ export function ImportacaoCotacoes() {
 
       for (const cotacao of cotacoesValidas) {
         try {
+          console.log('Processando linha', cotacao.linha, ':', cotacao.cliente_nome)
+          
           // Buscar ou criar cliente
           let clienteId: string
 
@@ -167,10 +185,11 @@ export function ImportacaoCotacoes() {
             .select('id')
             .eq('telefone', cotacao.cliente_telefone)
             .eq('empresa_id', userData.empresa_id)
-            .single()
+            .maybeSingle()
 
           if (clienteExistente) {
             clienteId = clienteExistente.id
+            console.log('Cliente existente encontrado:', clienteId)
           } else {
             const { data: novoCliente, error: clienteError } = await supabase
               .from('clientes')
@@ -185,8 +204,12 @@ export function ImportacaoCotacoes() {
               .select()
               .single()
 
-            if (clienteError) throw clienteError
+            if (clienteError) {
+              console.error('Erro ao criar cliente:', clienteError)
+              throw clienteError
+            }
             clienteId = novoCliente.id
+            console.log('Novo cliente criado:', clienteId)
           }
 
           // Criar cotação
@@ -199,15 +222,22 @@ export function ImportacaoCotacoes() {
             ? converterData(cotacao.data_cotacao) 
             : new Date().toISOString().split('T')[0]
 
-          const dataServicoDesejada = cotacao.data_servico_desejada 
-            ? converterData(cotacao.data_servico_desejada)
-            : null
+          const dataServicoDesejada = converterData(cotacao.data_servico_desejada)
 
           const valorEstimado = cotacao.valor_estimado 
-            ? parseFloat(cotacao.valor_estimado)
+            ? parseFloat(String(cotacao.valor_estimado).replace(/[^\d.,]/g, '').replace(',', '.'))
             : 0
 
           const status = dataServicoDesejada ? 'confirmada' : 'pendente'
+
+          console.log('Criando cotação:', {
+            cliente_id: clienteId,
+            tipo_servico: tiposServico,
+            data_servico_desejada: dataServicoDesejada,
+            valor_estimado: valorEstimado,
+            status,
+            dataCotacao
+          })
 
           const { error: cotacaoError } = await supabase
             .from('cotacoes')
@@ -217,17 +247,21 @@ export function ImportacaoCotacoes() {
               tipo_servico: tiposServico,
               data_servico_desejada: dataServicoDesejada,
               valor_estimado: valorEstimado,
-              ocasiao: cotacao.ocasiao,
-              origem_lead: cotacao.origem_lead,
+              ocasiao: cotacao.ocasiao || null,
+              origem_lead: cotacao.origem_lead || 'Importação em Massa',
               status: status,
               created_at: dataCotacao,
             })
 
-          if (cotacaoError) throw cotacaoError
+          if (cotacaoError) {
+            console.error('Erro ao criar cotação:', cotacaoError)
+            throw cotacaoError
+          }
           
+          console.log('Cotação criada com sucesso para linha', cotacao.linha)
           sucessos++
         } catch (error) {
-          console.error('Erro ao importar cotação linha', cotacao.linha, error)
+          console.error('Erro ao importar cotação linha', cotacao.linha, ':', error)
           falhas++
         }
       }
