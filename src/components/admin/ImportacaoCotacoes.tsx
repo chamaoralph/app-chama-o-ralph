@@ -52,70 +52,12 @@ export function ImportacaoCotacoes() {
     XLSX.writeFile(wb, 'template-cotacoes.xlsx')
   }
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    setArquivo(file)
-    
-    try {
-      const data = await file.arrayBuffer()
-      const workbook = XLSX.read(data, { type: 'array' })
-      const sheetName = workbook.SheetNames[0]
-      const worksheet = workbook.Sheets[sheetName]
-      const jsonData = XLSX.utils.sheet_to_json(worksheet)
-
-      const cotacoesParsed: CotacaoImportada[] = jsonData.map((row: any, index) => {
-        const erros: string[] = []
-        
-        if (!row['Nome do Cliente']) erros.push('Nome do cliente obrigatório')
-        if (!row['Telefone']) erros.push('Telefone obrigatório')
-        if (!row['Tipo de Serviço']) erros.push('Tipo de serviço obrigatório')
-
-        return {
-          linha: index + 2,
-          data_cotacao: row['Data da Cotação (DD/MM/AAAA)'] || undefined,
-          cliente_nome: row['Nome do Cliente'] || '',
-          cliente_idade: row['Idade'] ? String(row['Idade']) : undefined,
-          cliente_telefone: String(row['Telefone'] || ''),
-          cliente_bairro: row['Bairro'] || undefined,
-          tipo_servico: row['Tipo de Serviço'] || '',
-          data_servico_desejada: row['Data do Serviço (DD/MM/AAAA)'] || '',
-          valor_estimado: String(row['Valor Estimado'] || ''),
-          ocasiao: row['Ocasião'] || '',
-          origem_lead: row['Origem Lead'] || 'Importação em Massa',
-          status: erros.length > 0 ? 'erro' : 'valido',
-          erros: erros.length > 0 ? erros : undefined,
-        }
-      })
-
-      setDadosParsed(cotacoesParsed)
-
-      const validos = cotacoesParsed.filter(c => c.status === 'valido').length
-      const erros = cotacoesParsed.filter(c => c.status === 'erro').length
-
-      toast({
-        title: 'Arquivo processado',
-        description: `${validos} cotações válidas, ${erros} com erros`,
-      })
-    } catch (error) {
-      console.error('Erro ao processar arquivo:', error)
-      toast({
-        title: 'Erro ao processar arquivo',
-        description: 'Verifique se o formato está correto',
-        variant: 'destructive',
-      })
-    }
-  }
-
   const converterData = (dataStr: string | number | undefined): string | null => {
     if (!dataStr) return null
     
     try {
       // Se for número (serial do Excel), converter para data
       if (typeof dataStr === 'number') {
-        // Excel usa 1900-01-01 como base, mas tem um bug do ano 1900
-        // A fórmula correta é: (serial - 25569) * 86400 * 1000
         const date = new Date((dataStr - 25569) * 86400 * 1000)
         const ano = date.getFullYear()
         const mes = String(date.getMonth() + 1).padStart(2, '0')
@@ -141,6 +83,71 @@ export function ImportacaoCotacoes() {
     } catch (error) {
       console.error('Erro ao converter data:', dataStr, error)
       return null
+    }
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setArquivo(file)
+    
+    try {
+      const data = await file.arrayBuffer()
+      const workbook = XLSX.read(data, { type: 'array' })
+      const sheetName = workbook.SheetNames[0]
+      const worksheet = workbook.Sheets[sheetName]
+      const jsonData = XLSX.utils.sheet_to_json(worksheet)
+
+      const cotacoesParsed: CotacaoImportada[] = jsonData.map((row: any, index) => {
+        const erros: string[] = []
+        
+        if (!row['Nome do Cliente']) erros.push('Nome do cliente obrigatório')
+        if (!row['Telefone']) erros.push('Telefone obrigatório')
+        if (!row['Tipo de Serviço']) erros.push('Tipo de serviço obrigatório')
+
+        // Converter datas imediatamente para exibição correta
+        const dataCotacaoConvertida = row['Data da Cotação (DD/MM/AAAA)'] 
+          ? converterData(row['Data da Cotação (DD/MM/AAAA)']) 
+          : undefined
+
+        const dataServicoConvertida = row['Data do Serviço (DD/MM/AAAA)']
+          ? converterData(row['Data do Serviço (DD/MM/AAAA)'])
+          : null
+
+        return {
+          linha: index + 2,
+          data_cotacao: dataCotacaoConvertida || undefined,
+          cliente_nome: row['Nome do Cliente'] || '',
+          cliente_idade: row['Idade'] ? String(row['Idade']) : undefined,
+          cliente_telefone: String(row['Telefone'] || ''),
+          cliente_bairro: row['Bairro'] || undefined,
+          tipo_servico: row['Tipo de Serviço'] || '',
+          data_servico_desejada: dataServicoConvertida || '',
+          valor_estimado: String(row['Valor Estimado'] || '0'),
+          ocasiao: row['Ocasião'] || '',
+          origem_lead: row['Origem Lead'] || 'Importação em Massa',
+          status: erros.length > 0 ? 'erro' : 'valido',
+          erros: erros.length > 0 ? erros : undefined,
+        }
+      })
+
+      setDadosParsed(cotacoesParsed)
+
+      const validos = cotacoesParsed.filter(c => c.status === 'valido').length
+      const erros = cotacoesParsed.filter(c => c.status === 'erro').length
+
+      toast({
+        title: 'Arquivo processado',
+        description: `${validos} cotações válidas, ${erros} com erros`,
+      })
+    } catch (error) {
+      console.error('Erro ao processar arquivo:', error)
+      toast({
+        title: 'Erro ao processar arquivo',
+        description: 'Verifique se o formato está correto',
+        variant: 'destructive',
+      })
     }
   }
 
@@ -218,11 +225,9 @@ export function ImportacaoCotacoes() {
             .map(t => t.trim())
             .filter(t => t.length > 0)
 
-          const dataCotacao = cotacao.data_cotacao 
-            ? converterData(cotacao.data_cotacao) 
-            : new Date().toISOString().split('T')[0]
-
-          const dataServicoDesejada = converterData(cotacao.data_servico_desejada)
+          // Usar as datas já convertidas
+          const dataCotacao = cotacao.data_cotacao || new Date().toISOString().split('T')[0]
+          const dataServicoDesejada = cotacao.data_servico_desejada || null
 
           const valorEstimado = cotacao.valor_estimado 
             ? parseFloat(String(cotacao.valor_estimado).replace(/[^\d.,]/g, '').replace(',', '.'))
