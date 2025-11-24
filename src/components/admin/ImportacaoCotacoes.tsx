@@ -184,13 +184,14 @@ export function ImportacaoCotacoes() {
         try {
           console.log('Processando linha', cotacao.linha, ':', cotacao.cliente_nome)
           
-          // Buscar ou criar cliente
+          // Buscar ou criar cliente (verificando telefone E nome)
           let clienteId: string
 
           const { data: clienteExistente } = await supabase
             .from('clientes')
             .select('id')
             .eq('telefone', cotacao.cliente_telefone)
+            .eq('nome', cotacao.cliente_nome)
             .eq('empresa_id', userData.empresa_id)
             .maybeSingle()
 
