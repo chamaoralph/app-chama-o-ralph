@@ -90,6 +90,7 @@ export function ImportacaoCotacoes() {
     const file = e.target.files?.[0]
     if (!file) return
 
+    console.log('Arquivo selecionado:', file.name)
     setArquivo(file)
     
     try {
@@ -98,6 +99,7 @@ export function ImportacaoCotacoes() {
       const sheetName = workbook.SheetNames[0]
       const worksheet = workbook.Sheets[sheetName]
       const jsonData = XLSX.utils.sheet_to_json(worksheet)
+      console.log('Dados parseados do Excel:', jsonData.length, 'linhas')
 
       const cotacoesParsed: CotacaoImportada[] = jsonData.map((row: any, index) => {
         const erros: string[] = []
@@ -152,7 +154,9 @@ export function ImportacaoCotacoes() {
   }
 
   const importarCotacoes = async () => {
+    console.log('Iniciando importação...')
     const cotacoesValidas = dadosParsed.filter(c => c.status === 'valido')
+    console.log('Cotações válidas:', cotacoesValidas.length)
     
     if (cotacoesValidas.length === 0) {
       toast({
@@ -167,6 +171,7 @@ export function ImportacaoCotacoes() {
 
     try {
       const { data: { user } } = await supabase.auth.getUser()
+      console.log('Usuário autenticado:', user?.id)
       if (!user) throw new Error('Usuário não autenticado')
 
       const { data: userData } = await supabase
@@ -175,11 +180,13 @@ export function ImportacaoCotacoes() {
         .eq('id', user.id)
         .single()
 
+      console.log('Empresa ID:', userData?.empresa_id)
       if (!userData) throw new Error('Dados do usuário não encontrados')
 
       let sucessos = 0
       let falhas = 0
 
+      console.log('Iniciando loop de importação...')
       for (const cotacao of cotacoesValidas) {
         try {
           console.log('Processando linha', cotacao.linha, ':', cotacao.cliente_nome)

@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AdminLayout } from '@/components/layout/AdminLayout'
 import { supabase } from '@/integrations/supabase/client'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ImportacaoCotacoes } from '@/components/admin/ImportacaoCotacoes'
 
 export default function NovaCotacao() {
   const navigate = useNavigate()
@@ -100,16 +102,23 @@ export default function NovaCotacao() {
 
   return (
     <AdminLayout>
-      <div className="max-w-3xl">
+      <div className="max-w-6xl">
         <h1 className="text-3xl font-bold text-gray-900 mb-6">Nova Cotação</h1>
 
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
-            {error}
-          </div>
-        )}
+        <Tabs defaultValue="manual" className="w-full">
+          <TabsList className="mb-6">
+            <TabsTrigger value="manual">Cadastro Manual</TabsTrigger>
+            <TabsTrigger value="importacao">Importação em Massa</TabsTrigger>
+          </TabsList>
 
-        <form onSubmit={handleSubmit} className="bg-white shadow rounded-lg p-6 space-y-6">
+          <TabsContent value="manual">
+            {error && (
+              <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="bg-white shadow rounded-lg p-6 space-y-6">
           <div>
             <h2 className="text-xl font-semibold mb-4">Dados do Cliente</h2>
             <div className="grid grid-cols-2 gap-4">
@@ -158,11 +167,17 @@ export default function NovaCotacao() {
             </div>
           </div>
 
-          <div className="flex gap-3">
-            <button type="button" onClick={() => navigate('/admin/cotacoes')} className="px-6 py-2 border rounded-md">Cancelar</button>
-            <button type="submit" disabled={loading} className="flex-1 bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700">{loading ? 'Salvando...' : 'Criar Cotação'}</button>
-          </div>
-        </form>
+              <div className="flex gap-3">
+                <button type="button" onClick={() => navigate('/admin/cotacoes')} className="px-6 py-2 border rounded-md">Cancelar</button>
+                <button type="submit" disabled={loading} className="flex-1 bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700">{loading ? 'Salvando...' : 'Criar Cotação'}</button>
+              </div>
+            </form>
+          </TabsContent>
+
+          <TabsContent value="importacao">
+            <ImportacaoCotacoes />
+          </TabsContent>
+        </Tabs>
       </div>
     </AdminLayout>
   )
