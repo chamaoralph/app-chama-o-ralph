@@ -234,14 +234,12 @@ export function ImportacaoCotacoes() {
             ? parseFloat(String(cotacao.valor_estimado).replace(/[^\d.,]/g, '').replace(',', '.'))
             : 0
 
-          const status = dataServicoDesejada ? 'confirmada' : 'pendente'
-
           console.log('Criando cotação:', {
             cliente_id: clienteId,
             tipo_servico: tiposServico,
             data_servico_desejada: dataServicoDesejada,
             valor_estimado: valorEstimado,
-            status,
+            status: 'pendente',
             dataCotacao
           })
 
@@ -255,7 +253,7 @@ export function ImportacaoCotacoes() {
               valor_estimado: valorEstimado,
               ocasiao: cotacao.ocasiao || null,
               origem_lead: cotacao.origem_lead || 'Importação em Massa',
-              status: status,
+              status: 'pendente',
               created_at: dataCotacao,
             })
 

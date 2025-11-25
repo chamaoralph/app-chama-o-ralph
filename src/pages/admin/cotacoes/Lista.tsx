@@ -23,6 +23,7 @@ interface Cotacao {
   valor_estimado: number | null
   clientes: {
     nome: string
+    telefone: string
   }
 }
 
@@ -37,6 +38,12 @@ export default function ListaCotacoes() {
   const [cotacaoParaNaoGerou, setCotacaoParaNaoGerou] = useState<string | null>(null)
   const [motivoNaoGerou, setMotivoNaoGerou] = useState<string>('')
   const [observacaoNaoGerou, setObservacaoNaoGerou] = useState<string>('')
+  const [paginaAtual, setPaginaAtual] = useState(1)
+  const [itensPorPagina, setItensPorPagina] = useState(10)
+  const [ordenacao, setOrdenacao] = useState<{ campo: string; direcao: 'asc' | 'desc' }>({
+    campo: 'created_at',
+    direcao: 'desc'
+  })
 
   useEffect(() => {
     fetchCotacoes()
@@ -141,6 +148,43 @@ export default function ListaCotacoes() {
     }
   }
 
+  const handleOrdenar = (campo: string) => {
+    if (ordenacao.campo === campo) {
+      setOrdenacao({ campo, direcao: ordenacao.direcao === 'asc' ? 'desc' : 'asc' })
+    } else {
+      setOrdenacao({ campo, direcao: 'asc' })
+    }
+  }
+
+  const cotacoesOrdenadas = [...cotacoes].sort((a, b) => {
+    const campo = ordenacao.campo as keyof Cotacao
+    let valorA = a[campo]
+    let valorB = b[campo]
+
+    if (campo === 'clientes') {
+      valorA = a.clientes?.nome
+      valorB = b.clientes?.nome
+    }
+
+    if (valorA === null || valorA === undefined) return 1
+    if (valorB === null || valorB === undefined) return -1
+    
+    if (typeof valorA === 'string' && typeof valorB === 'string') {
+      return ordenacao.direcao === 'asc' 
+        ? valorA.localeCompare(valorB)
+        : valorB.localeCompare(valorA)
+    }
+    
+    return ordenacao.direcao === 'asc' 
+      ? (valorA > valorB ? 1 : -1)
+      : (valorB > valorA ? 1 : -1)
+  })
+
+  const totalPaginas = Math.ceil(cotacoesOrdenadas.length / itensPorPagina)
+  const indexInicio = (paginaAtual - 1) * itensPorPagina
+  const indexFim = indexInicio + itensPorPagina
+  const cotacoesPaginadas = cotacoesOrdenadas.slice(indexInicio, indexFim)
+
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { bg: string; text: string; label: string }> = {
       enviada: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Enviada' },
@@ -153,7 +197,7 @@ export default function ListaCotacoes() {
       nao_gerou_caro: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Não Gerou - Caro' },
       nao_gerou_cliente_sumiu: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Não Gerou - Cliente Sumiu' },
     }
-    const badge = badges[status] || badges.enviada
+    const badge = badges[status] || badges.pendente
     return (
       <span className={`px-3 py-1 rounded-full text-xs font-medium ${badge.bg} ${badge.text}`}>
         {badge.label}
@@ -204,25 +248,95 @@ export default function ListaCotacoes() {
           </TabsList>
 
           <TabsContent value="lista">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">Mostrar</span>
+                <Select value={String(itensPorPagina)} onValueChange={(v) => {
+                  setItensPorPagina(Number(v))
+                  setPaginaAtual(1)
+                }}>
+                  <SelectTrigger className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-sm text-gray-600">por página</span>
+              </div>
+              <div className="text-sm text-gray-600">
+                Total: {cotacoes.length} cotações
+              </div>
+            </div>
+
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleOrdenar('clientes')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Cliente
+                          {ordenacao.campo === 'clientes' && (
+                            <span>{ordenacao.direcao === 'asc' ? '↑' : '↓'}</span>
+                          )}
+                        </div>
+                      </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Cliente
+                        Telefone
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Serviço
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleOrdenar('status')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Status
+                          {ordenacao.campo === 'status' && (
+                            <span>{ordenacao.direcao === 'asc' ? '↑' : '↓'}</span>
+                          )}
+                        </div>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Valor
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleOrdenar('valor_estimado')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Valor
+                          {ordenacao.campo === 'valor_estimado' && (
+                            <span>{ordenacao.direcao === 'asc' ? '↑' : '↓'}</span>
+                          )}
+                        </div>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Data
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleOrdenar('data_servico_desejada')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Data Serviço
+                          {ordenacao.campo === 'data_servico_desejada' && (
+                            <span>{ordenacao.direcao === 'asc' ? '↑' : '↓'}</span>
+                          )}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleOrdenar('created_at')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Data Criação
+                          {ordenacao.campo === 'created_at' && (
+                            <span>{ordenacao.direcao === 'asc' ? '↑' : '↓'}</span>
+                          )}
+                        </div>
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Ações
@@ -232,7 +346,7 @@ export default function ListaCotacoes() {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {cotacoes.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                        <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                           <div className="flex flex-col items-center">
                             <svg className="w-16 h-16 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -243,10 +357,13 @@ export default function ListaCotacoes() {
                         </td>
                       </tr>
                     ) : (
-                      cotacoes.map((cotacao) => (
+                      cotacoesPaginadas.map((cotacao) => (
                         <tr key={cotacao.id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">{cotacao.clientes.nome}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{cotacao.clientes.telefone || '-'}</div>
                           </td>
                           <td className="px-6 py-4">
                             <div className="text-sm text-gray-900">
@@ -265,24 +382,59 @@ export default function ListaCotacoes() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
+                              {cotacao.data_servico_desejada 
+                                ? new Date(cotacao.data_servico_desejada).toLocaleDateString('pt-BR')
+                                : '-'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
                               {new Date(cotacao.created_at).toLocaleDateString('pt-BR')}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
                             <div className="flex items-center gap-2">
-                              {cotacao.status === 'enviada' && (
-                                <Button
-                                  onClick={() => {
-                                    if (confirm('Confirmar esta cotação?')) {
-                                      confirmarCotacao(cotacao.id)
-                                    }
-                                  }}
-                                  size="sm"
-                                  variant="default"
-                                  className="bg-green-600 hover:bg-green-700"
-                                >
-                                  Confirmar
-                                </Button>
+                              {cotacao.status === 'pendente' && (
+                                <>
+                                  <Button
+                                    onClick={() => {
+                                      if (confirm('Aprovar esta cotação?')) {
+                                        supabase
+                                          .from('cotacoes')
+                                          .update({ status: 'aprovada' })
+                                          .eq('id', cotacao.id)
+                                          .then(() => {
+                                            toast({ title: "Cotação aprovada!" })
+                                            fetchCotacoes()
+                                          })
+                                      }
+                                    }}
+                                    size="sm"
+                                    variant="default"
+                                    className="bg-green-600 hover:bg-green-700"
+                                  >
+                                    Aprovar
+                                  </Button>
+                                  <Button
+                                    onClick={() => {
+                                      if (confirm('Reprovar esta cotação?')) {
+                                        supabase
+                                          .from('cotacoes')
+                                          .update({ status: 'recusada' })
+                                          .eq('id', cotacao.id)
+                                          .then(() => {
+                                            toast({ title: "Cotação reprovada!" })
+                                            fetchCotacoes()
+                                          })
+                                      }
+                                    }}
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-red-600 hover:text-red-700"
+                                  >
+                                    Reprovar
+                                  </Button>
+                                </>
                               )}
                               {!cotacao.status.startsWith('nao_gerou') && (
                                 <Button
@@ -312,6 +464,32 @@ export default function ListaCotacoes() {
                 </table>
               </div>
             </div>
+
+            {totalPaginas > 1 && (
+              <div className="mt-4 flex items-center justify-between">
+                <div className="text-sm text-gray-600">
+                  Página {paginaAtual} de {totalPaginas}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => setPaginaAtual(p => Math.max(1, p - 1))}
+                    disabled={paginaAtual === 1}
+                    size="sm"
+                    variant="outline"
+                  >
+                    Anterior
+                  </Button>
+                  <Button
+                    onClick={() => setPaginaAtual(p => Math.min(totalPaginas, p + 1))}
+                    disabled={paginaAtual === totalPaginas}
+                    size="sm"
+                    variant="outline"
+                  >
+                    Próxima
+                  </Button>
+                </div>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="importacao">
