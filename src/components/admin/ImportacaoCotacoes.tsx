@@ -154,9 +154,11 @@ export function ImportacaoCotacoes() {
   }
 
   const importarCotacoes = async () => {
-    console.log('Iniciando importação...')
+    console.log('=== INÍCIO DA IMPORTAÇÃO ===')
+    console.log('Total de dados parseados:', dadosParsed.length)
     const cotacoesValidas = dadosParsed.filter(c => c.status === 'valido')
     console.log('Cotações válidas:', cotacoesValidas.length)
+    console.log('Primeiras 3 cotações:', cotacoesValidas.slice(0, 3))
     
     if (cotacoesValidas.length === 0) {
       toast({
@@ -170,26 +172,29 @@ export function ImportacaoCotacoes() {
     setProcessando(true)
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      console.log('Usuário autenticado:', user?.id)
+      console.log('Buscando usuário autenticado...')
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      console.log('Usuário:', user?.id, 'Erro:', userError)
       if (!user) throw new Error('Usuário não autenticado')
 
-      const { data: userData } = await supabase
+      console.log('Buscando dados da empresa...')
+      const { data: userData, error: userDataError } = await supabase
         .from('usuarios')
         .select('empresa_id')
         .eq('id', user.id)
         .single()
 
-      console.log('Empresa ID:', userData?.empresa_id)
+      console.log('Empresa ID:', userData?.empresa_id, 'Erro:', userDataError)
       if (!userData) throw new Error('Dados do usuário não encontrados')
 
       let sucessos = 0
       let falhas = 0
 
-      console.log('Iniciando loop de importação...')
+      console.log('=== INÍCIO DO LOOP DE IMPORTAÇÃO ===')
       for (const cotacao of cotacoesValidas) {
         try {
-          console.log('Processando linha', cotacao.linha, ':', cotacao.cliente_nome)
+          console.log('------')
+          console.log('LINHA', cotacao.linha, '- Cliente:', cotacao.cliente_nome, 'Tel:', cotacao.cliente_telefone)
           
           // Buscar ou criar cliente (verificando telefone E nome)
           let clienteId: string
@@ -257,25 +262,32 @@ export function ImportacaoCotacoes() {
             cotacaoInsert.created_at = new Date(cotacao.data_cotacao + 'T00:00:00').toISOString()
           }
 
-          console.log('Criando cotação:', cotacaoInsert)
+          console.log('Objeto cotação a inserir:', JSON.stringify(cotacaoInsert, null, 2))
 
-          const { error: cotacaoError } = await supabase
+          const { data: cotacaoData, error: cotacaoError } = await supabase
             .from('cotacoes')
             .insert(cotacaoInsert)
+            .select()
+
+          console.log('Resultado da inserção:', { data: cotacaoData, error: cotacaoError })
 
           if (cotacaoError) {
-            console.error('Erro ao criar cotação:', cotacaoError)
+            console.error('ERRO AO CRIAR COTAÇÃO:', cotacaoError)
             throw cotacaoError
           }
           
-          console.log('Cotação criada com sucesso para linha', cotacao.linha)
+          console.log('✓ Cotação criada com sucesso para linha', cotacao.linha)
           sucessos++
         } catch (error) {
-          console.error('Erro ao importar cotação linha', cotacao.linha, ':', error)
+          console.error('✗ ERRO na linha', cotacao.linha, ':', error)
           falhas++
         }
       }
 
+      console.log('=== FIM DO LOOP DE IMPORTAÇÃO ===')
+      console.log('Sucessos:', sucessos, '| Falhas:', falhas)
+
+      console.log('Exibindo toast de conclusão...')
       toast({
         title: 'Importação concluída',
         description: `${sucessos} cotações importadas com sucesso${falhas > 0 ? `, ${falhas} falharam` : ''}`,
@@ -284,18 +296,21 @@ export function ImportacaoCotacoes() {
       setArquivo(null)
       setDadosParsed([])
       
+      console.log('Aguardando 1.5s antes de recarregar...')
       setTimeout(() => {
+        console.log('Recarregando página...')
         window.location.reload()
       }, 1500)
 
     } catch (error) {
-      console.error('Erro na importação:', error)
+      console.error('=== ERRO GERAL NA IMPORTAÇÃO ===', error)
       toast({
         title: 'Erro na importação',
-        description: 'Ocorreu um erro ao importar as cotações',
+        description: error instanceof Error ? error.message : 'Ocorreu um erro ao importar as cotações',
         variant: 'destructive',
       })
     } finally {
+      console.log('Finalizando processamento...')
       setProcessando(false)
     }
   }
