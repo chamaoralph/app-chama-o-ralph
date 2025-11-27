@@ -234,35 +234,34 @@ export function ImportacaoCotacoes() {
             .filter(t => t.length > 0)
 
           // Usar as datas já convertidas
-          const dataCotacao = cotacao.data_cotacao || new Date().toISOString().split('T')[0]
           const dataServicoDesejada = cotacao.data_servico_desejada || null
 
           const valorEstimado = cotacao.valor_estimado 
             ? parseFloat(String(cotacao.valor_estimado).replace(/[^\d.,]/g, '').replace(',', '.'))
             : 0
 
-          console.log('Criando cotação:', {
+          // Preparar objeto de inserção
+          const cotacaoInsert: any = {
             cliente_id: clienteId,
+            empresa_id: userData.empresa_id,
             tipo_servico: tiposServico,
             data_servico_desejada: dataServicoDesejada,
             valor_estimado: valorEstimado,
+            ocasiao: cotacao.ocasiao || null,
+            origem_lead: cotacao.origem_lead || 'Importação em Massa',
             status: 'pendente',
-            dataCotacao
-          })
+          }
+
+          // Se houver data da cotação, adicionar como timestamp
+          if (cotacao.data_cotacao) {
+            cotacaoInsert.created_at = new Date(cotacao.data_cotacao + 'T00:00:00').toISOString()
+          }
+
+          console.log('Criando cotação:', cotacaoInsert)
 
           const { error: cotacaoError } = await supabase
             .from('cotacoes')
-            .insert({
-              cliente_id: clienteId,
-              empresa_id: userData.empresa_id,
-              tipo_servico: tiposServico,
-              data_servico_desejada: dataServicoDesejada,
-              valor_estimado: valorEstimado,
-              ocasiao: cotacao.ocasiao || null,
-              origem_lead: cotacao.origem_lead || 'Importação em Massa',
-              status: 'pendente',
-              created_at: dataCotacao,
-            })
+            .insert(cotacaoInsert)
 
           if (cotacaoError) {
             console.error('Erro ao criar cotação:', cotacaoError)
