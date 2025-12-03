@@ -254,7 +254,7 @@ export function ImportacaoCotacoes() {
             valor_estimado: valorEstimado,
             ocasiao: cotacao.ocasiao || null,
             origem_lead: cotacao.origem_lead || 'Importação em Massa',
-            status: 'enviada',
+            status: 'pendente',
           }
 
           // Se houver data da cotação, adicionar como timestamp
