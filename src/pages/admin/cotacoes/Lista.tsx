@@ -7,11 +7,13 @@ import { useToast } from '@/hooks/use-toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ImportacaoCotacoes } from '@/components/admin/ImportacaoCotacoes'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Trash2, XCircle } from 'lucide-react'
+import { Trash2, XCircle, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 interface Cotacao {
   id: string
@@ -21,10 +23,32 @@ interface Cotacao {
   created_at: string
   data_servico_desejada: string | null
   valor_estimado: number | null
+  ocasiao: string | null
+  origem_lead: string | null
+  descricao_servico: string | null
+  observacoes: string | null
   clientes: {
+    id: string
     nome: string
     telefone: string
+    endereco_completo: string | null
+    bairro: string | null
+    idade: number | null
   }
+}
+
+interface EditForm {
+  cliente_nome: string
+  cliente_telefone: string
+  cliente_idade: string
+  endereco_completo: string
+  bairro: string
+  origem_lead: string
+  ocasiao: string
+  data_servico_desejada: string
+  tipo_servico: string
+  valor_estimado: string
+  observacoes: string
 }
 
 export default function ListaCotacoes() {
@@ -36,6 +60,21 @@ export default function ListaCotacoes() {
   const [error, setError] = useState<string | null>(null)
   const [cotacaoParaExcluir, setCotacaoParaExcluir] = useState<string | null>(null)
   const [cotacaoParaNaoGerou, setCotacaoParaNaoGerou] = useState<string | null>(null)
+  const [cotacaoParaEditar, setCotacaoParaEditar] = useState<Cotacao | null>(null)
+  const [editForm, setEditForm] = useState<EditForm>({
+    cliente_nome: '',
+    cliente_telefone: '',
+    cliente_idade: '',
+    endereco_completo: '',
+    bairro: '',
+    origem_lead: '',
+    ocasiao: '',
+    data_servico_desejada: '',
+    tipo_servico: '',
+    valor_estimado: '',
+    observacoes: ''
+  })
+  const [editLoading, setEditLoading] = useState(false)
   const [motivoNaoGerou, setMotivoNaoGerou] = useState<string>('')
   const [observacaoNaoGerou, setObservacaoNaoGerou] = useState<string>('')
   const [paginaAtual, setPaginaAtual] = useState(1)
@@ -65,6 +104,76 @@ export default function ListaCotacoes() {
       setError('Erro ao carregar cotações')
     } finally {
       setLoading(false)
+    }
+  }
+
+  function abrirEdicao(cotacao: Cotacao) {
+    setEditForm({
+      cliente_nome: cotacao.clientes.nome || '',
+      cliente_telefone: cotacao.clientes.telefone || '',
+      cliente_idade: cotacao.clientes.idade?.toString() || '',
+      endereco_completo: cotacao.clientes.endereco_completo || '',
+      bairro: cotacao.clientes.bairro || '',
+      origem_lead: cotacao.origem_lead || '',
+      ocasiao: cotacao.ocasiao || '',
+      data_servico_desejada: cotacao.data_servico_desejada || '',
+      tipo_servico: cotacao.tipo_servico?.join(', ') || '',
+      valor_estimado: cotacao.valor_estimado?.toString() || '',
+      observacoes: cotacao.observacoes || ''
+    })
+    setCotacaoParaEditar(cotacao)
+  }
+
+  async function salvarEdicao() {
+    if (!cotacaoParaEditar) return
+    setEditLoading(true)
+
+    try {
+      // Atualizar cliente
+      const { error: erroCliente } = await supabase
+        .from('clientes')
+        .update({
+          nome: editForm.cliente_nome,
+          telefone: editForm.cliente_telefone,
+          idade: editForm.cliente_idade ? parseInt(editForm.cliente_idade) : null,
+          endereco_completo: editForm.endereco_completo,
+          bairro: editForm.bairro,
+        })
+        .eq('id', cotacaoParaEditar.cliente_id)
+
+      if (erroCliente) throw erroCliente
+
+      // Atualizar cotação
+      const { error: erroCotacao } = await supabase
+        .from('cotacoes')
+        .update({
+          tipo_servico: editForm.tipo_servico.split(',').map(s => s.trim()).filter(Boolean),
+          data_servico_desejada: editForm.data_servico_desejada || null,
+          valor_estimado: editForm.valor_estimado ? parseFloat(editForm.valor_estimado) : null,
+          origem_lead: editForm.origem_lead || null,
+          ocasiao: editForm.ocasiao || null,
+          observacoes: editForm.observacoes || null,
+        })
+        .eq('id', cotacaoParaEditar.id)
+
+      if (erroCotacao) throw erroCotacao
+
+      toast({
+        title: "Cotação atualizada",
+        description: "Os dados foram salvos com sucesso.",
+      })
+
+      setCotacaoParaEditar(null)
+      fetchCotacoes()
+    } catch (err) {
+      console.error('Erro ao atualizar cotação:', err)
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar a cotação.",
+        variant: "destructive"
+      })
+    } finally {
+      setEditLoading(false)
     }
   }
 
@@ -394,6 +503,14 @@ export default function ListaCotacoes() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
                             <div className="flex items-center gap-2">
+                              <Button
+                                onClick={() => abrirEdicao(cotacao)}
+                                size="sm"
+                                variant="outline"
+                              >
+                                <Pencil className="w-4 h-4 mr-1" />
+                                Editar
+                              </Button>
                               {cotacao.status === 'pendente' && (
                                 <>
                                   <Button
@@ -497,6 +614,136 @@ export default function ListaCotacoes() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Dialog de Edição */}
+      <Dialog open={!!cotacaoParaEditar} onOpenChange={() => setCotacaoParaEditar(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Cotação</DialogTitle>
+            <DialogDescription>
+              Atualize os dados da cotação e do cliente.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Dados do Cliente</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Nome</Label>
+                  <Input 
+                    value={editForm.cliente_nome}
+                    onChange={(e) => setEditForm({...editForm, cliente_nome: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Telefone</Label>
+                  <Input 
+                    value={editForm.cliente_telefone}
+                    onChange={(e) => setEditForm({...editForm, cliente_telefone: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Idade</Label>
+                  <Input 
+                    type="number"
+                    value={editForm.cliente_idade}
+                    onChange={(e) => setEditForm({...editForm, cliente_idade: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Bairro</Label>
+                  <Input 
+                    value={editForm.bairro}
+                    onChange={(e) => setEditForm({...editForm, bairro: e.target.value})}
+                  />
+                </div>
+                <div className="col-span-2 space-y-2">
+                  <Label>Endereço Completo</Label>
+                  <Input 
+                    value={editForm.endereco_completo}
+                    onChange={(e) => setEditForm({...editForm, endereco_completo: e.target.value})}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Dados do Serviço</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Data Desejada</Label>
+                  <Input 
+                    type="date"
+                    value={editForm.data_servico_desejada}
+                    onChange={(e) => setEditForm({...editForm, data_servico_desejada: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Valor Estimado</Label>
+                  <Input 
+                    type="number"
+                    step="0.01"
+                    value={editForm.valor_estimado}
+                    onChange={(e) => setEditForm({...editForm, valor_estimado: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Origem</Label>
+                  <Select 
+                    value={editForm.origem_lead} 
+                    onValueChange={(v) => setEditForm({...editForm, origem_lead: v})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="WhatsApp">WhatsApp</SelectItem>
+                      <SelectItem value="Instagram">Instagram</SelectItem>
+                      <SelectItem value="Google">Google</SelectItem>
+                      <SelectItem value="Indicação">Indicação</SelectItem>
+                      <SelectItem value="Já era cliente">Já era cliente</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Ocasião</Label>
+                  <Input 
+                    value={editForm.ocasiao}
+                    onChange={(e) => setEditForm({...editForm, ocasiao: e.target.value})}
+                    placeholder="Ex: Mudança, Instalação nova"
+                  />
+                </div>
+                <div className="col-span-2 space-y-2">
+                  <Label>Tipo de Serviço</Label>
+                  <Input 
+                    value={editForm.tipo_servico}
+                    onChange={(e) => setEditForm({...editForm, tipo_servico: e.target.value})}
+                    placeholder="Ex: TV 50, Suporte fixo"
+                  />
+                </div>
+                <div className="col-span-2 space-y-2">
+                  <Label>Observações</Label>
+                  <Textarea 
+                    value={editForm.observacoes}
+                    onChange={(e) => setEditForm({...editForm, observacoes: e.target.value})}
+                    rows={3}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCotacaoParaEditar(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={salvarEdicao} disabled={editLoading}>
+              {editLoading ? 'Salvando...' : 'Salvar Alterações'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog de Confirmação de Exclusão */}
       <AlertDialog open={!!cotacaoParaExcluir} onOpenChange={() => setCotacaoParaExcluir(null)}>
