@@ -46,18 +46,23 @@ export default function Marketing() {
       const dataInicioStr = format(dataInicio, "yyyy-MM-dd");
       const dataFimStr = format(dataFim, "yyyy-MM-dd");
 
-      // 1. Buscar investimento em Google Ads das despesas
+      // 1. Buscar investimento em Google Ads das despesas (busca em categoria OU descrição)
       const { data: despesas, error: erroDespesas } = await supabase
         .from("lancamentos_caixa")
-        .select("valor, data_lancamento")
+        .select("valor, data_lancamento, categoria, descricao")
         .eq("tipo", "despesa")
-        .ilike("categoria", "%google%")
         .gte("data_lancamento", dataInicioStr)
         .lte("data_lancamento", dataFimStr);
 
       if (erroDespesas) throw erroDespesas;
 
-      const investimento = despesas?.reduce((sum, d) => sum + Number(d.valor), 0) || 0;
+      // Filtrar por google na categoria OU descrição
+      const despesasGoogle = despesas?.filter(d => 
+        d.categoria?.toLowerCase().includes('google') || 
+        d.descricao?.toLowerCase().includes('google')
+      ) || [];
+
+      const investimento = despesasGoogle.reduce((sum, d) => sum + Number(d.valor), 0);
 
       // 2. Buscar cotações com origem Google no período
       const { data: cotacoes, error: erroCotacoes } = await supabase
