@@ -2,12 +2,14 @@ import { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
-import { TrendingUp, Users, Target, DollarSign, ArrowDown, Percent } from "lucide-react";
+import { format, parse } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { TrendingUp, Users, Target, DollarSign, ArrowDown, Percent, CalendarIcon } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 interface FunnelData {
   investimento: number;
@@ -23,10 +25,10 @@ interface FunnelData {
 export default function Marketing() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [dataInicio, setDataInicio] = useState(
-    format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), "yyyy-MM-dd")
+  const [dataInicio, setDataInicio] = useState<Date>(
+    new Date(new Date().getFullYear(), new Date().getMonth(), 1)
   );
-  const [dataFim, setDataFim] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [dataFim, setDataFim] = useState<Date>(new Date());
   const [funnelData, setFunnelData] = useState<FunnelData>({
     investimento: 0,
     leads: 0,
@@ -41,14 +43,17 @@ export default function Marketing() {
   async function carregarDados() {
     setLoading(true);
     try {
+      const dataInicioStr = format(dataInicio, "yyyy-MM-dd");
+      const dataFimStr = format(dataFim, "yyyy-MM-dd");
+
       // 1. Buscar investimento em Google Ads das despesas
       const { data: despesas, error: erroDespesas } = await supabase
         .from("lancamentos_caixa")
         .select("valor, data_lancamento")
         .eq("tipo", "despesa")
         .ilike("categoria", "%google%")
-        .gte("data_lancamento", dataInicio)
-        .lte("data_lancamento", dataFim);
+        .gte("data_lancamento", dataInicioStr)
+        .lte("data_lancamento", dataFimStr);
 
       if (erroDespesas) throw erroDespesas;
 
@@ -59,8 +64,8 @@ export default function Marketing() {
         .from("cotacoes")
         .select("id, status")
         .ilike("origem_lead", "%google%")
-        .gte("created_at", dataInicio)
-        .lte("created_at", dataFim + "T23:59:59");
+        .gte("created_at", dataInicioStr)
+        .lte("created_at", dataFimStr + "T23:59:59");
 
       if (erroCotacoes) throw erroCotacoes;
 
@@ -138,22 +143,56 @@ export default function Marketing() {
           <CardContent>
             <div className="flex flex-wrap gap-4 items-end">
               <div>
-                <Label>Data Início</Label>
-                <Input
-                  type="date"
-                  value={dataInicio}
-                  onChange={(e) => setDataInicio(e.target.value)}
-                  className="w-40"
-                />
+                <label className="block text-sm font-medium mb-2">Data Início</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-40 justify-start text-left font-normal",
+                        !dataInicio && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dataInicio ? format(dataInicio, "dd/MM/yyyy") : "Selecione"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dataInicio}
+                      onSelect={(date) => date && setDataInicio(date)}
+                      initialFocus
+                      className="pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div>
-                <Label>Data Fim</Label>
-                <Input
-                  type="date"
-                  value={dataFim}
-                  onChange={(e) => setDataFim(e.target.value)}
-                  className="w-40"
-                />
+                <label className="block text-sm font-medium mb-2">Data Fim</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-40 justify-start text-left font-normal",
+                        !dataFim && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dataFim ? format(dataFim, "dd/MM/yyyy") : "Selecione"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dataFim}
+                      onSelect={(date) => date && setDataFim(date)}
+                      initialFocus
+                      className="pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <Button onClick={carregarDados} disabled={loading}>
                 {loading ? "Carregando..." : "Atualizar"}
