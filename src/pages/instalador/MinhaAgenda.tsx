@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { InstaladorLayout } from "@/components/layout/InstaladorLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 export default function MinhaAgenda() {
   const [servicos, setServicos] = useState<any[]>([]);
@@ -95,7 +97,7 @@ export default function MinhaAgenda() {
                   <div className="flex-1">
                     <h3 className="text-xl font-bold text-gray-900 mb-2">{servico.codigo}</h3>
                     <div className="space-y-1 text-gray-600">
-                      <p>📅 {new Date(servico.data_servico_agendada).toLocaleString("pt-BR")}</p>
+                      <p>📅 {format(new Date(servico.data_servico_agendada), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
                       <p>👤 {servico.clientes.nome}</p>
                       <p>📞 {servico.clientes.telefone}</p>
                       <p>📍 {servico.clientes.endereco_completo}</p>
