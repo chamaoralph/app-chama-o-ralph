@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { AdminLayout } from '@/components/layout/AdminLayout'
 import { supabase } from '@/integrations/supabase/client'
 import { useEffect, useState } from 'react'
@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ImportacaoCotacoes } from '@/components/admin/ImportacaoCotacoes'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Trash2, XCircle, Pencil } from 'lucide-react'
+import { Trash2, XCircle, Pencil, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -344,12 +344,20 @@ export default function ListaCotacoes() {
             <h1 className="text-3xl font-bold text-gray-900">Cotações</h1>
             <p className="text-gray-600 mt-2">Gerencie todas as cotações de serviços</p>
           </div>
-          <button
-            onClick={() => navigate('/admin/cotacoes/nova')}
-            className="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition-colors font-medium"
-          >
-            + Nova Cotação
-          </button>
+          <div className="flex gap-3">
+            <Link to="/admin/clientes">
+              <Button variant="outline">
+                <Users className="w-4 h-4 mr-2" />
+                Ver Clientes
+              </Button>
+            </Link>
+            <button
+              onClick={() => navigate('/admin/cotacoes/nova')}
+              className="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition-colors font-medium"
+            >
+              + Nova Cotação
+            </button>
+          </div>
         </div>
 
         <Tabs defaultValue="lista" className="w-full">
