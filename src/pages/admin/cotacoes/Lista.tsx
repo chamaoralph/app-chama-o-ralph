@@ -390,6 +390,17 @@ export default function ListaCotacoes() {
                     <tr>
                       <th 
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleOrdenar('created_at')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Data Cotação
+                          {ordenacao.campo === 'created_at' && (
+                            <span>{ordenacao.direcao === 'asc' ? '↑' : '↓'}</span>
+                          )}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                         onClick={() => handleOrdenar('clientes')}
                       >
                         <div className="flex items-center gap-1">
@@ -405,16 +416,8 @@ export default function ListaCotacoes() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Serviço
                       </th>
-                      <th 
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                        onClick={() => handleOrdenar('status')}
-                      >
-                        <div className="flex items-center gap-1">
-                          Status
-                          {ordenacao.campo === 'status' && (
-                            <span>{ordenacao.direcao === 'asc' ? '↑' : '↓'}</span>
-                          )}
-                        </div>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Bairro
                       </th>
                       <th 
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
@@ -429,22 +432,22 @@ export default function ListaCotacoes() {
                       </th>
                       <th 
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                        onClick={() => handleOrdenar('data_servico_desejada')}
+                        onClick={() => handleOrdenar('status')}
                       >
                         <div className="flex items-center gap-1">
-                          Data Serviço
-                          {ordenacao.campo === 'data_servico_desejada' && (
+                          Status
+                          {ordenacao.campo === 'status' && (
                             <span>{ordenacao.direcao === 'asc' ? '↑' : '↓'}</span>
                           )}
                         </div>
                       </th>
                       <th 
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                        onClick={() => handleOrdenar('created_at')}
+                        onClick={() => handleOrdenar('data_servico_desejada')}
                       >
                         <div className="flex items-center gap-1">
-                          Data Criação
-                          {ordenacao.campo === 'created_at' && (
+                          Data Serviço
+                          {ordenacao.campo === 'data_servico_desejada' && (
                             <span>{ordenacao.direcao === 'asc' ? '↑' : '↓'}</span>
                           )}
                         </div>
@@ -471,6 +474,11 @@ export default function ListaCotacoes() {
                       cotacoesPaginadas.map((cotacao) => (
                         <tr key={cotacao.id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {new Date(cotacao.created_at).toLocaleDateString('pt-BR')}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">{cotacao.clientes.nome}</div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -482,7 +490,7 @@ export default function ListaCotacoes() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            {getStatusBadge(cotacao.status)}
+                            <div className="text-sm text-gray-900">{cotacao.clientes.bairro || '-'}</div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
@@ -492,15 +500,13 @@ export default function ListaCotacoes() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
+                            {getStatusBadge(cotacao.status)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
                               {cotacao.data_servico_desejada 
                                 ? new Date(cotacao.data_servico_desejada).toLocaleDateString('pt-BR')
                                 : '-'}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              {new Date(cotacao.created_at).toLocaleDateString('pt-BR')}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
