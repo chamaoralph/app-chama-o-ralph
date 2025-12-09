@@ -46,6 +46,7 @@ interface EditForm {
   origem_lead: string
   ocasiao: string
   data_servico_desejada: string
+  data_criacao: string
   tipo_servico: string
   valor_estimado: string
   observacoes: string
@@ -70,6 +71,7 @@ export default function ListaCotacoes() {
     origem_lead: '',
     ocasiao: '',
     data_servico_desejada: '',
+    data_criacao: '',
     tipo_servico: '',
     valor_estimado: '',
     observacoes: ''
@@ -117,6 +119,7 @@ export default function ListaCotacoes() {
       origem_lead: cotacao.origem_lead || '',
       ocasiao: cotacao.ocasiao || '',
       data_servico_desejada: cotacao.data_servico_desejada || '',
+      data_criacao: cotacao.created_at ? cotacao.created_at.split('T')[0] : '',
       tipo_servico: cotacao.tipo_servico?.join(', ') || '',
       valor_estimado: cotacao.valor_estimado?.toString() || '',
       observacoes: cotacao.observacoes || ''
@@ -149,6 +152,7 @@ export default function ListaCotacoes() {
         .update({
           tipo_servico: editForm.tipo_servico.split(',').map(s => s.trim()).filter(Boolean),
           data_servico_desejada: editForm.data_servico_desejada || null,
+          created_at: editForm.data_criacao ? new Date(editForm.data_criacao).toISOString() : undefined,
           valor_estimado: editForm.valor_estimado ? parseFloat(editForm.valor_estimado) : null,
           origem_lead: editForm.origem_lead || null,
           ocasiao: editForm.ocasiao || null,
@@ -231,8 +235,8 @@ export default function ListaCotacoes() {
       const { error } = await supabase
         .from('cotacoes')
         .update({ 
-          status: motivoNaoGerou,
-          observacoes: observacaoNaoGerou || null
+          status: 'nao_gerou',
+          observacoes: `${motivoNaoGerou}${observacaoNaoGerou ? ': ' + observacaoNaoGerou : ''}`
         })
         .eq('id', cotacaoParaNaoGerou)
       
@@ -302,9 +306,7 @@ export default function ListaCotacoes() {
       em_analise: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Em Análise' },
       aprovada: { bg: 'bg-green-100', text: 'text-green-800', label: 'Aprovada' },
       recusada: { bg: 'bg-red-100', text: 'text-red-800', label: 'Recusada' },
-      nao_gerou_longe: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Não Gerou - Longe' },
-      nao_gerou_caro: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Não Gerou - Caro' },
-      nao_gerou_cliente_sumiu: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Não Gerou - Cliente Sumiu' },
+      nao_gerou: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Não Gerou' },
     }
     const badge = badges[status] || badges.pendente
     return (
@@ -532,28 +534,9 @@ export default function ListaCotacoes() {
                                   >
                                     Aprovar
                                   </Button>
-                                  <Button
-                                    onClick={() => {
-                                      if (confirm('Reprovar esta cotação?')) {
-                                        supabase
-                                          .from('cotacoes')
-                                          .update({ status: 'recusada' })
-                                          .eq('id', cotacao.id)
-                                          .then(() => {
-                                            toast({ title: "Cotação reprovada!" })
-                                            fetchCotacoes()
-                                          })
-                                      }
-                                    }}
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-red-600 hover:text-red-700"
-                                  >
-                                    Reprovar
-                                  </Button>
                                 </>
                               )}
-                              {!cotacao.status.startsWith('nao_gerou') && (
+                              {cotacao.status !== 'nao_gerou' && (
                                 <Button
                                   onClick={() => setCotacaoParaNaoGerou(cotacao.id)}
                                   size="sm"
@@ -672,7 +655,15 @@ export default function ListaCotacoes() {
               <h3 className="text-lg font-semibold mb-4">Dados do Serviço</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Data Desejada</Label>
+                  <Label>Data de Criação (dd/mm/aaaa)</Label>
+                  <Input 
+                    type="date"
+                    value={editForm.data_criacao}
+                    onChange={(e) => setEditForm({...editForm, data_criacao: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Data Desejada (dd/mm/aaaa)</Label>
                   <Input 
                     type="date"
                     value={editForm.data_servico_desejada}
