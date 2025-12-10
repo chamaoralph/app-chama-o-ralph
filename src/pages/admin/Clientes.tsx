@@ -82,9 +82,18 @@ export default function AdminClientes() {
   
   const [clienteSelecionado, setClienteSelecionado] = useState<ClienteComMetricas | null>(null)
   const [modalAberto, setModalAberto] = useState(false)
+  const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false)
   const [editandoNome, setEditandoNome] = useState(false)
   const [novoNome, setNovoNome] = useState("")
   const [observacoes, setObservacoes] = useState("")
+  const [formEdicao, setFormEdicao] = useState({
+    nome: "",
+    telefone: "",
+    bairro: "",
+    endereco_completo: "",
+    idade: "",
+    origem_lead: ""
+  })
 
   // Fetch clientes
   const { data: clientes = [], isLoading: loadingClientes } = useQuery({
@@ -243,6 +252,68 @@ export default function AdminClientes() {
       toast({ title: "Erro ao atualizar nome", variant: "destructive" })
     }
   })
+
+  // Mutation para atualizar cliente completo
+  const atualizarClienteCompleto = useMutation({
+    mutationFn: async (dados: { 
+      id: string
+      nome: string
+      telefone: string
+      bairro: string | null
+      endereco_completo: string | null
+      idade: number | null
+      origem_lead: string
+    }) => {
+      const { error } = await supabase
+        .from('clientes')
+        .update({
+          nome: dados.nome,
+          telefone: dados.telefone,
+          bairro: dados.bairro || null,
+          endereco_completo: dados.endereco_completo || null,
+          idade: dados.idade,
+          origem_lead: dados.origem_lead
+        })
+        .eq('id', dados.id)
+      
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clientes-admin'] })
+      queryClient.invalidateQueries({ queryKey: ['cotacoes-admin'] })
+      toast({ title: "Cliente atualizado com sucesso!" })
+      setModalEdicaoAberto(false)
+      setModalAberto(false)
+    },
+    onError: () => {
+      toast({ title: "Erro ao atualizar cliente", variant: "destructive" })
+    }
+  })
+
+  function abrirModalEdicao(cliente: ClienteComMetricas) {
+    setFormEdicao({
+      nome: cliente.nome,
+      telefone: cliente.telefone,
+      bairro: cliente.bairro || "",
+      endereco_completo: cliente.endereco_completo || "",
+      idade: cliente.idade?.toString() || "",
+      origem_lead: cliente.origem_lead
+    })
+    setModalEdicaoAberto(true)
+  }
+
+  function salvarEdicaoCliente() {
+    if (!clienteSelecionado) return
+    atualizarClienteCompleto.mutate({
+      id: clienteSelecionado.id,
+      nome: formEdicao.nome,
+      telefone: formEdicao.telefone,
+      bairro: formEdicao.bairro || null,
+      endereco_completo: formEdicao.endereco_completo || null,
+      idade: formEdicao.idade ? parseInt(formEdicao.idade) : null,
+      origem_lead: formEdicao.origem_lead
+    })
+  }
 
   function handleOrdenar(campo: OrdenacaoCampo) {
     setOrdenacao(prev => ({
@@ -655,8 +726,15 @@ export default function AdminClientes() {
                   </p>
                 )}
 
-                {/* Botão Nova Cotação */}
-                <div className="mb-6">
+                {/* Botões de Ação */}
+                <div className="mb-6 flex gap-3">
+                  <Button
+                    onClick={() => abrirModalEdicao(clienteSelecionado)}
+                    variant="outline"
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
+                    Editar Cliente
+                  </Button>
                   <Button
                     onClick={() => {
                       navigate(`/admin/cotacoes/nova?cliente=${clienteSelecionado.telefone}&nome=${encodeURIComponent(clienteSelecionado.nome)}`)
@@ -664,7 +742,7 @@ export default function AdminClientes() {
                     className="bg-green-600 hover:bg-green-700"
                   >
                     <Plus className="w-4 h-4 mr-2" />
-                    Nova Cotação para este Cliente
+                    Nova Cotação
                   </Button>
                 </div>
 
@@ -725,6 +803,93 @@ export default function AdminClientes() {
                 </div>
               </>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal de Edição do Cliente */}
+        <Dialog open={modalEdicaoAberto} onOpenChange={setModalEdicaoAberto}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Editar Cliente</DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="edit-nome">Nome</Label>
+                <Input
+                  id="edit-nome"
+                  value={formEdicao.nome}
+                  onChange={(e) => setFormEdicao({ ...formEdicao, nome: e.target.value })}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="edit-telefone">Telefone</Label>
+                <Input
+                  id="edit-telefone"
+                  value={formEdicao.telefone}
+                  onChange={(e) => setFormEdicao({ ...formEdicao, telefone: e.target.value })}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="edit-bairro">Bairro</Label>
+                <Input
+                  id="edit-bairro"
+                  value={formEdicao.bairro}
+                  onChange={(e) => setFormEdicao({ ...formEdicao, bairro: e.target.value })}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="edit-endereco">Endereço Completo</Label>
+                <Input
+                  id="edit-endereco"
+                  value={formEdicao.endereco_completo}
+                  onChange={(e) => setFormEdicao({ ...formEdicao, endereco_completo: e.target.value })}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="edit-idade">Idade</Label>
+                <Input
+                  id="edit-idade"
+                  type="number"
+                  value={formEdicao.idade}
+                  onChange={(e) => setFormEdicao({ ...formEdicao, idade: e.target.value })}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="edit-origem">Origem do Lead</Label>
+                <Select 
+                  value={formEdicao.origem_lead} 
+                  onValueChange={(value) => setFormEdicao({ ...formEdicao, origem_lead: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Google">Google</SelectItem>
+                    <SelectItem value="Facebook">Facebook</SelectItem>
+                    <SelectItem value="Instagram">Instagram</SelectItem>
+                    <SelectItem value="Indicação">Indicação</SelectItem>
+                    <SelectItem value="Site">Site</SelectItem>
+                    <SelectItem value="WhatsApp">WhatsApp</SelectItem>
+                    <SelectItem value="Outro">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setModalEdicaoAberto(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={salvarEdicaoCliente} disabled={!formEdicao.nome || !formEdicao.telefone}>
+                Salvar Alterações
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
