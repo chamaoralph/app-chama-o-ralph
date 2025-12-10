@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { InstaladorLayout } from "@/components/layout/InstaladorLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,9 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Search, BookOpen, Play } from "lucide-react";
+import { Search, BookOpen, Play, FileQuestion, Award } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/lib/auth";
 
 const categorias = [
   "Todas",
@@ -32,6 +34,8 @@ const categoriaCores: Record<string, string> = {
 };
 
 export default function BaseConhecimento() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [busca, setBusca] = useState("");
   const [categoria, setCategoria] = useState("Todas");
   const [artigoSelecionado, setArtigoSelecionado] = useState<any>(null);
@@ -79,6 +83,51 @@ export default function BaseConhecimento() {
       if (error) throw error;
       return data;
     }
+  });
+
+  // Buscar questionários disponíveis
+  const { data: questionarios, isLoading: loadingQuestionarios } = useQuery({
+    queryKey: ["questionarios-disponiveis"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("questionarios")
+        .select("*")
+        .eq("ativo", true)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Buscar certificações do usuário
+  const { data: certificacoes } = useQuery({
+    queryKey: ["minhas-certificacoes-base", user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data, error } = await supabase
+        .from("certificacoes")
+        .select("questionario_id")
+        .eq("instalador_id", user.id)
+        .eq("ativa", true);
+      if (error) throw error;
+      return data?.map(c => c.questionario_id) || [];
+    },
+    enabled: !!user
+  });
+
+  // Buscar tentativas do usuário
+  const { data: tentativas } = useQuery({
+    queryKey: ["minhas-tentativas", user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data, error } = await supabase
+        .from("tentativas")
+        .select("questionario_id, aprovado")
+        .eq("instalador_id", user.id);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user
   });
 
   const getEmbedUrl = (url: string) => {
@@ -129,8 +178,12 @@ export default function BaseConhecimento() {
           </Select>
         </div>
 
-        <Tabs defaultValue="artigos" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+        <Tabs defaultValue="questionarios" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="questionarios">
+              <FileQuestion className="h-4 w-4 mr-2" />
+              Questionários
+            </TabsTrigger>
             <TabsTrigger value="artigos">
               <BookOpen className="h-4 w-4 mr-2" />
               Artigos
@@ -140,6 +193,73 @@ export default function BaseConhecimento() {
               Treinamentos
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="questionarios" className="mt-6">
+            {loadingQuestionarios ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[...Array(3)].map((_, i) => (
+                  <Card key={i}>
+                    <CardHeader>
+                      <Skeleton className="h-6 w-3/4" />
+                    </CardHeader>
+                    <CardContent>
+                      <Skeleton className="h-20 w-full" />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : questionarios && questionarios.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {questionarios.map((quest) => {
+                  const jaCertificado = certificacoes?.includes(quest.id);
+                  const tentativasDoQuest = tentativas?.filter(t => t.questionario_id === quest.id) || [];
+                  const jaFez = tentativasDoQuest.length > 0;
+                  
+                  return (
+                    <Card key={quest.id} className="hover:shadow-lg transition-shadow">
+                      <CardHeader>
+                        <div className="flex items-start justify-between gap-2">
+                          <CardTitle className="text-lg">{quest.titulo}</CardTitle>
+                          {jaCertificado && (
+                            <Badge className="bg-green-100 text-green-800">
+                              <Award className="w-3 h-3 mr-1" />
+                              Certificado
+                            </Badge>
+                          )}
+                        </div>
+                        <CardDescription>
+                          Nota mínima: {quest.nota_minima}%
+                          {quest.tempo_limite_minutos && ` • ${quest.tempo_limite_minutos} min`}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex flex-wrap gap-1 mb-4">
+                          {quest.tipos_servico_liberados?.map((tipo: string) => (
+                            <Badge key={tipo} variant="outline" className="text-xs">
+                              {tipo}
+                            </Badge>
+                          ))}
+                        </div>
+                        <Button 
+                          onClick={() => navigate(`/instalador/fazer-questionario/${quest.id}`)}
+                          className="w-full"
+                          variant={jaCertificado ? "outline" : "default"}
+                        >
+                          <FileQuestion className="h-4 w-4 mr-2" />
+                          {jaCertificado ? "Refazer Questionário" : jaFez ? "Tentar Novamente" : "Fazer Questionário"}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <FileQuestion className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">Nenhum questionário disponível</p>
+              </div>
+            )}
+          </TabsContent>
 
           <TabsContent value="artigos" className="mt-6">
             {loadingArtigos ? (

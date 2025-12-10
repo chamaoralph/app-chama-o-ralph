@@ -4,6 +4,12 @@ import { supabase } from '@/integrations/supabase/client'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/auth'
 import { useToast } from '@/hooks/use-toast'
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
+import { UserPlus, Users } from 'lucide-react'
 
 interface Servico {
   id: string
@@ -25,16 +31,32 @@ interface Servico {
   }
 }
 
+interface Instalador {
+  id: string
+  nome: string
+  ativo: boolean
+}
+
 export default function ListaServicos() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { toast } = useToast()
   const [servicos, setServicos] = useState<Servico[]>([])
+  const [instaladores, setInstaladores] = useState<Instalador[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // Estado para seleção em massa
+  const [servicosSelecionados, setServicosSelecionados] = useState<Set<string>>(new Set())
+  
+  // Estado para modal de atribuição
+  const [modalAberto, setModalAberto] = useState(false)
+  const [instaladorSelecionado, setInstaladorSelecionado] = useState<string>("")
+  const [servicoParaAtribuir, setServicoParaAtribuir] = useState<string | null>(null) // null = em massa
 
   useEffect(() => {
     fetchServicos()
+    fetchInstaladores()
   }, [user])
 
   async function fetchServicos() {
@@ -60,6 +82,22 @@ export default function ListaServicos() {
     }
   }
 
+  async function fetchInstaladores() {
+    try {
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select('id, nome, ativo')
+        .eq('tipo', 'instalador')
+        .eq('ativo', true)
+        .order('nome')
+
+      if (error) throw error
+      setInstaladores(data || [])
+    } catch (err) {
+      console.error('Erro ao buscar instaladores:', err)
+    }
+  }
+
   async function disponibilizarServico(servicoId: string) {
     try {
       const { error } = await supabase
@@ -82,6 +120,69 @@ export default function ListaServicos() {
         description: "Não foi possível disponibilizar o serviço",
         variant: "destructive",
       })
+    }
+  }
+
+  function abrirModalAtribuicao(servicoId: string | null) {
+    setServicoParaAtribuir(servicoId)
+    setInstaladorSelecionado("")
+    setModalAberto(true)
+  }
+
+  async function confirmarAtribuicao() {
+    if (!instaladorSelecionado) {
+      toast({ title: "Selecione um instalador", variant: "destructive" })
+      return
+    }
+
+    try {
+      const idsParaAtribuir = servicoParaAtribuir 
+        ? [servicoParaAtribuir] 
+        : Array.from(servicosSelecionados)
+
+      const { error } = await supabase
+        .from('servicos')
+        .update({ 
+          instalador_id: instaladorSelecionado,
+          status: 'atribuido'
+        })
+        .in('id', idsParaAtribuir)
+
+      if (error) throw error
+
+      toast({
+        title: "Instalador atribuído",
+        description: `${idsParaAtribuir.length} serviço(s) atribuído(s) com sucesso`,
+      })
+
+      setModalAberto(false)
+      setServicosSelecionados(new Set())
+      fetchServicos()
+    } catch (err) {
+      console.error('Erro ao atribuir instalador:', err)
+      toast({
+        title: "Erro",
+        description: "Não foi possível atribuir o instalador",
+        variant: "destructive",
+      })
+    }
+  }
+
+  function toggleSelecao(servicoId: string) {
+    const novaSelecao = new Set(servicosSelecionados)
+    if (novaSelecao.has(servicoId)) {
+      novaSelecao.delete(servicoId)
+    } else {
+      novaSelecao.add(servicoId)
+    }
+    setServicosSelecionados(novaSelecao)
+  }
+
+  function toggleSelecionarTodos() {
+    if (servicosSelecionados.size === servicos.length) {
+      setServicosSelecionados(new Set())
+    } else {
+      setServicosSelecionados(new Set(servicos.map(s => s.id)))
     }
   }
 
@@ -131,6 +232,16 @@ export default function ListaServicos() {
             <h1 className="text-3xl font-bold text-gray-900">Serviços</h1>
             <p className="text-gray-600 mt-2">Gerencie todos os serviços da empresa</p>
           </div>
+          
+          {servicosSelecionados.size > 0 && (
+            <Button 
+              onClick={() => abrirModalAtribuicao(null)}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              <Users className="w-4 h-4 mr-2" />
+              Definir Instalador ({servicosSelecionados.size})
+            </Button>
+          )}
         </div>
 
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
@@ -138,6 +249,12 @@ export default function ListaServicos() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-4 py-3 text-left">
+                    <Checkbox
+                      checked={servicosSelecionados.size === servicos.length && servicos.length > 0}
+                      onCheckedChange={toggleSelecionarTodos}
+                    />
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Código
                   </th>
@@ -167,7 +284,7 @@ export default function ListaServicos() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {servicos.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
                       <div className="flex flex-col items-center">
                         <svg className="w-16 h-16 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
@@ -180,6 +297,12 @@ export default function ListaServicos() {
                 ) : (
                   servicos.map((servico) => (
                     <tr key={servico.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-4">
+                        <Checkbox
+                          checked={servicosSelecionados.has(servico.id)}
+                          onCheckedChange={() => toggleSelecao(servico.id)}
+                        />
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">{servico.codigo}</div>
                       </td>
@@ -209,13 +332,22 @@ export default function ListaServicos() {
                           {new Date(servico.data_servico_agendada).toLocaleDateString('pt-BR')}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
                         {servico.status === 'aguardando_distribuicao' && (
                           <button
                             onClick={() => disponibilizarServico(servico.id)}
-                            className="text-blue-600 hover:text-blue-800 font-medium mr-4"
+                            className="text-blue-600 hover:text-blue-800 font-medium"
                           >
                             Disponibilizar
+                          </button>
+                        )}
+                        {!servico.instalador_id && (
+                          <button
+                            onClick={() => abrirModalAtribuicao(servico.id)}
+                            className="text-purple-600 hover:text-purple-800 font-medium"
+                          >
+                            <UserPlus className="w-4 h-4 inline mr-1" />
+                            Definir Instalador
                           </button>
                         )}
                         <button
@@ -235,10 +367,50 @@ export default function ListaServicos() {
 
         <div className="mt-4 flex justify-between items-center text-sm text-gray-600">
           <div>
-            Mostrando {servicos.length} serviço(s)
+            Mostrando {servicos.length} serviço(s) | {servicosSelecionados.size} selecionado(s)
           </div>
         </div>
       </div>
+
+      {/* Modal de Atribuição */}
+      <Dialog open={modalAberto} onOpenChange={setModalAberto}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Definir Instalador
+              {servicoParaAtribuir 
+                ? "" 
+                : ` (${servicosSelecionados.size} serviços)`
+              }
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <Label>Selecione o Instalador</Label>
+            <Select value={instaladorSelecionado} onValueChange={setInstaladorSelecionado}>
+              <SelectTrigger className="mt-2">
+                <SelectValue placeholder="Escolha um instalador..." />
+              </SelectTrigger>
+              <SelectContent>
+                {instaladores.map(instalador => (
+                  <SelectItem key={instalador.id} value={instalador.id}>
+                    {instalador.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setModalAberto(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={confirmarAtribuicao} disabled={!instaladorSelecionado}>
+              Confirmar Atribuição
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   )
 }

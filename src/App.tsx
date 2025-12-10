@@ -15,6 +15,7 @@ import AdminDashboard from "@/pages/admin/Dashboard";
 import AdminCotacoesLista from "@/pages/admin/cotacoes/Lista";
 import AdminCotacoesNova from "@/pages/admin/cotacoes/Nova";
 import AdminServicosLista from "@/pages/admin/servicos/Lista";
+import AdminServicoDetalhe from "@/pages/admin/servicos/Detalhe";
 import AdminAprovacoes from "@/pages/admin/Aprovacoes";
 import Caixa from "@/pages/admin/Caixa";
 import AdminInstaladores from "@/pages/admin/Instaladores";
@@ -64,6 +65,7 @@ function App() {
               <Route path="cotacoes" element={<AdminCotacoesLista />} />
               <Route path="cotacoes/nova" element={<AdminCotacoesNova />} />
               <Route path="servicos" element={<AdminServicosLista />} />
+              <Route path="servicos/:id" element={<AdminServicoDetalhe />} />
               <Route path="aprovacoes" element={<AdminAprovacoes />} />
               <Route path="caixa" element={<Caixa />} />
               <Route path="despesas" element={<AdminDespesas />} />
