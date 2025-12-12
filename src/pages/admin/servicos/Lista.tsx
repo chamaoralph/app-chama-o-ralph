@@ -9,7 +9,10 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
-import { UserPlus, Users, CheckCircle } from 'lucide-react'
+import { UserPlus, Users, CheckCircle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+
+type SortField = 'codigo' | 'cliente' | 'tipo_servico' | 'instalador' | 'status' | 'valor_total' | 'data_servico_agendada'
+type SortDirection = 'asc' | 'desc'
 
 interface Servico {
   id: string
@@ -53,7 +56,11 @@ export default function ListaServicos() {
   // Estado para modal de atribuição
   const [modalAberto, setModalAberto] = useState(false)
   const [instaladorSelecionado, setInstaladorSelecionado] = useState<string>("")
-  const [servicoParaAtribuir, setServicoParaAtribuir] = useState<string | null>(null) // null = em massa
+  const [servicoParaAtribuir, setServicoParaAtribuir] = useState<string | null>(null)
+  
+  // Estado para ordenação
+  const [sortField, setSortField] = useState<SortField>('data_servico_agendada')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
   useEffect(() => {
     fetchServicos()
@@ -242,6 +249,54 @@ export default function ListaServicos() {
     )
   }
 
+  function handleSort(field: SortField) {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  function getSortIcon(field: SortField) {
+    if (sortField !== field) {
+      return <ArrowUpDown className="w-4 h-4 ml-1 opacity-50" />
+    }
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="w-4 h-4 ml-1" />
+      : <ArrowDown className="w-4 h-4 ml-1" />
+  }
+
+  const servicosOrdenados = [...servicos].sort((a, b) => {
+    let comparison = 0
+    
+    switch (sortField) {
+      case 'codigo':
+        comparison = a.codigo.localeCompare(b.codigo)
+        break
+      case 'cliente':
+        comparison = (a.clientes?.nome || '').localeCompare(b.clientes?.nome || '')
+        break
+      case 'tipo_servico':
+        comparison = (a.tipo_servico?.join(', ') || '').localeCompare(b.tipo_servico?.join(', ') || '')
+        break
+      case 'instalador':
+        comparison = (a.usuarios?.nome || '').localeCompare(b.usuarios?.nome || '')
+        break
+      case 'status':
+        comparison = a.status.localeCompare(b.status)
+        break
+      case 'valor_total':
+        comparison = Number(a.valor_total) - Number(b.valor_total)
+        break
+      case 'data_servico_agendada':
+        comparison = new Date(a.data_servico_agendada).getTime() - new Date(b.data_servico_agendada).getTime()
+        break
+    }
+    
+    return sortDirection === 'asc' ? comparison : -comparison
+  })
+
   if (loading) {
     return (
       <AdminLayout>
@@ -293,26 +348,61 @@ export default function ListaServicos() {
                       onCheckedChange={toggleSelecionarTodos}
                     />
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Código
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('codigo')}
+                  >
+                    <div className="flex items-center">
+                      Código {getSortIcon('codigo')}
+                    </div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Cliente
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('cliente')}
+                  >
+                    <div className="flex items-center">
+                      Cliente {getSortIcon('cliente')}
+                    </div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Serviço
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('tipo_servico')}
+                  >
+                    <div className="flex items-center">
+                      Serviço {getSortIcon('tipo_servico')}
+                    </div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Instalador
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('instalador')}
+                  >
+                    <div className="flex items-center">
+                      Instalador {getSortIcon('instalador')}
+                    </div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('status')}
+                  >
+                    <div className="flex items-center">
+                      Status {getSortIcon('status')}
+                    </div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Valor Total
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('valor_total')}
+                  >
+                    <div className="flex items-center">
+                      Valor Total {getSortIcon('valor_total')}
+                    </div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Data Agendada
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('data_servico_agendada')}
+                  >
+                    <div className="flex items-center">
+                      Data Agendada {getSortIcon('data_servico_agendada')}
+                    </div>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Ações
@@ -333,7 +423,7 @@ export default function ListaServicos() {
                     </td>
                   </tr>
                 ) : (
-                  servicos.map((servico) => (
+                  servicosOrdenados.map((servico) => (
                     <tr key={servico.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-4">
                         <Checkbox
