@@ -68,28 +68,38 @@ export default function Relatorios() {
       if (!userData) return
 
       const [year, month] = mesAno.split('-')
-      const startDate = new Date(parseInt(year), parseInt(month) - 1, 1)
-      const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59)
+      const startDate = `${year}-${month}-01`
+      const endDate = new Date(parseInt(year), parseInt(month), 0)
+      const endDateStr = `${year}-${month}-${String(endDate.getDate()).padStart(2, '0')}`
 
-      // Buscar resumo financeiro do mês
-      const { data: lancamentos } = await supabase
-        .from('lancamentos_caixa')
-        .select('tipo, categoria, valor')
+      // Buscar serviços concluídos no mês (baseado em data_servico_agendada)
+      const { data: servicosConcluidos } = await supabase
+        .from('servicos')
+        .select('valor_total, valor_mao_obra_instalador')
         .eq('empresa_id', userData.empresa_id)
-        .gte('data_lancamento', startDate.toISOString().split('T')[0])
-        .lte('data_lancamento', endDate.toISOString().split('T')[0])
+        .eq('status', 'concluido')
+        .gte('data_servico_agendada', startDate)
+        .lte('data_servico_agendada', endDateStr + 'T23:59:59')
 
-      const receitaBruta = lancamentos
-        ?.filter(l => l.tipo === 'receita')
-        .reduce((sum, l) => sum + Number(l.valor), 0) || 0
+      const receitaBruta = servicosConcluidos
+        ?.reduce((sum, s) => sum + Number(s.valor_total || 0), 0) || 0
 
-      const pagamentoInstaladores = lancamentos
-        ?.filter(l => l.categoria === 'Pagamento Instalador')
-        .reduce((sum, l) => sum + Number(l.valor), 0) || 0
+      const pagamentoInstaladores = servicosConcluidos
+        ?.reduce((sum, s) => sum + Number(s.valor_mao_obra_instalador || 0), 0) || 0
 
-      const outrasDespesas = lancamentos
-        ?.filter(l => l.tipo === 'despesa' && l.categoria !== 'Pagamento Instalador')
-        .reduce((sum, l) => sum + Number(l.valor), 0) || 0
+      // Buscar outras despesas do mês (não relacionadas a serviços)
+      const { data: despesasGerais } = await supabase
+        .from('lancamentos_caixa')
+        .select('valor, categoria')
+        .eq('empresa_id', userData.empresa_id)
+        .eq('tipo', 'despesa')
+        .neq('categoria', 'Pagamento Instalador')
+        .neq('categoria', 'Reembolso Materiais')
+        .gte('data_lancamento', startDate)
+        .lte('data_lancamento', endDateStr)
+
+      const outrasDespesas = despesasGerais
+        ?.reduce((sum, l) => sum + Number(l.valor), 0) || 0
 
       const lucroLiquido = receitaBruta - pagamentoInstaladores - outrasDespesas
 
@@ -107,13 +117,13 @@ export default function Relatorios() {
           instalador_id,
           valor_mao_obra_instalador,
           status,
-          updated_at,
+          data_servico_agendada,
           instalador:usuarios!servicos_instalador_id_fkey(nome)
         `)
         .eq('empresa_id', userData.empresa_id)
         .eq('status', 'concluido')
-        .gte('updated_at', startDate.toISOString())
-        .lte('updated_at', endDate.toISOString())
+        .gte('data_servico_agendada', startDate)
+        .lte('data_servico_agendada', endDateStr + 'T23:59:59')
 
       // Agrupar por instalador
       const instaladoresMap = new Map()
