@@ -478,7 +478,7 @@ export default function ListaServicos() {
                             Definir Instalador
                           </button>
                         )}
-                        {servico.status === 'em_andamento' && (
+                        {(servico.status === 'em_andamento' || servico.status === 'atribuido') && (
                           <button
                             onClick={() => finalizarComoAdmin(servico.id)}
                             className="text-green-600 hover:text-green-800 font-medium"
