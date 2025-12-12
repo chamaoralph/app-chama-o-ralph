@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
-import { UserPlus, Users } from 'lucide-react'
+import { UserPlus, Users, CheckCircle } from 'lucide-react'
 
 interface Servico {
   id: string
@@ -23,6 +23,7 @@ interface Servico {
   data_servico_agendada: string
   valor_total: number
   valor_mao_obra_instalador: number | null
+  observacoes_instalador: string | null
   clientes: {
     nome: string
   }
@@ -186,7 +187,35 @@ export default function ListaServicos() {
     }
   }
 
-  const getStatusBadge = (status: string) => {
+  async function finalizarComoAdmin(servicoId: string) {
+    try {
+      const { error } = await supabase
+        .from('servicos')
+        .update({ 
+          status: 'concluido',
+          observacoes_instalador: 'Finalizado pelo administrador'
+        })
+        .eq('id', servicoId)
+
+      if (error) throw error
+
+      toast({
+        title: "Serviço finalizado",
+        description: "O serviço foi finalizado pelo administrador",
+      })
+
+      fetchServicos()
+    } catch (err) {
+      console.error('Erro ao finalizar serviço:', err)
+      toast({
+        title: "Erro",
+        description: "Não foi possível finalizar o serviço",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const getStatusBadge = (status: string, observacoes?: string | null) => {
     const badges: Record<string, { bg: string; text: string; label: string }> = {
       aguardando_distribuicao: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Aguardando Distribuição' },
       disponivel: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Disponível' },
@@ -197,10 +226,19 @@ export default function ListaServicos() {
       cancelado: { bg: 'bg-red-100', text: 'text-red-800', label: 'Cancelado' },
     }
     const badge = badges[status] || badges.aguardando_distribuicao
+    const isFinalizadoPeloAdmin = status === 'concluido' && observacoes === 'Finalizado pelo administrador'
+    
     return (
-      <span className={`px-3 py-1 rounded-full text-xs font-medium ${badge.bg} ${badge.text}`}>
-        {badge.label}
-      </span>
+      <div className="flex flex-col gap-1">
+        <span className={`px-3 py-1 rounded-full text-xs font-medium ${badge.bg} ${badge.text}`}>
+          {badge.label}
+        </span>
+        {isFinalizadoPeloAdmin && (
+          <span className="text-xs text-gray-500 italic">
+            (pelo admin)
+          </span>
+        )}
+      </div>
     )
   }
 
@@ -320,7 +358,7 @@ export default function ListaServicos() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(servico.status)}
+                        {getStatusBadge(servico.status, servico.observacoes_instalador)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
@@ -348,6 +386,15 @@ export default function ListaServicos() {
                           >
                             <UserPlus className="w-4 h-4 inline mr-1" />
                             Definir Instalador
+                          </button>
+                        )}
+                        {servico.status === 'em_andamento' && (
+                          <button
+                            onClick={() => finalizarComoAdmin(servico.id)}
+                            className="text-green-600 hover:text-green-800 font-medium"
+                          >
+                            <CheckCircle className="w-4 h-4 inline mr-1" />
+                            Finalizar
                           </button>
                         )}
                         <button
