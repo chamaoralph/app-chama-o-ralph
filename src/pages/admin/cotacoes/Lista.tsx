@@ -300,12 +300,10 @@ export default function ListaCotacoes() {
 
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { bg: string; text: string; label: string }> = {
-      enviada: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Enviada' },
-      confirmada: { bg: 'bg-green-100', text: 'text-green-800', label: 'Confirmada' },
       pendente: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Pendente' },
-      em_analise: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Em Análise' },
       aprovada: { bg: 'bg-green-100', text: 'text-green-800', label: 'Aprovada' },
-      recusada: { bg: 'bg-red-100', text: 'text-red-800', label: 'Recusada' },
+      perdida: { bg: 'bg-red-100', text: 'text-red-800', label: 'Perdida' },
+      sem_resposta: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Sem Resposta' },
       nao_gerou: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Não Gerou' },
     }
     const badge = badges[status] || badges.pendente
@@ -550,7 +548,7 @@ export default function ListaCotacoes() {
                                   </Button>
                                 </>
                               )}
-                              {cotacao.status !== 'nao_gerou' && (
+                              {cotacao.status === 'pendente' && (
                                 <Button
                                   onClick={() => setCotacaoParaNaoGerou(cotacao.id)}
                                   size="sm"
