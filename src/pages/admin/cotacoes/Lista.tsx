@@ -22,6 +22,8 @@ interface Cotacao {
   status: string
   created_at: string
   data_servico_desejada: string | null
+  horario_inicio: string | null
+  horario_fim: string | null
   valor_estimado: number | null
   ocasiao: string | null
   origem_lead: string | null
@@ -46,6 +48,8 @@ interface EditForm {
   origem_lead: string
   ocasiao: string
   data_servico_desejada: string
+  horario_inicio: string
+  horario_fim: string
   data_criacao: string
   tipo_servico: string
   valor_estimado: string
@@ -71,6 +75,8 @@ export default function ListaCotacoes() {
     origem_lead: '',
     ocasiao: '',
     data_servico_desejada: '',
+    horario_inicio: '',
+    horario_fim: '',
     data_criacao: '',
     tipo_servico: '',
     valor_estimado: '',
@@ -119,6 +125,8 @@ export default function ListaCotacoes() {
       origem_lead: cotacao.origem_lead || '',
       ocasiao: cotacao.ocasiao || '',
       data_servico_desejada: cotacao.data_servico_desejada || '',
+      horario_inicio: cotacao.horario_inicio || '',
+      horario_fim: cotacao.horario_fim || '',
       data_criacao: cotacao.created_at ? cotacao.created_at.split('T')[0] : '',
       tipo_servico: cotacao.tipo_servico?.join(', ') || '',
       valor_estimado: cotacao.valor_estimado?.toString() || '',
@@ -152,6 +160,8 @@ export default function ListaCotacoes() {
         .update({
           tipo_servico: editForm.tipo_servico.split(',').map(s => s.trim()).filter(Boolean),
           data_servico_desejada: editForm.data_servico_desejada || null,
+          horario_inicio: editForm.horario_inicio || null,
+          horario_fim: editForm.horario_fim || null,
           created_at: editForm.data_criacao ? new Date(editForm.data_criacao).toISOString() : undefined,
           valor_estimado: editForm.valor_estimado ? parseFloat(editForm.valor_estimado) : null,
           origem_lead: editForm.origem_lead || null,
@@ -680,6 +690,22 @@ export default function ListaCotacoes() {
                     type="date"
                     value={editForm.data_servico_desejada}
                     onChange={(e) => setEditForm({...editForm, data_servico_desejada: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Horário Início</Label>
+                  <Input 
+                    type="time"
+                    value={editForm.horario_inicio}
+                    onChange={(e) => setEditForm({...editForm, horario_inicio: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Horário Fim</Label>
+                  <Input 
+                    type="time"
+                    value={editForm.horario_fim}
+                    onChange={(e) => setEditForm({...editForm, horario_fim: e.target.value})}
                   />
                 </div>
                 <div className="space-y-2">

@@ -20,6 +20,8 @@ export default function NovaCotacao() {
     origem_lead: 'WhatsApp',
     ocasiao: '',
     data_servico_desejada: '',
+    horario_inicio: '',
+    horario_fim: '',
     tipo_servico: '',
     valor_estimado: '',
     observacoes: ''
@@ -78,6 +80,8 @@ export default function NovaCotacao() {
           empresa_id: userData.empresa_id,
           cliente_id: clienteId,
           data_servico_desejada: formData.data_servico_desejada,
+          horario_inicio: formData.horario_inicio || null,
+          horario_fim: formData.horario_fim || null,
           tipo_servico: [formData.tipo_servico],
           descricao_servico: formData.tipo_servico,
           valor_estimado: formData.valor_estimado ? parseFloat(formData.valor_estimado) : null,
@@ -159,6 +163,14 @@ export default function NovaCotacao() {
               <div>
                 <label className="block text-sm font-medium mb-2">Valor Estimado</label>
                 <input type="number" step="0.01" value={formData.valor_estimado} onChange={(e) => setFormData({...formData, valor_estimado: e.target.value})} className="w-full px-3 py-2 border rounded-md" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Horário Início</label>
+                <input type="time" value={formData.horario_inicio} onChange={(e) => setFormData({...formData, horario_inicio: e.target.value})} className="w-full px-3 py-2 border rounded-md" placeholder="Ex: 13:00" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Horário Fim</label>
+                <input type="time" value={formData.horario_fim} onChange={(e) => setFormData({...formData, horario_fim: e.target.value})} className="w-full px-3 py-2 border rounded-md" placeholder="Ex: 18:00" />
               </div>
               <div className="col-span-2">
                 <label className="block text-sm font-medium mb-2">Tipo de Serviço *</label>
