@@ -218,6 +218,8 @@ export type Database = {
           data_servico_desejada: string | null
           descricao_servico: string | null
           empresa_id: string
+          horario_fim: string | null
+          horario_inicio: string | null
           id: string
           observacoes: string | null
           ocasiao: string | null
@@ -233,6 +235,8 @@ export type Database = {
           data_servico_desejada?: string | null
           descricao_servico?: string | null
           empresa_id: string
+          horario_fim?: string | null
+          horario_inicio?: string | null
           id?: string
           observacoes?: string | null
           ocasiao?: string | null
@@ -248,6 +252,8 @@ export type Database = {
           data_servico_desejada?: string | null
           descricao_servico?: string | null
           empresa_id?: string
+          horario_fim?: string | null
+          horario_inicio?: string | null
           id?: string
           observacoes?: string | null
           ocasiao?: string | null
