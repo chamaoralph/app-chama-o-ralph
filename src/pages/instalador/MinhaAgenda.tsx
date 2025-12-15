@@ -36,7 +36,7 @@ export default function MinhaAgenda() {
         `
         )
         .eq("instalador_id", user.id)
-        .in("status", ["atribuido", "em_andamento"])
+        .in("status", ["solicitado", "atribuido", "em_andamento"])
         .order("data_servico_agendada", { ascending: true });
 
       if (error) {
@@ -125,6 +125,12 @@ export default function MinhaAgenda() {
                       >
                         📞 Ligar
                       </button>
+
+                      {servico.status === "solicitado" && (
+                        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-3 py-2 rounded text-sm text-center">
+                          ⏳ Aguardando aprovação
+                        </div>
+                      )}
 
                       {servico.status === "atribuido" && (
                         <button

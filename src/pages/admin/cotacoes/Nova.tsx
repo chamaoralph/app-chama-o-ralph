@@ -84,7 +84,7 @@ export default function NovaCotacao() {
           origem_lead: formData.origem_lead,
           ocasiao: formData.ocasiao,
           observacoes: formData.observacoes,
-          status: 'enviada'
+          status: 'pendente'
         })
 
       if (erroCotacao) throw erroCotacao
