@@ -1,1 +1,4 @@
 project_id = "xenevneonaqbrqiuvuch"
+
+[functions.criar-cotacao-whatsapp]
+verify_jwt = false
