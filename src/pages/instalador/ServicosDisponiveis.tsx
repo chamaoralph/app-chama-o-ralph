@@ -8,8 +8,9 @@ import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Lock } from 'lucide-react'
+import { useIsMobile } from '@/hooks/use-mobile'
+import { MobileServicoCard } from '@/components/instalador/MobileServicoCard'
 
 interface Servico {
   id: string
@@ -26,16 +27,12 @@ interface Servico {
   }
 }
 
-// Helper para extrair bairro e rua (sem número/complemento)
 function formatarEndereco(endereco: string, bairro: string | null): string {
   if (!endereco) return bairro || 'N/A'
   
-  // Se temos bairro separado, exibir apenas bairro + rua (parte antes do número)
   const partes = endereco.split(',')
   if (partes.length > 0) {
-    // Pegar apenas a primeira parte (rua) e remover números
     let rua = partes[0].trim()
-    // Remover números do final (número da casa)
     rua = rua.replace(/\s*\d+\s*$/, '').trim()
     
     if (bairro) {
@@ -55,8 +52,8 @@ export default function ServicosDisponiveis() {
   const [solicitando, setSolicitando] = useState<string | null>(null)
   const { user } = useAuth()
   const { toast } = useToast()
+  const isMobile = useIsMobile()
 
-  // Buscar certificações do instalador
   const { data: certificacoes } = useQuery({
     queryKey: ['minhas-certificacoes', user?.id],
     queryFn: async () => {
@@ -118,11 +115,9 @@ export default function ServicosDisponiveis() {
     try {
       setSolicitando(servicoId)
       
-      // 1. Buscar usuário logado
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Não autenticado')
 
-      // 2. Atualizar serviço para status 'solicitado'
       const { error } = await supabase
         .from('servicos')
         .update({
@@ -130,7 +125,7 @@ export default function ServicosDisponiveis() {
           status: 'solicitado'
         })
         .eq('id', servicoId)
-        .eq('status', 'disponivel') // Só atualiza se ainda estiver disponível
+        .eq('status', 'disponivel')
 
       if (error) throw error
 
@@ -139,7 +134,6 @@ export default function ServicosDisponiveis() {
         description: "O serviço foi adicionado à sua agenda.",
       })
       
-      // 3. Redirecionar para Minha Agenda
       navigate('/instalador/minha-agenda')
       
     } catch (error: any) {
@@ -158,7 +152,7 @@ export default function ServicosDisponiveis() {
     return (
       <InstaladorLayout>
         <div className="flex items-center justify-center min-h-[400px]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
       </InstaladorLayout>
     )
@@ -177,18 +171,20 @@ export default function ServicosDisponiveis() {
   return (
     <InstaladorLayout>
       <div>
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Serviços Disponíveis</h1>
-          <p className="text-gray-600 mt-2">
+        <div className={`mb-4 ${isMobile ? "" : "mb-6"}`}>
+          <h1 className={`font-bold text-gray-900 ${isMobile ? "text-2xl" : "text-3xl"}`}>
+            Serviços Disponíveis
+          </h1>
+          <p className="text-gray-600 mt-1">
             {servicos.length} {servicos.length === 1 ? 'serviço disponível' : 'serviços disponíveis'}
           </p>
         </div>
 
         {servicos.length === 0 ? (
           <div className="bg-white rounded-lg shadow p-8 text-center">
-            <div className="text-6xl mb-4">📭</div>
+            <div className="text-5xl mb-4">📭</div>
             <h2 className="text-xl font-semibold text-gray-700 mb-2">
-              Nenhum serviço disponível no momento
+              Nenhum serviço disponível
             </h2>
             <p className="text-gray-600">
               Novos serviços aparecerão aqui assim que forem disponibilizados
@@ -197,10 +193,22 @@ export default function ServicosDisponiveis() {
         ) : (
           <div className="space-y-4">
             {servicos.map((servico) => {
-              // Verificar se instalador tem certificação para este serviço
               const temCertificacao = servico.tipo_servico?.some(tipo => 
                 certificacoes?.has(tipo)
               ) ?? false
+
+              if (isMobile) {
+                return (
+                  <MobileServicoCard
+                    key={servico.id}
+                    servico={servico}
+                    variant="disponivel"
+                    temCertificacao={temCertificacao}
+                    onSolicitar={solicitarServico}
+                    isLoading={solicitando === servico.id}
+                  />
+                )
+              }
 
               return (
                 <div
@@ -270,7 +278,6 @@ export default function ServicosDisponiveis() {
                       disabled
                       variant="outline"
                       className="w-full border-orange-300 text-orange-600"
-                      onClick={() => navigate('/instalador/base-conhecimento')}
                     >
                       <Lock className="w-4 h-4 mr-2" />
                       Certificação Necessária

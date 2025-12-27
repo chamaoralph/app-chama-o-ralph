@@ -1,6 +1,9 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { MobileInstaladorLayout } from "./MobileInstaladorLayout";
+import { supabase } from "@/integrations/supabase/client";
 
 interface InstaladorLayoutProps {
   children: ReactNode;
@@ -9,6 +12,36 @@ interface InstaladorLayoutProps {
 export function InstaladorLayout({ children }: InstaladorLayoutProps) {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
+  const [servicosDisponiveis, setServicosDisponiveis] = useState(0);
+
+  useEffect(() => {
+    async function fetchServicosDisponiveis() {
+      try {
+        const { data: userData } = await supabase
+          .from("usuarios")
+          .select("empresa_id")
+          .eq("id", user?.id)
+          .single();
+
+        if (userData) {
+          const { count } = await supabase
+            .from("servicos")
+            .select("id", { count: "exact", head: true })
+            .eq("empresa_id", userData.empresa_id)
+            .eq("status", "disponivel");
+
+          setServicosDisponiveis(count || 0);
+        }
+      } catch (error) {
+        console.error("Erro ao buscar serviços disponíveis:", error);
+      }
+    }
+
+    if (user?.id) {
+      fetchServicosDisponiveis();
+    }
+  }, [user?.id]);
 
   async function handleSignOut() {
     try {
@@ -17,6 +50,15 @@ export function InstaladorLayout({ children }: InstaladorLayoutProps) {
     } catch (error) {
       console.error("Erro ao sair:", error);
     }
+  }
+
+  // Usar layout mobile em telas pequenas
+  if (isMobile) {
+    return (
+      <MobileInstaladorLayout servicosDisponiveis={servicosDisponiveis}>
+        {children}
+      </MobileInstaladorLayout>
+    );
   }
 
   return (
@@ -33,9 +75,14 @@ export function InstaladorLayout({ children }: InstaladorLayoutProps) {
           </Link>
           <Link
             to="/instalador/servicos-disponiveis"
-            className="block px-4 py-2 rounded hover:bg-blue-800 transition-colors"
+            className="block px-4 py-2 rounded hover:bg-blue-800 transition-colors relative"
           >
             🆕 Serviços Disponíveis
+            {servicosDisponiveis > 0 && (
+              <span className="ml-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">
+                {servicosDisponiveis}
+              </span>
+            )}
           </Link>
           <Link to="/instalador/minha-agenda" className="block px-4 py-2 rounded hover:bg-blue-800 transition-colors">
             📅 Minha Agenda
