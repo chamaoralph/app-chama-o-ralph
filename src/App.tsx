@@ -9,6 +9,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "@/pages/Index";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
+import Instalar from "@/pages/Instalar";
 import NotFound from "@/pages/NotFound";
 // Admin Pages
 import AdminDashboard from "@/pages/admin/Dashboard";
@@ -50,6 +51,7 @@ function App() {
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/instalar" element={<Instalar />} />
 
             {/* Admin Routes */}
             <Route
