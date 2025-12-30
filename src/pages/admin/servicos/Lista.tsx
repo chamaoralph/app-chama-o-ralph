@@ -10,6 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { UserPlus, Users, CheckCircle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { useIsMobile } from '@/hooks/use-mobile'
+import { MobileServicoCardAdmin } from '@/components/admin/MobileServicoCardAdmin'
 
 type SortField = 'codigo' | 'cliente' | 'tipo_servico' | 'instalador' | 'status' | 'valor_total' | 'data_servico_agendada'
 type SortDirection = 'asc' | 'desc'
@@ -45,6 +47,7 @@ export default function ListaServicos() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { toast } = useToast()
+  const isMobile = useIsMobile()
   const [servicos, setServicos] = useState<Servico[]>([])
   const [instaladores, setInstaladores] = useState<Instalador[]>([])
   const [loading, setLoading] = useState(true)
@@ -322,187 +325,228 @@ export default function ListaServicos() {
       <div>
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Serviços</h1>
-            <p className="text-gray-600 mt-2">Gerencie todos os serviços da empresa</p>
+            <h1 className={`font-bold text-foreground ${isMobile ? 'text-2xl' : 'text-3xl'}`}>Serviços</h1>
+            {!isMobile && (
+              <p className="text-muted-foreground mt-2">Gerencie todos os serviços da empresa</p>
+            )}
           </div>
           
           {servicosSelecionados.size > 0 && (
             <Button 
               onClick={() => abrirModalAtribuicao(null)}
               className="bg-purple-600 hover:bg-purple-700"
+              size={isMobile ? "sm" : "default"}
             >
               <Users className="w-4 h-4 mr-2" />
-              Definir Instalador ({servicosSelecionados.size})
+              {isMobile ? `(${servicosSelecionados.size})` : `Definir Instalador (${servicosSelecionados.size})`}
             </Button>
           )}
         </div>
 
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left">
-                    <Checkbox
-                      checked={servicosSelecionados.size === servicos.length && servicos.length > 0}
-                      onCheckedChange={toggleSelecionarTodos}
-                    />
-                  </th>
-                  <th 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                    onClick={() => handleSort('codigo')}
-                  >
-                    <div className="flex items-center">
-                      Código {getSortIcon('codigo')}
-                    </div>
-                  </th>
-                  <th 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                    onClick={() => handleSort('cliente')}
-                  >
-                    <div className="flex items-center">
-                      Cliente {getSortIcon('cliente')}
-                    </div>
-                  </th>
-                  <th 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                    onClick={() => handleSort('tipo_servico')}
-                  >
-                    <div className="flex items-center">
-                      Serviço {getSortIcon('tipo_servico')}
-                    </div>
-                  </th>
-                  <th 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                    onClick={() => handleSort('instalador')}
-                  >
-                    <div className="flex items-center">
-                      Instalador {getSortIcon('instalador')}
-                    </div>
-                  </th>
-                  <th 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                    onClick={() => handleSort('status')}
-                  >
-                    <div className="flex items-center">
-                      Status {getSortIcon('status')}
-                    </div>
-                  </th>
-                  <th 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                    onClick={() => handleSort('valor_total')}
-                  >
-                    <div className="flex items-center">
-                      Valor Total {getSortIcon('valor_total')}
-                    </div>
-                  </th>
-                  <th 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                    onClick={() => handleSort('data_servico_agendada')}
-                  >
-                    <div className="flex items-center">
-                      Data Agendada {getSortIcon('data_servico_agendada')}
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Ações
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {servicos.length === 0 ? (
+        {/* Mobile: Cards */}
+        {isMobile ? (
+          <div className="space-y-3">
+            {servicos.length === 0 ? (
+              <div className="bg-card rounded-lg p-8 text-center">
+                <p className="text-lg font-medium text-foreground">Nenhum serviço cadastrado</p>
+                <p className="text-sm text-muted-foreground mt-1">Confirme uma cotação para criar um serviço</p>
+              </div>
+            ) : (
+              <>
+                {/* Seleção em massa mobile */}
+                <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
+                  <Checkbox
+                    checked={servicosSelecionados.size === servicos.length && servicos.length > 0}
+                    onCheckedChange={toggleSelecionarTodos}
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    Selecionar todos ({servicos.length})
+                  </span>
+                </div>
+
+                {servicosOrdenados.map((servico) => (
+                  <MobileServicoCardAdmin
+                    key={servico.id}
+                    servico={servico}
+                    isSelected={servicosSelecionados.has(servico.id)}
+                    onToggleSelect={() => toggleSelecao(servico.id)}
+                    onAtribuir={() => abrirModalAtribuicao(servico.id)}
+                    onFinalizar={() => finalizarComoAdmin(servico.id)}
+                    onVerDetalhes={() => navigate(`/admin/servicos/${servico.id}`)}
+                  />
+                ))}
+              </>
+            )}
+          </div>
+        ) : (
+          /* Desktop: Tabela */
+          <div className="bg-card rounded-lg shadow-md overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-border">
+                <thead className="bg-muted/50">
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
-                      <div className="flex flex-col items-center">
-                        <svg className="w-16 h-16 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                        </svg>
-                        <p className="text-lg font-medium">Nenhum serviço cadastrado</p>
-                        <p className="text-sm mt-1">Confirme uma cotação para criar um serviço</p>
+                    <th className="px-4 py-3 text-left">
+                      <Checkbox
+                        checked={servicosSelecionados.size === servicos.length && servicos.length > 0}
+                        onCheckedChange={toggleSelecionarTodos}
+                      />
+                    </th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:bg-muted"
+                      onClick={() => handleSort('codigo')}
+                    >
+                      <div className="flex items-center">
+                        Código {getSortIcon('codigo')}
                       </div>
-                    </td>
+                    </th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:bg-muted"
+                      onClick={() => handleSort('cliente')}
+                    >
+                      <div className="flex items-center">
+                        Cliente {getSortIcon('cliente')}
+                      </div>
+                    </th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:bg-muted"
+                      onClick={() => handleSort('tipo_servico')}
+                    >
+                      <div className="flex items-center">
+                        Serviço {getSortIcon('tipo_servico')}
+                      </div>
+                    </th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:bg-muted"
+                      onClick={() => handleSort('instalador')}
+                    >
+                      <div className="flex items-center">
+                        Instalador {getSortIcon('instalador')}
+                      </div>
+                    </th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:bg-muted"
+                      onClick={() => handleSort('status')}
+                    >
+                      <div className="flex items-center">
+                        Status {getSortIcon('status')}
+                      </div>
+                    </th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:bg-muted"
+                      onClick={() => handleSort('valor_total')}
+                    >
+                      <div className="flex items-center">
+                        Valor Total {getSortIcon('valor_total')}
+                      </div>
+                    </th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:bg-muted"
+                      onClick={() => handleSort('data_servico_agendada')}
+                    >
+                      <div className="flex items-center">
+                        Data Agendada {getSortIcon('data_servico_agendada')}
+                      </div>
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Ações
+                    </th>
                   </tr>
-                ) : (
-                  servicosOrdenados.map((servico) => (
-                    <tr key={servico.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-4">
-                        <Checkbox
-                          checked={servicosSelecionados.has(servico.id)}
-                          onCheckedChange={() => toggleSelecao(servico.id)}
-                        />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{servico.codigo}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{servico.clientes.nome}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900">
-                          {servico.tipo_servico?.join(', ') || '-'}
+                </thead>
+                <tbody className="bg-card divide-y divide-border">
+                  {servicos.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="px-6 py-12 text-center text-muted-foreground">
+                        <div className="flex flex-col items-center">
+                          <svg className="w-16 h-16 text-muted mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                          </svg>
+                          <p className="text-lg font-medium">Nenhum serviço cadastrado</p>
+                          <p className="text-sm mt-1">Confirme uma cotação para criar um serviço</p>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {servico.usuarios?.nome || '-'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(servico.status, servico.observacoes_instalador)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          R$ {Number(servico.valor_total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {new Date(servico.data_servico_agendada).toLocaleDateString('pt-BR')}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
-                        {servico.status === 'aguardando_distribuicao' && (
-                          <button
-                            onClick={() => disponibilizarServico(servico.id)}
-                            className="text-blue-600 hover:text-blue-800 font-medium"
-                          >
-                            Disponibilizar
-                          </button>
-                        )}
-                        {!servico.instalador_id && (
-                          <button
-                            onClick={() => abrirModalAtribuicao(servico.id)}
-                            className="text-purple-600 hover:text-purple-800 font-medium"
-                          >
-                            <UserPlus className="w-4 h-4 inline mr-1" />
-                            Definir Instalador
-                          </button>
-                        )}
-                        {(servico.status === 'em_andamento' || servico.status === 'atribuido') && (
-                          <button
-                            onClick={() => finalizarComoAdmin(servico.id)}
-                            className="text-green-600 hover:text-green-800 font-medium"
-                          >
-                            <CheckCircle className="w-4 h-4 inline mr-1" />
-                            Finalizar
-                          </button>
-                        )}
-                        <button
-                          onClick={() => navigate(`/admin/servicos/${servico.id}`)}
-                          className="text-blue-600 hover:text-blue-800 font-medium"
-                        >
-                          Ver Detalhes
-                        </button>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    servicosOrdenados.map((servico) => (
+                      <tr key={servico.id} className="hover:bg-muted/50 transition-colors">
+                        <td className="px-4 py-4">
+                          <Checkbox
+                            checked={servicosSelecionados.has(servico.id)}
+                            onCheckedChange={() => toggleSelecao(servico.id)}
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-foreground">{servico.codigo}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-foreground">{servico.clientes.nome}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-foreground">
+                            {servico.tipo_servico?.join(', ') || '-'}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-foreground">
+                            {servico.usuarios?.nome || '-'}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {getStatusBadge(servico.status, servico.observacoes_instalador)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-foreground">
+                            R$ {Number(servico.valor_total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-foreground">
+                            {new Date(servico.data_servico_agendada).toLocaleDateString('pt-BR')}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                          {servico.status === 'aguardando_distribuicao' && (
+                            <button
+                              onClick={() => disponibilizarServico(servico.id)}
+                              className="text-blue-600 hover:text-blue-800 font-medium"
+                            >
+                              Disponibilizar
+                            </button>
+                          )}
+                          {!servico.instalador_id && (
+                            <button
+                              onClick={() => abrirModalAtribuicao(servico.id)}
+                              className="text-purple-600 hover:text-purple-800 font-medium"
+                            >
+                              <UserPlus className="w-4 h-4 inline mr-1" />
+                              Definir Instalador
+                            </button>
+                          )}
+                          {(servico.status === 'em_andamento' || servico.status === 'atribuido') && (
+                            <button
+                              onClick={() => finalizarComoAdmin(servico.id)}
+                              className="text-green-600 hover:text-green-800 font-medium"
+                            >
+                              <CheckCircle className="w-4 h-4 inline mr-1" />
+                              Finalizar
+                            </button>
+                          )}
+                          <button
+                            onClick={() => navigate(`/admin/servicos/${servico.id}`)}
+                            className="text-blue-600 hover:text-blue-800 font-medium"
+                          >
+                            Ver Detalhes
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="mt-4 flex justify-between items-center text-sm text-gray-600">
+        <div className="mt-4 flex justify-between items-center text-sm text-muted-foreground">
           <div>
             Mostrando {servicos.length} serviço(s) | {servicosSelecionados.size} selecionado(s)
           </div>
