@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
-import { UserPlus, Users, CheckCircle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { UserPlus, Users, CheckCircle, ArrowUpDown, ArrowUp, ArrowDown, Calendar, User, DollarSign } from 'lucide-react'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { MobileServicoCardAdmin } from '@/components/admin/MobileServicoCardAdmin'
 
@@ -353,6 +353,38 @@ export default function ListaServicos() {
               </div>
             ) : (
               <>
+                {/* Barra de ordenação mobile */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                  <span className="text-sm text-muted-foreground whitespace-nowrap">Ordenar:</span>
+                  <Button
+                    variant={sortField === 'data_servico_agendada' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => handleSort('data_servico_agendada')}
+                    className="shrink-0"
+                  >
+                    <Calendar className="w-4 h-4 mr-1" />
+                    Data {sortField === 'data_servico_agendada' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </Button>
+                  <Button
+                    variant={sortField === 'cliente' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => handleSort('cliente')}
+                    className="shrink-0"
+                  >
+                    <User className="w-4 h-4 mr-1" />
+                    Cliente {sortField === 'cliente' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </Button>
+                  <Button
+                    variant={sortField === 'valor_total' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => handleSort('valor_total')}
+                    className="shrink-0"
+                  >
+                    <DollarSign className="w-4 h-4 mr-1" />
+                    Valor {sortField === 'valor_total' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </Button>
+                </div>
+
                 {/* Seleção em massa mobile */}
                 <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
                   <Checkbox
