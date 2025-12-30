@@ -406,11 +406,11 @@ export default function ListaCotacoes() {
                     <tr>
                       <th 
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                        onClick={() => handleOrdenar('created_at')}
+                        onClick={() => handleOrdenar('data_servico_desejada')}
                       >
                         <div className="flex items-center gap-1">
-                          Data Cotação
-                          {ordenacao.campo === 'created_at' && (
+                          Data Serviço
+                          {ordenacao.campo === 'data_servico_desejada' && (
                             <span>{ordenacao.direcao === 'asc' ? '↑' : '↓'}</span>
                           )}
                         </div>
@@ -459,11 +459,11 @@ export default function ListaCotacoes() {
                       </th>
                       <th 
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                        onClick={() => handleOrdenar('data_servico_desejada')}
+                        onClick={() => handleOrdenar('created_at')}
                       >
                         <div className="flex items-center gap-1">
-                          Data Serviço
-                          {ordenacao.campo === 'data_servico_desejada' && (
+                          Data Cotação
+                          {ordenacao.campo === 'created_at' && (
                             <span>{ordenacao.direcao === 'asc' ? '↑' : '↓'}</span>
                           )}
                         </div>
@@ -491,7 +491,9 @@ export default function ListaCotacoes() {
                         <tr key={cotacao.id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
-                              {new Date(cotacao.created_at).toLocaleDateString('pt-BR')}
+                              {cotacao.data_servico_desejada 
+                                ? new Date(cotacao.data_servico_desejada).toLocaleDateString('pt-BR')
+                                : '-'}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -520,9 +522,7 @@ export default function ListaCotacoes() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
-                              {cotacao.data_servico_desejada 
-                                ? new Date(cotacao.data_servico_desejada).toLocaleDateString('pt-BR')
-                                : '-'}
+                              {new Date(cotacao.created_at).toLocaleDateString('pt-BR')}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
