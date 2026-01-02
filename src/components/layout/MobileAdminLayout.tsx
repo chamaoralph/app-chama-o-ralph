@@ -16,7 +16,8 @@ import {
   BarChart3,
   CheckCircle,
   TrendingUp,
-  Receipt
+  Receipt,
+  Settings
 } from "lucide-react";
 import {
   Drawer,
@@ -50,6 +51,7 @@ const moreItems = [
   { to: "/admin/relatorios", icon: BarChart3, label: "Relatórios" },
   { to: "/admin/marketing", icon: TrendingUp, label: "Marketing" },
   { to: "/admin/aprovacoes", icon: CheckCircle, label: "Aprovações" },
+  { to: "/admin/configuracoes", icon: Settings, label: "Configurações" },
 ];
 
 export function MobileAdminLayout({ children, pendingCount = 0 }: MobileAdminLayoutProps) {

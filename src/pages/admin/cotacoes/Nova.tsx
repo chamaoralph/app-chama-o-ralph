@@ -1,16 +1,24 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AdminLayout } from '@/components/layout/AdminLayout'
 import { supabase } from '@/integrations/supabase/client'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ImportacaoCotacoes } from '@/components/admin/ImportacaoCotacoes'
 import { useToast } from '@/hooks/use-toast'
+import { Input } from '@/components/ui/input'
+
+interface TipoServico {
+  id: string
+  nome: string
+}
 
 export default function NovaCotacao() {
   const navigate = useNavigate()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [tiposServico, setTiposServico] = useState<TipoServico[]>([])
+  const [showOutroInput, setShowOutroInput] = useState(false)
   
   const [formData, setFormData] = useState({
     cliente_nome: '',
@@ -25,10 +33,24 @@ export default function NovaCotacao() {
     horario_inicio: '',
     duracao: '60',
     tipo_servico: '',
+    tipo_servico_outro: '',
     valor_mao_obra: '',
     valor_material: '',
     observacoes: ''
   })
+
+  useEffect(() => {
+    async function fetchTiposServico() {
+      const { data } = await supabase
+        .from('tipos_servico')
+        .select('id, nome')
+        .eq('ativo', true)
+        .order('ordem')
+      
+      setTiposServico(data || [])
+    }
+    fetchTiposServico()
+  }, [])
 
   // Gerar opções de horário de 8:00 às 19:00 em intervalos de 30 minutos
   const horariosDisponiveis = []
@@ -111,6 +133,10 @@ export default function NovaCotacao() {
         clienteId = novoCliente.id
       }
 
+      const tipoServicoFinal = formData.tipo_servico === 'Outros' && formData.tipo_servico_outro 
+        ? formData.tipo_servico_outro 
+        : formData.tipo_servico
+
       const { error: erroCotacao } = await supabase
         .from('cotacoes')
         .insert({
@@ -119,8 +145,8 @@ export default function NovaCotacao() {
           data_servico_desejada: formData.data_servico_desejada,
           horario_inicio: formData.horario_inicio || null,
           horario_fim: formData.horario_inicio ? calcularHorarioFim(formData.horario_inicio, formData.duracao) : null,
-          tipo_servico: [formData.tipo_servico],
-          descricao_servico: formData.tipo_servico,
+          tipo_servico: [tipoServicoFinal],
+          descricao_servico: tipoServicoFinal,
           valor_estimado: formData.valor_mao_obra ? parseFloat(formData.valor_mao_obra) : null,
           valor_material: formData.valor_material ? parseFloat(formData.valor_material) : 0,
           origem_lead: formData.origem_lead,
@@ -246,8 +272,34 @@ export default function NovaCotacao() {
               </div>
               <div className="col-span-2">
                 <label className="block text-sm font-medium mb-2">Tipo de Serviço *</label>
-                <input type="text" required value={formData.tipo_servico} onChange={(e) => setFormData({...formData, tipo_servico: e.target.value})} className="w-full px-3 py-2 border rounded-md" placeholder="TV 50, Suporte fixo" />
+                <select 
+                  required 
+                  value={formData.tipo_servico} 
+                  onChange={(e) => {
+                    const value = e.target.value
+                    setFormData({...formData, tipo_servico: value})
+                    setShowOutroInput(value === 'Outros')
+                  }} 
+                  className="w-full px-3 py-2 border rounded-md bg-white"
+                >
+                  <option value="">Selecione...</option>
+                  {tiposServico.map((tipo) => (
+                    <option key={tipo.id} value={tipo.nome}>{tipo.nome}</option>
+                  ))}
+                </select>
               </div>
+              {showOutroInput && (
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium mb-2">Especifique o serviço *</label>
+                  <Input 
+                    type="text" 
+                    required={showOutroInput}
+                    value={formData.tipo_servico_outro} 
+                    onChange={(e) => setFormData({...formData, tipo_servico_outro: e.target.value})} 
+                    placeholder="Ex: Instalação de câmera, Suporte articulado..." 
+                  />
+                </div>
+              )}
             </div>
           </div>
 
