@@ -21,12 +21,46 @@ export default function NovaCotacao() {
     ocasiao: '',
     data_servico_desejada: '',
     horario_inicio: '',
-    horario_fim: '',
+    duracao: '60',
     tipo_servico: '',
     valor_mao_obra: '',
     valor_material: '',
     observacoes: ''
   })
+
+  // Gerar opções de horário de 8:00 às 19:00 em intervalos de 30 minutos
+  const horariosDisponiveis = []
+  for (let hora = 8; hora <= 19; hora++) {
+    horariosDisponiveis.push(`${hora.toString().padStart(2, '0')}:00`)
+    if (hora < 19) {
+      horariosDisponiveis.push(`${hora.toString().padStart(2, '0')}:30`)
+    }
+  }
+
+  // Opções de duração em intervalos de 30 minutos
+  const duracoesDisponiveis = [
+    { valor: '30', label: '30 minutos' },
+    { valor: '60', label: '1 hora' },
+    { valor: '90', label: '1h30' },
+    { valor: '120', label: '2 horas' },
+    { valor: '150', label: '2h30' },
+    { valor: '180', label: '3 horas' },
+    { valor: '210', label: '3h30' },
+    { valor: '240', label: '4 horas' },
+    { valor: '300', label: '5 horas' },
+    { valor: '360', label: '6 horas' },
+    { valor: '480', label: '8 horas' },
+  ]
+
+  // Calcular horário fim baseado no início + duração
+  const calcularHorarioFim = (inicio: string, duracaoMinutos: string) => {
+    if (!inicio) return ''
+    const [horas, minutos] = inicio.split(':').map(Number)
+    const totalMinutos = horas * 60 + minutos + parseInt(duracaoMinutos)
+    const horaFim = Math.floor(totalMinutos / 60)
+    const minutoFim = totalMinutos % 60
+    return `${horaFim.toString().padStart(2, '0')}:${minutoFim.toString().padStart(2, '0')}`
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -82,7 +116,7 @@ export default function NovaCotacao() {
           cliente_id: clienteId,
           data_servico_desejada: formData.data_servico_desejada,
           horario_inicio: formData.horario_inicio || null,
-          horario_fim: formData.horario_fim || null,
+          horario_fim: formData.horario_inicio ? calcularHorarioFim(formData.horario_inicio, formData.duracao) : null,
           tipo_servico: [formData.tipo_servico],
           descricao_servico: formData.tipo_servico,
           valor_estimado: formData.valor_mao_obra ? parseFloat(formData.valor_mao_obra) : null,
@@ -172,11 +206,33 @@ export default function NovaCotacao() {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2">Horário Início</label>
-                <input type="time" value={formData.horario_inicio} onChange={(e) => setFormData({...formData, horario_inicio: e.target.value})} className="w-full px-3 py-2 border rounded-md" placeholder="Ex: 13:00" />
+                <select 
+                  value={formData.horario_inicio} 
+                  onChange={(e) => setFormData({...formData, horario_inicio: e.target.value})} 
+                  className="w-full px-3 py-2 border rounded-md"
+                >
+                  <option value="">Selecione...</option>
+                  {horariosDisponiveis.map((horario) => (
+                    <option key={horario} value={horario}>{horario}</option>
+                  ))}
+                </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Horário Fim</label>
-                <input type="time" value={formData.horario_fim} onChange={(e) => setFormData({...formData, horario_fim: e.target.value})} className="w-full px-3 py-2 border rounded-md" placeholder="Ex: 18:00" />
+                <label className="block text-sm font-medium mb-2">Duração</label>
+                <select 
+                  value={formData.duracao} 
+                  onChange={(e) => setFormData({...formData, duracao: e.target.value})} 
+                  className="w-full px-3 py-2 border rounded-md"
+                >
+                  {duracoesDisponiveis.map((d) => (
+                    <option key={d.valor} value={d.valor}>{d.label}</option>
+                  ))}
+                </select>
+                {formData.horario_inicio && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Término previsto: {calcularHorarioFim(formData.horario_inicio, formData.duracao)}
+                  </p>
+                )}
               </div>
               <div className="col-span-2">
                 <label className="block text-sm font-medium mb-2">Tipo de Serviço *</label>
