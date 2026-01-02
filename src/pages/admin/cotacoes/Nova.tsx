@@ -23,7 +23,8 @@ export default function NovaCotacao() {
     horario_inicio: '',
     horario_fim: '',
     tipo_servico: '',
-    valor_estimado: '',
+    valor_mao_obra: '',
+    valor_material: '',
     observacoes: ''
   })
 
@@ -84,7 +85,8 @@ export default function NovaCotacao() {
           horario_fim: formData.horario_fim || null,
           tipo_servico: [formData.tipo_servico],
           descricao_servico: formData.tipo_servico,
-          valor_estimado: formData.valor_estimado ? parseFloat(formData.valor_estimado) : null,
+          valor_estimado: formData.valor_mao_obra ? parseFloat(formData.valor_mao_obra) : null,
+          valor_material: formData.valor_material ? parseFloat(formData.valor_material) : 0,
           origem_lead: formData.origem_lead,
           ocasiao: formData.ocasiao,
           observacoes: formData.observacoes,
@@ -161,8 +163,12 @@ export default function NovaCotacao() {
                 <input type="date" required value={formData.data_servico_desejada} onChange={(e) => setFormData({...formData, data_servico_desejada: e.target.value})} className="w-full px-3 py-2 border rounded-md" />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Valor Estimado</label>
-                <input type="number" step="0.01" value={formData.valor_estimado} onChange={(e) => setFormData({...formData, valor_estimado: e.target.value})} className="w-full px-3 py-2 border rounded-md" />
+                <label className="block text-sm font-medium mb-2">Valor Mão de Obra</label>
+                <input type="number" step="0.01" value={formData.valor_mao_obra} onChange={(e) => setFormData({...formData, valor_mao_obra: e.target.value})} className="w-full px-3 py-2 border rounded-md" placeholder="R$ 0,00" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Valor do Material</label>
+                <input type="number" step="0.01" value={formData.valor_material} onChange={(e) => setFormData({...formData, valor_material: e.target.value})} className="w-full px-3 py-2 border rounded-md" placeholder="R$ 0,00" />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2">Horário Início</label>
