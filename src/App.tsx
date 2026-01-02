@@ -37,6 +37,7 @@ const AdminQuestionarios = lazy(() => import('./pages/admin/Questionarios'));
 const AdminGerenciarPerguntas = lazy(() => import('./pages/admin/GerenciarPerguntas'));
 const AdminCertificacoes = lazy(() => import('./pages/admin/CertificacoesInstaladores'));
 const AdminConfiguracoes = lazy(() => import('./pages/admin/Configuracoes'));
+const AdminAnaliseRFM = lazy(() => import('./pages/admin/AnaliseRFM'));
 const InstaladorFazerQuestionario = lazy(() => import('./pages/instalador/FazerQuestionario'));
 const InstaladorResultado = lazy(() => import('./pages/instalador/ResultadoQuestionario'));
 const InstaladorCertificados = lazy(() => import('./pages/instalador/MeusCertificados'));
@@ -81,6 +82,7 @@ function App() {
               <Route path="questionarios/:id/perguntas" element={<Suspense><AdminGerenciarPerguntas /></Suspense>} />
               <Route path="certificacoes" element={<Suspense><AdminCertificacoes /></Suspense>} />
               <Route path="configuracoes" element={<Suspense><AdminConfiguracoes /></Suspense>} />
+              <Route path="analise-rfm" element={<Suspense><AdminAnaliseRFM /></Suspense>} />
             </Route>
 
             {/* Instalador Routes */}

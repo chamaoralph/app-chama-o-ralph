@@ -211,6 +211,72 @@ export type Database = {
           },
         ]
       }
+      clientes_rfm_cache: {
+        Row: {
+          cliente_id: string
+          created_at: string | null
+          empresa_id: string
+          frequency_count: number
+          frequency_score: number
+          id: string
+          monetary_score: number
+          monetary_value: number
+          periodo_analise: number
+          recency_days: number
+          recency_score: number
+          rfm_score: string
+          segmento: string
+          ultima_atualizacao: string | null
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string | null
+          empresa_id: string
+          frequency_count?: number
+          frequency_score?: number
+          id?: string
+          monetary_score?: number
+          monetary_value?: number
+          periodo_analise?: number
+          recency_days?: number
+          recency_score?: number
+          rfm_score?: string
+          segmento?: string
+          ultima_atualizacao?: string | null
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string | null
+          empresa_id?: string
+          frequency_count?: number
+          frequency_score?: number
+          id?: string
+          monetary_score?: number
+          monetary_value?: number
+          periodo_analise?: number
+          recency_days?: number
+          recency_score?: number
+          rfm_score?: string
+          segmento?: string
+          ultima_atualizacao?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clientes_rfm_cache_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clientes_rfm_cache_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cotacoes: {
         Row: {
           cliente_id: string
@@ -318,6 +384,47 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      importacao_clientes_log: {
+        Row: {
+          arquivo_nome: string
+          clientes_atualizados: number
+          created_at: string | null
+          empresa_id: string
+          erros: Json | null
+          id: string
+          novos_clientes: number
+          total_linhas: number
+        }
+        Insert: {
+          arquivo_nome: string
+          clientes_atualizados?: number
+          created_at?: string | null
+          empresa_id: string
+          erros?: Json | null
+          id?: string
+          novos_clientes?: number
+          total_linhas?: number
+        }
+        Update: {
+          arquivo_nome?: string
+          clientes_atualizados?: number
+          created_at?: string | null
+          empresa_id?: string
+          erros?: Json | null
+          id?: string
+          novos_clientes?: number
+          total_linhas?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "importacao_clientes_log_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       instaladores: {
         Row: {
@@ -911,6 +1018,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_rfm: {
+        Args: { p_empresa_id: string; p_periodo_dias?: number }
+        Returns: Json
+      }
       get_empresa_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
@@ -918,6 +1029,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      import_clientes_csv: {
+        Args: { p_arquivo_nome?: string; p_dados: Json; p_empresa_id: string }
+        Returns: Json
       }
       instalador_certificado_para_tipo: {
         Args: { _instalador_id: string; _tipos_servico: string[] }
