@@ -34,6 +34,7 @@ export default function NovaCotacao() {
     duracao: '60',
     tipo_servico: '',
     tipo_servico_outro: '',
+    descricao: '',
     valor_mao_obra: '',
     valor_material: '',
     observacoes: ''
@@ -146,7 +147,7 @@ export default function NovaCotacao() {
           horario_inicio: formData.horario_inicio || null,
           horario_fim: formData.horario_inicio ? calcularHorarioFim(formData.horario_inicio, formData.duracao) : null,
           tipo_servico: [tipoServicoFinal],
-          descricao_servico: tipoServicoFinal,
+          descricao_servico: formData.descricao || tipoServicoFinal,
           valor_estimado: formData.valor_mao_obra ? parseFloat(formData.valor_mao_obra) : null,
           valor_material: formData.valor_material ? parseFloat(formData.valor_material) : 0,
           origem_lead: formData.origem_lead,
@@ -300,6 +301,16 @@ export default function NovaCotacao() {
                   />
                 </div>
               )}
+              <div className="col-span-2">
+                <label className="block text-sm font-medium mb-2">Descrição do Serviço</label>
+                <textarea 
+                  value={formData.descricao} 
+                  onChange={(e) => setFormData({...formData, descricao: e.target.value})} 
+                  className="w-full px-3 py-2 border rounded-md" 
+                  rows={4}
+                  placeholder="Descreva detalhes adicionais sobre o serviço (modelo da TV, tipo de parede, acesso, etc.)"
+                />
+              </div>
             </div>
           </div>
 
