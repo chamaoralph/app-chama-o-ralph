@@ -2,10 +2,12 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { InstaladorLayout } from "@/components/layout/InstaladorLayout";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 export default function FinalizarServico() {
   const { id: servicoId } = useParams();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [servico, setServico] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [enviando, setEnviando] = useState(false);
@@ -48,7 +50,11 @@ export default function FinalizarServico() {
       setServico(data);
     } catch (error: any) {
       console.error("Erro ao carregar serviço:", error);
-      alert(`Erro ao carregar serviço: ${error.message || 'Desconhecido'}`);
+      toast({
+        title: "❌ Erro ao carregar serviço",
+        description: error.message || 'Desconhecido',
+        variant: "destructive",
+      });
       navigate("/instalador/minha-agenda");
     } finally {
       setLoading(false);
@@ -59,17 +65,29 @@ export default function FinalizarServico() {
     e.preventDefault();
 
     if (fotos.length < 3) {
-      alert("❌ Envie pelo menos 3 fotos!");
+      toast({
+        title: "❌ Fotos insuficientes",
+        description: "Envie pelo menos 3 fotos!",
+        variant: "destructive",
+      });
       return;
     }
 
     if (fotos.length > 10) {
-      alert("❌ Máximo de 10 fotos!");
+      toast({
+        title: "❌ Limite excedido",
+        description: "Máximo de 10 fotos!",
+        variant: "destructive",
+      });
       return;
     }
 
     if (temReembolso && !notaFiscal) {
-      alert("❌ Anexe a nota fiscal!");
+      toast({
+        title: "❌ Nota fiscal obrigatória",
+        description: "Anexe a nota fiscal para reembolso!",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -120,11 +138,18 @@ export default function FinalizarServico() {
 
       if (updateError) throw updateError;
 
-      alert("✅ Serviço finalizado! Aguardando aprovação do gestor.");
+      toast({
+        title: "✅ Serviço finalizado!",
+        description: "Aguardando aprovação do gestor.",
+      });
       navigate("/instalador/minha-agenda");
     } catch (error: any) {
       console.error("Erro:", error);
-      alert("❌ Erro: " + error.message);
+      toast({
+        title: "❌ Erro ao finalizar",
+        description: error.message,
+        variant: "destructive",
+      });
     } finally {
       setEnviando(false);
     }
