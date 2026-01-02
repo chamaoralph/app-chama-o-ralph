@@ -17,7 +17,8 @@ import {
   CheckCircle,
   TrendingUp,
   Receipt,
-  Settings
+  Settings,
+  Target
 } from "lucide-react";
 import {
   Drawer,
@@ -49,6 +50,7 @@ const moreItems = [
   { to: "/admin/questionarios", icon: ClipboardList, label: "Questionários" },
   { to: "/admin/certificacoes", icon: Award, label: "Certificações" },
   { to: "/admin/relatorios", icon: BarChart3, label: "Relatórios" },
+  { to: "/admin/analise-rfm", icon: Target, label: "Análise RFM" },
   { to: "/admin/marketing", icon: TrendingUp, label: "Marketing" },
   { to: "/admin/aprovacoes", icon: CheckCircle, label: "Aprovações" },
   { to: "/admin/configuracoes", icon: Settings, label: "Configurações" },
