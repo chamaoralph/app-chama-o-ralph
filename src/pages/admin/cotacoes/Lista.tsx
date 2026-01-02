@@ -49,11 +49,50 @@ interface EditForm {
   ocasiao: string
   data_servico_desejada: string
   horario_inicio: string
-  horario_fim: string
+  duracao: string
   data_criacao: string
   tipo_servico: string
+  tipo_servico_outro: string
   valor_estimado: string
   observacoes: string
+}
+
+interface TipoServico {
+  id: string
+  nome: string
+}
+
+// Horários disponíveis de 8:00 às 19:00 em intervalos de 30 minutos
+const horariosDisponiveis = [
+  '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
+  '11:00', '11:30', '12:00', '12:30', '13:00', '13:30',
+  '14:00', '14:30', '15:00', '15:30', '16:00', '16:30',
+  '17:00', '17:30', '18:00', '18:30', '19:00'
+]
+
+// Durações disponíveis
+const duracoesDisponiveis = [
+  { valor: '30', label: '30 minutos' },
+  { valor: '60', label: '1 hora' },
+  { valor: '90', label: '1h 30min' },
+  { valor: '120', label: '2 horas' },
+  { valor: '150', label: '2h 30min' },
+  { valor: '180', label: '3 horas' },
+  { valor: '240', label: '4 horas' },
+  { valor: '300', label: '5 horas' },
+  { valor: '360', label: '6 horas' },
+  { valor: '420', label: '7 horas' },
+  { valor: '480', label: '8 horas' },
+]
+
+// Função para calcular horário fim
+function calcularHorarioFim(horarioInicio: string, duracaoMinutos: string): string {
+  if (!horarioInicio) return ''
+  const [h, m] = horarioInicio.split(':').map(Number)
+  const totalMinutos = h * 60 + m + parseInt(duracaoMinutos)
+  const novaHora = Math.floor(totalMinutos / 60)
+  const novosMinutos = totalMinutos % 60
+  return `${String(novaHora).padStart(2, '0')}:${String(novosMinutos).padStart(2, '0')}`
 }
 
 export default function ListaCotacoes() {
@@ -76,9 +115,10 @@ export default function ListaCotacoes() {
     ocasiao: '',
     data_servico_desejada: '',
     horario_inicio: '',
-    horario_fim: '',
+    duracao: '60',
     data_criacao: '',
     tipo_servico: '',
+    tipo_servico_outro: '',
     valor_estimado: '',
     observacoes: ''
   })
@@ -91,10 +131,22 @@ export default function ListaCotacoes() {
     campo: 'created_at',
     direcao: 'desc'
   })
+  const [tiposServico, setTiposServico] = useState<TipoServico[]>([])
+  const [showOutroInput, setShowOutroInput] = useState(false)
 
   useEffect(() => {
     fetchCotacoes()
+    fetchTiposServico()
   }, [user])
+
+  async function fetchTiposServico() {
+    const { data } = await supabase
+      .from('tipos_servico')
+      .select('id, nome')
+      .eq('ativo', true)
+      .order('ordem')
+    setTiposServico(data || [])
+  }
 
   async function fetchCotacoes() {
     try {
@@ -116,6 +168,19 @@ export default function ListaCotacoes() {
   }
 
   function abrirEdicao(cotacao: Cotacao) {
+    // Calcular duração baseada no horário início/fim
+    let duracao = '60'
+    if (cotacao.horario_inicio && cotacao.horario_fim) {
+      const [h1, m1] = cotacao.horario_inicio.split(':').map(Number)
+      const [h2, m2] = cotacao.horario_fim.split(':').map(Number)
+      const minutos = (h2 * 60 + m2) - (h1 * 60 + m1)
+      if (minutos > 0) duracao = String(minutos)
+    }
+
+    // Verificar se tipo_servico é um dos tipos cadastrados ou "Outro"
+    const tipoAtual = cotacao.tipo_servico?.[0] || ''
+    const ehTipoCadastrado = tiposServico.some(t => t.nome === tipoAtual)
+    
     setEditForm({
       cliente_nome: cotacao.clientes.nome || '',
       cliente_telefone: cotacao.clientes.telefone || '',
@@ -125,13 +190,15 @@ export default function ListaCotacoes() {
       origem_lead: cotacao.origem_lead || '',
       ocasiao: cotacao.ocasiao || '',
       data_servico_desejada: cotacao.data_servico_desejada || '',
-      horario_inicio: cotacao.horario_inicio || '',
-      horario_fim: cotacao.horario_fim || '',
+      horario_inicio: cotacao.horario_inicio?.substring(0, 5) || '',
+      duracao: duracao,
       data_criacao: cotacao.created_at ? cotacao.created_at.split('T')[0] : '',
-      tipo_servico: cotacao.tipo_servico?.join(', ') || '',
+      tipo_servico: ehTipoCadastrado ? tipoAtual : (tipoAtual ? 'Outros' : ''),
+      tipo_servico_outro: ehTipoCadastrado ? '' : tipoAtual,
       valor_estimado: cotacao.valor_estimado?.toString() || '',
       observacoes: cotacao.observacoes || ''
     })
+    setShowOutroInput(!ehTipoCadastrado && !!tipoAtual)
     setCotacaoParaEditar(cotacao)
   }
 
@@ -154,14 +221,24 @@ export default function ListaCotacoes() {
 
       if (erroCliente) throw erroCliente
 
+      // Definir tipo de serviço final
+      const tipoServicoFinal = editForm.tipo_servico === 'Outros' && editForm.tipo_servico_outro 
+        ? editForm.tipo_servico_outro 
+        : editForm.tipo_servico
+
+      // Calcular horário fim automaticamente
+      const horarioFim = editForm.horario_inicio 
+        ? calcularHorarioFim(editForm.horario_inicio, editForm.duracao) 
+        : null
+
       // Atualizar cotação
       const { error: erroCotacao } = await supabase
         .from('cotacoes')
         .update({
-          tipo_servico: editForm.tipo_servico.split(',').map(s => s.trim()).filter(Boolean),
+          tipo_servico: tipoServicoFinal ? [tipoServicoFinal] : null,
           data_servico_desejada: editForm.data_servico_desejada || null,
           horario_inicio: editForm.horario_inicio || null,
-          horario_fim: editForm.horario_fim || null,
+          horario_fim: horarioFim,
           created_at: editForm.data_criacao ? new Date(editForm.data_criacao).toISOString() : undefined,
           valor_estimado: editForm.valor_estimado ? parseFloat(editForm.valor_estimado) : null,
           origem_lead: editForm.origem_lead || null,
@@ -178,6 +255,7 @@ export default function ListaCotacoes() {
       })
 
       setCotacaoParaEditar(null)
+      setShowOutroInput(false)
       fetchCotacoes()
     } catch (err) {
       console.error('Erro ao atualizar cotação:', err)
@@ -774,19 +852,40 @@ export default function ListaCotacoes() {
                 </div>
                 <div className="space-y-2">
                   <Label>Horário Início</Label>
-                  <Input 
-                    type="time"
-                    value={editForm.horario_inicio}
-                    onChange={(e) => setEditForm({...editForm, horario_inicio: e.target.value})}
-                  />
+                  <Select 
+                    value={editForm.horario_inicio} 
+                    onValueChange={(v) => setEditForm({...editForm, horario_inicio: v})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {horariosDisponiveis.map((h) => (
+                        <SelectItem key={h} value={h}>{h}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Horário Fim</Label>
-                  <Input 
-                    type="time"
-                    value={editForm.horario_fim}
-                    onChange={(e) => setEditForm({...editForm, horario_fim: e.target.value})}
-                  />
+                  <Label>Duração</Label>
+                  <Select 
+                    value={editForm.duracao} 
+                    onValueChange={(v) => setEditForm({...editForm, duracao: v})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {duracoesDisponiveis.map((d) => (
+                        <SelectItem key={d.valor} value={d.valor}>{d.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {editForm.horario_inicio && (
+                    <p className="text-sm text-muted-foreground">
+                      Término previsto: {calcularHorarioFim(editForm.horario_inicio, editForm.duracao)}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Valor Estimado</Label>
@@ -823,14 +922,36 @@ export default function ListaCotacoes() {
                     placeholder="Ex: Mudança, Instalação nova"
                   />
                 </div>
-                <div className="col-span-2 space-y-2">
+                <div className="space-y-2">
                   <Label>Tipo de Serviço</Label>
-                  <Input 
-                    value={editForm.tipo_servico}
-                    onChange={(e) => setEditForm({...editForm, tipo_servico: e.target.value})}
-                    placeholder="Ex: TV 50, Suporte fixo"
-                  />
+                  <Select 
+                    value={editForm.tipo_servico} 
+                    onValueChange={(v) => {
+                      setEditForm({...editForm, tipo_servico: v})
+                      setShowOutroInput(v === 'Outros')
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tiposServico.map((tipo) => (
+                        <SelectItem key={tipo.id} value={tipo.nome}>{tipo.nome}</SelectItem>
+                      ))}
+                      <SelectItem value="Outros">Outros</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
+                {showOutroInput && (
+                  <div className="space-y-2">
+                    <Label>Especifique o serviço</Label>
+                    <Input 
+                      value={editForm.tipo_servico_outro}
+                      onChange={(e) => setEditForm({...editForm, tipo_servico_outro: e.target.value})}
+                      placeholder="Ex: Instalação de câmera..."
+                    />
+                  </div>
+                )}
                 <div className="col-span-2 space-y-2">
                   <Label>Observações</Label>
                   <Textarea 
