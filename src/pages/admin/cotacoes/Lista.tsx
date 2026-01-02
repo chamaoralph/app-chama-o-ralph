@@ -200,16 +200,27 @@ export default function ListaCotacoes() {
       
       if (error) {
         console.error('Erro:', error)
-        alert('Erro ao confirmar: ' + error.message)
+        toast({
+          title: "❌ Erro ao confirmar",
+          description: error.message,
+          variant: "destructive",
+        })
         return
       }
       
-      alert('Cotação confirmada com sucesso!')
-      window.location.reload()
+      toast({
+        title: "✅ Cotação confirmada!",
+        description: "A cotação foi confirmada com sucesso.",
+      })
+      fetchCotacoes()
       
     } catch (err) {
       console.error('Erro catch:', err)
-      alert('Erro: ' + err)
+      toast({
+        title: "❌ Erro inesperado",
+        description: String(err),
+        variant: "destructive",
+      })
     }
   }
 

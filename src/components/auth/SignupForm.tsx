@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
+import { useToast } from '@/hooks/use-toast'
 import { z } from 'zod'
 
 const signupSchema = z.object({
@@ -32,6 +33,7 @@ export function SignupForm() {
   
   const { signUp } = useAuth()
   const navigate = useNavigate()
+  const { toast } = useToast()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -56,7 +58,10 @@ export function SignupForm() {
         tipo: formData.tipo,
       })
 
-      alert('Conta criada com sucesso! Verifique seu email para confirmar.')
+      toast({
+        title: "✅ Conta criada!",
+        description: "Verifique seu email para confirmar.",
+      })
       navigate('/login')
       
     } catch (error: any) {

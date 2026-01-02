@@ -7,12 +7,14 @@ import { ptBR } from "date-fns/locale";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileServicoCard } from "@/components/instalador/MobileServicoCard";
 import { Phone, MapPin, Play, CheckCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function MinhaAgenda() {
   const [servicos, setServicos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const { toast } = useToast();
 
   useEffect(() => {
     carregarMeusServicos();
@@ -58,10 +60,17 @@ export default function MinhaAgenda() {
         .eq("id", servicoId);
 
       if (error) throw error;
-      alert("✅ Serviço iniciado!");
+      toast({
+        title: "✅ Serviço iniciado!",
+        description: "Bom trabalho! Você pode finalizar quando concluir.",
+      });
       carregarMeusServicos();
     } catch (error: any) {
-      alert("❌ Erro: " + error.message);
+      toast({
+        title: "❌ Erro ao iniciar serviço",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   }
 
