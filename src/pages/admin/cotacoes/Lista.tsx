@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ImportacaoCotacoes } from '@/components/admin/ImportacaoCotacoes'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Trash2, XCircle, Pencil, Users } from 'lucide-react'
+import { Trash2, XCircle, Pencil, Users, Undo2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -277,6 +277,62 @@ export default function ListaCotacoes() {
       toast({
         title: "Erro",
         description: "Não foi possível atualizar a cotação.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  async function reprovarCotacao(cotacaoId: string) {
+    try {
+      // Verificar se existe serviço associado e qual é o status
+      const { data: servico, error: erroServico } = await supabase
+        .from('servicos')
+        .select('id, status')
+        .eq('cotacao_id', cotacaoId)
+        .maybeSingle()
+
+      if (erroServico) throw erroServico
+
+      if (servico) {
+        // Só permite reprovar se o serviço ainda não foi iniciado
+        const statusPermitidos = ['disponivel', 'solicitado']
+        if (!statusPermitidos.includes(servico.status || '')) {
+          toast({
+            title: "❌ Não é possível reprovar",
+            description: `O serviço já está com status "${servico.status}". Só é possível reprovar se estiver disponível ou solicitado.`,
+            variant: "destructive"
+          })
+          return
+        }
+
+        // Deletar o serviço associado
+        const { error: erroDeletar } = await supabase
+          .from('servicos')
+          .delete()
+          .eq('id', servico.id)
+
+        if (erroDeletar) throw erroDeletar
+      }
+
+      // Voltar cotação para pendente
+      const { error: erroAtualizar } = await supabase
+        .from('cotacoes')
+        .update({ status: 'pendente' })
+        .eq('id', cotacaoId)
+
+      if (erroAtualizar) throw erroAtualizar
+
+      toast({
+        title: "✅ Cotação reprovada",
+        description: "A cotação voltou para pendente e o serviço foi removido."
+      })
+
+      fetchCotacoes()
+    } catch (err) {
+      console.error('Erro ao reprovar cotação:', err)
+      toast({
+        title: "❌ Erro",
+        description: "Não foi possível reprovar a cotação.",
         variant: "destructive"
       })
     }
@@ -567,17 +623,30 @@ export default function ListaCotacoes() {
                                   >
                                     Aprovar
                                   </Button>
+                                  <Button
+                                    onClick={() => setCotacaoParaNaoGerou(cotacao.id)}
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-orange-600 hover:text-orange-700"
+                                  >
+                                    <XCircle className="w-4 h-4 mr-1" />
+                                    Não Gerou
+                                  </Button>
                                 </>
                               )}
-                              {cotacao.status === 'pendente' && (
+                              {cotacao.status === 'aprovada' && (
                                 <Button
-                                  onClick={() => setCotacaoParaNaoGerou(cotacao.id)}
+                                  onClick={() => {
+                                    if (confirm('Reprovar esta cotação? O serviço associado será removido (se ainda não iniciado).')) {
+                                      reprovarCotacao(cotacao.id)
+                                    }
+                                  }}
                                   size="sm"
                                   variant="outline"
-                                  className="text-orange-600 hover:text-orange-700"
+                                  className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
                                 >
-                                  <XCircle className="w-4 h-4 mr-1" />
-                                  Não Gerou
+                                  <Undo2 className="w-4 h-4 mr-1" />
+                                  Reprovar
                                 </Button>
                               )}
                               <Button
