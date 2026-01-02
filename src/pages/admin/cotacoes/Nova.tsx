@@ -4,9 +4,11 @@ import { AdminLayout } from '@/components/layout/AdminLayout'
 import { supabase } from '@/integrations/supabase/client'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ImportacaoCotacoes } from '@/components/admin/ImportacaoCotacoes'
+import { useToast } from '@/hooks/use-toast'
 
 export default function NovaCotacao() {
   const navigate = useNavigate()
+  const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   
@@ -129,11 +131,19 @@ export default function NovaCotacao() {
 
       if (erroCotacao) throw erroCotacao
 
-      alert('Cotação criada com sucesso!')
+      toast({
+        title: "✅ Cotação criada!",
+        description: "A cotação foi registrada com sucesso.",
+      })
       navigate('/admin/cotacoes')
       
     } catch (error: any) {
       console.error('Erro ao criar cotação:', error)
+      toast({
+        title: "❌ Erro ao criar cotação",
+        description: error.message || 'Ocorreu um erro inesperado',
+        variant: "destructive"
+      })
       setError(error.message || 'Erro ao criar cotação')
     } finally {
       setLoading(false)
