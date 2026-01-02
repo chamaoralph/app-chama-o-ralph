@@ -277,6 +277,71 @@ export type Database = {
           },
         ]
       }
+      configuracoes_rfm: {
+        Row: {
+          created_at: string | null
+          empresa_id: string
+          frequency_2: number
+          frequency_3: number
+          frequency_4: number
+          frequency_5: number
+          id: string
+          monetary_2: number
+          monetary_3: number
+          monetary_4: number
+          monetary_5: number
+          recency_2: number
+          recency_3: number
+          recency_4: number
+          recency_5: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          empresa_id: string
+          frequency_2?: number
+          frequency_3?: number
+          frequency_4?: number
+          frequency_5?: number
+          id?: string
+          monetary_2?: number
+          monetary_3?: number
+          monetary_4?: number
+          monetary_5?: number
+          recency_2?: number
+          recency_3?: number
+          recency_4?: number
+          recency_5?: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          empresa_id?: string
+          frequency_2?: number
+          frequency_3?: number
+          frequency_4?: number
+          frequency_5?: number
+          id?: string
+          monetary_2?: number
+          monetary_3?: number
+          monetary_4?: number
+          monetary_5?: number
+          recency_2?: number
+          recency_3?: number
+          recency_4?: number
+          recency_5?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "configuracoes_rfm_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: true
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cotacoes: {
         Row: {
           cliente_id: string

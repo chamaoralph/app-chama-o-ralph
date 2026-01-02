@@ -3,6 +3,7 @@ import { AdminLayout } from '@/components/layout/AdminLayout'
 import { supabase } from '@/integrations/supabase/client'
 import { useToast } from '@/hooks/use-toast'
 import { Plus, Pencil, Trash2, GripVertical } from 'lucide-react'
+import { RFMConfigCard } from '@/components/admin/RFMConfigCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -277,6 +278,11 @@ export default function Configuracoes() {
             )}
           </CardContent>
         </Card>
+
+        {/* Critérios RFM */}
+        <div className="mt-6">
+          <RFMConfigCard />
+        </div>
 
         {/* Espaço para futuras configurações */}
         <Card className="mt-6 opacity-50">
