@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { InstaladorLayout } from '@/components/layout/InstaladorLayout'
 import { supabase } from '@/integrations/supabase/client'
-import { DollarSign, Package, TrendingUp, CheckCircle, FileDown } from 'lucide-react'
+import { DollarSign, Package, TrendingUp, CheckCircle, FileDown, FileText } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { subDays, format } from 'date-fns'
+import { subDays, format, isToday } from 'date-fns'
+import { GerarReciboModal } from '@/components/instalador/GerarReciboModal'
 
 interface Servico {
   id: string
@@ -24,6 +25,14 @@ export default function MeuExtrato() {
   const [loading, setLoading] = useState(true)
   const [filtroStatus, setFiltroStatus] = useState('todos')
   const [tipoPeriodo, setTipoPeriodo] = useState('ultimo_mes')
+  const [modalReciboOpen, setModalReciboOpen] = useState(false)
+  const [instaladorNome, setInstaladorNome] = useState('')
+
+  // Serviços finalizados de hoje (para o recibo)
+  const servicosHoje = servicos.filter(s => {
+    const dataServico = new Date(s.data_servico_agendada)
+    return isToday(dataServico) && (s.status === 'aguardando_aprovacao' || s.status === 'concluido')
+  })
 
   // Cálculos dos cards
   const aReceber = servicos
@@ -43,7 +52,27 @@ export default function MeuExtrato() {
 
   useEffect(() => {
     carregarServicos()
+    carregarNomeInstalador()
   }, [filtroStatus, tipoPeriodo])
+
+  async function carregarNomeInstalador() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data } = await supabase
+        .from('usuarios')
+        .select('nome')
+        .eq('id', user.id)
+        .single()
+
+      if (data) {
+        setInstaladorNome(data.nome)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar nome:', error)
+    }
+  }
 
   async function carregarServicos() {
     try {
@@ -240,11 +269,21 @@ export default function MeuExtrato() {
 
             <Button 
               onClick={exportarCSV}
+              variant="outline"
               className="flex items-center gap-2"
               disabled={servicosFiltrados.length === 0}
             >
               <FileDown className="h-4 w-4" />
               Exportar CSV
+            </Button>
+
+            <Button 
+              onClick={() => setModalReciboOpen(true)}
+              className="flex items-center gap-2"
+              disabled={servicosHoje.length === 0}
+            >
+              <FileText className="h-4 w-4" />
+              Gerar Recibo do Dia
             </Button>
           </div>
         </div>
@@ -320,6 +359,22 @@ export default function MeuExtrato() {
             </>
           )}
         </div>
+
+        {/* Modal de Recibo */}
+        <GerarReciboModal
+          open={modalReciboOpen}
+          onOpenChange={setModalReciboOpen}
+          servicos={servicosHoje.map(s => ({
+            id: s.id,
+            codigo: s.codigo,
+            cliente_nome: s.cliente_nome,
+            tipo_servico: s.tipo_servico,
+            valor_mao_obra_instalador: s.valor_mao_obra_instalador,
+            valor_reembolso_despesas: s.valor_reembolso_despesas
+          }))}
+          dataReferencia={new Date()}
+          instaladorNome={instaladorNome}
+        />
       </div>
     </InstaladorLayout>
   )
