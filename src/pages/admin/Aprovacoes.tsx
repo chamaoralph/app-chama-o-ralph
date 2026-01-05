@@ -33,6 +33,7 @@ export default function Aprovacoes() {
   const [loading, setLoading] = useState(true)
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [filtroStatus, setFiltroStatus] = useState<'todos' | 'pendentes' | 'aprovados'>('pendentes')
+  const [signedUrls, setSignedUrls] = useState<Record<string, string[]>>({})
 
   useEffect(() => {
     fetchServicos()
@@ -71,6 +72,21 @@ export default function Aprovacoes() {
       })) || []
 
       setServicos(servicosFormatados)
+
+      // Gerar URLs assinadas para as fotos
+      const urlsMap: Record<string, string[]> = {}
+      for (const servico of servicosFormatados) {
+        if (servico.fotos_conclusao && servico.fotos_conclusao.length > 0) {
+          const urls = await Promise.all(
+            servico.fotos_conclusao.map(async (path: string) => {
+              const url = await getSignedUrl(path)
+              return url || ''
+            })
+          )
+          urlsMap[servico.id] = urls.filter(u => u !== '')
+        }
+      }
+      setSignedUrls(urlsMap)
     } catch (error) {
       console.error('Erro ao buscar serviços:', error)
       toast.error('Erro ao carregar serviços')
@@ -348,18 +364,22 @@ export default function Aprovacoes() {
                   {/* Fotos */}
                   <div className="border-t pt-4">
                     <h3 className="font-semibold text-gray-900 mb-3">Fotos do Serviço</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {(servico.fotos_conclusao || []).map((foto, idx) => (
-                        <div key={idx} className="relative aspect-square">
-                          <img
-                            src={foto}
-                            alt={`Foto ${idx + 1}`}
-                            className="w-full h-full object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                            onClick={() => window.open(foto, '_blank')}
-                          />
-                        </div>
-                      ))}
-                    </div>
+                    {(signedUrls[servico.id] && signedUrls[servico.id].length > 0) ? (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {signedUrls[servico.id].map((fotoUrl, idx) => (
+                          <div key={idx} className="relative aspect-square">
+                            <img
+                              src={fotoUrl}
+                              alt={`Foto ${idx + 1}`}
+                              className="w-full h-full object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                              onClick={() => window.open(fotoUrl, '_blank')}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-500 text-sm">Nenhuma foto disponível</p>
+                    )}
                   </div>
 
                   {/* Nota Fiscal */}
