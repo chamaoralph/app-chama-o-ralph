@@ -497,6 +497,57 @@ export type Database = {
           },
         ]
       }
+      indisponibilidades_instaladores: {
+        Row: {
+          created_at: string | null
+          data_fim: string
+          data_inicio: string
+          empresa_id: string
+          hora_fim: string | null
+          hora_inicio: string | null
+          id: string
+          instalador_id: string
+          motivo: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          data_fim: string
+          data_inicio: string
+          empresa_id: string
+          hora_fim?: string | null
+          hora_inicio?: string | null
+          id?: string
+          instalador_id: string
+          motivo?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          data_fim?: string
+          data_inicio?: string
+          empresa_id?: string
+          hora_fim?: string | null
+          hora_inicio?: string | null
+          id?: string
+          instalador_id?: string
+          motivo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "indisponibilidades_instaladores_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "indisponibilidades_instaladores_instalador_id_fkey"
+            columns: ["instalador_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       instaladores: {
         Row: {
           ativo: boolean
