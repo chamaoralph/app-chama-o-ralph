@@ -68,10 +68,10 @@ export default function ServicosDisponiveis() {
     }
   })
 
-  const { data: certificacoes } = useQuery({
+  const { data: certificacoes, refetch: refetchCertificacoes } = useQuery({
     queryKey: ['minhas-certificacoes', user?.id],
     queryFn: async () => {
-      if (!user) return new Set<string>()
+      if (!user) return []
       
       const { data } = await supabase
         .from('certificacoes')
@@ -79,15 +79,31 @@ export default function ServicosDisponiveis() {
         .eq('instalador_id', user.id)
         .eq('ativa', true)
       
-      const tiposCertificados = new Set<string>()
+      // Retornar array de tipos certificados em lowercase para comparação
+      const tiposCertificados: string[] = []
       data?.forEach(cert => {
-        cert.tipos_servico_liberados.forEach((tipo: string) => tiposCertificados.add(tipo))
+        cert.tipos_servico_liberados.forEach((tipo: string) => 
+          tiposCertificados.push(tipo.toLowerCase())
+        )
       })
       
       return tiposCertificados
     },
     enabled: !!user,
+    staleTime: 0, // Sempre buscar dados frescos
   })
+
+  // Função para verificar se instalador tem certificação para o serviço
+  const temCertificacaoParaServico = (tiposServico: string[]) => {
+    if (!certificacoes || certificacoes.length === 0) return false
+    
+    return tiposServico.some(tipoServico => {
+      const tipoLower = tipoServico.toLowerCase()
+      return certificacoes.some(tipoCert => 
+        tipoLower.includes(tipoCert) || tipoCert.includes(tipoLower)
+      )
+    })
+  }
 
   useEffect(() => {
     fetchServicos()
@@ -231,9 +247,7 @@ export default function ServicosDisponiveis() {
         ) : (
           <div className="space-y-4">
             {servicosOrdenados.map((servico) => {
-              const temCertificacao = servico.tipo_servico?.some(tipo => 
-                certificacoes?.has(tipo)
-              ) ?? false
+              const temCertificacao = temCertificacaoParaServico(servico.tipo_servico || [])
 
               if (isMobile) {
                 return (
