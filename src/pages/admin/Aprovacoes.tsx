@@ -187,15 +187,24 @@ export default function Aprovacoes() {
 
   async function getSignedUrl(pathOrUrl: string) {
     try {
-      // Se já for uma URL completa, retorna diretamente
+      let path = pathOrUrl
+      
+      // Se for uma URL completa, extrair o path
       if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
-        return pathOrUrl
+        // Extrair path da URL: .../fotos-servicos/PATH
+        const match = pathOrUrl.match(/fotos-servicos\/(.+)$/)
+        if (match) {
+          path = match[1]
+        } else {
+          // URL não reconhecida, retornar como está
+          return pathOrUrl
+        }
       }
       
-      // Caso contrário, gera URL assinada a partir do path
+      // Gera URL assinada a partir do path
       const { data, error } = await supabase.storage
         .from('fotos-servicos')
-        .createSignedUrl(pathOrUrl, 3600)
+        .createSignedUrl(path, 3600)
 
       if (error) throw error
       return data.signedUrl
@@ -207,15 +216,23 @@ export default function Aprovacoes() {
 
   async function getNotaFiscalUrl(pathOrUrl: string) {
     try {
-      // Se já for uma URL completa, retorna diretamente
+      let path = pathOrUrl
+      
+      // Se for uma URL completa, extrair o path
       if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
-        return pathOrUrl
+        // Extrair path da URL: .../notas-fiscais/PATH
+        const match = pathOrUrl.match(/notas-fiscais\/(.+)$/)
+        if (match) {
+          path = match[1]
+        } else {
+          return pathOrUrl
+        }
       }
       
-      // Caso contrário, gera URL assinada a partir do path
+      // Gera URL assinada a partir do path
       const { data, error } = await supabase.storage
         .from('notas-fiscais')
-        .createSignedUrl(pathOrUrl, 3600)
+        .createSignedUrl(path, 3600)
 
       if (error) throw error
       return data.signedUrl
