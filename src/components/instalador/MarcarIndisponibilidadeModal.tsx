@@ -257,16 +257,6 @@ export function MarcarIndisponibilidadeModal({
             </div>
           )}
 
-          {/* Motivo */}
-          <div className="space-y-2">
-            <Label>Motivo (opcional)</Label>
-            <Textarea
-              placeholder="Ex: Férias, Consulta médica, Compromisso pessoal..."
-              value={motivo}
-              onChange={(e) => setMotivo(e.target.value)}
-              rows={2}
-            />
-          </div>
         </div>
 
         <DialogFooter>
