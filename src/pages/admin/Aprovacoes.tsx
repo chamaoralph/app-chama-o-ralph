@@ -286,7 +286,7 @@ export default function Aprovacoes() {
                     <div>
                       <h3 className="font-semibold text-gray-900 mb-2">Tipo de Serviço</h3>
                       <div className="flex flex-wrap gap-2">
-                        {servico.tipo_servico.map((tipo, idx) => (
+                        {(servico.tipo_servico || []).map((tipo, idx) => (
                           <Badge key={idx} variant="secondary">{tipo}</Badge>
                         ))}
                       </div>
@@ -349,7 +349,7 @@ export default function Aprovacoes() {
                   <div className="border-t pt-4">
                     <h3 className="font-semibold text-gray-900 mb-3">Fotos do Serviço</h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {servico.fotos_conclusao.map((foto, idx) => (
+                      {(servico.fotos_conclusao || []).map((foto, idx) => (
                         <div key={idx} className="relative aspect-square">
                           <img
                             src={foto}
