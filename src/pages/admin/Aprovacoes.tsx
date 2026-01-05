@@ -185,11 +185,17 @@ export default function Aprovacoes() {
     }
   }
 
-  async function getSignedUrl(path: string) {
+  async function getSignedUrl(pathOrUrl: string) {
     try {
+      // Se já for uma URL completa, retorna diretamente
+      if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+        return pathOrUrl
+      }
+      
+      // Caso contrário, gera URL assinada a partir do path
       const { data, error } = await supabase.storage
         .from('fotos-servicos')
-        .createSignedUrl(path, 3600)
+        .createSignedUrl(pathOrUrl, 3600)
 
       if (error) throw error
       return data.signedUrl
@@ -199,11 +205,17 @@ export default function Aprovacoes() {
     }
   }
 
-  async function getNotaFiscalUrl(path: string) {
+  async function getNotaFiscalUrl(pathOrUrl: string) {
     try {
+      // Se já for uma URL completa, retorna diretamente
+      if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+        return pathOrUrl
+      }
+      
+      // Caso contrário, gera URL assinada a partir do path
       const { data, error } = await supabase.storage
         .from('notas-fiscais')
-        .createSignedUrl(path, 3600)
+        .createSignedUrl(pathOrUrl, 3600)
 
       if (error) throw error
       return data.signedUrl
