@@ -36,6 +36,8 @@ interface Cotacao {
     endereco_completo: string | null
     bairro: string | null
     idade: number | null
+    tipo_alerta: string | null
+    observacao_alerta: string | null
   }
 }
 
@@ -642,7 +644,17 @@ export default function ListaCotacoes() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">{cotacao.clientes.nome}</div>
+                            <div className={`text-sm font-bold ${
+                              cotacao.clientes.tipo_alerta === 'problematico' 
+                                ? 'text-red-600' 
+                                : cotacao.clientes.tipo_alerta === 'atencao' 
+                                  ? 'text-amber-600' 
+                                  : 'text-gray-900 font-medium'
+                            }`} title={cotacao.clientes.observacao_alerta || undefined}>
+                              {cotacao.clientes.tipo_alerta === 'problematico' && '💀 '}
+                              {cotacao.clientes.tipo_alerta === 'atencao' && '⚠️ '}
+                              {cotacao.clientes.nome}
+                            </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">{cotacao.clientes.telefone || '-'}</div>
