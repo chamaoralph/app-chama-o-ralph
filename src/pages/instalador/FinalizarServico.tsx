@@ -132,7 +132,7 @@ export default function FinalizarServico() {
       const { error: updateError } = await supabase
         .from("servicos")
         .update({
-          status: "aguardando_aprovacao",
+          status: "concluido",
           fotos_conclusao: fotosUrls,
           nota_fiscal_url: notaFiscalUrl,
           valor_reembolso_despesas: temReembolso ? parseFloat(valorReembolso) : servico.valor_reembolso_despesas,
