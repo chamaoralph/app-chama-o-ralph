@@ -169,8 +169,10 @@ export type Database = {
           id: string
           idade: number | null
           nome: string
+          observacao_alerta: string | null
           origem_lead: string
           telefone: string
+          tipo_alerta: string | null
           updated_at: string | null
         }
         Insert: {
@@ -183,8 +185,10 @@ export type Database = {
           id?: string
           idade?: number | null
           nome: string
+          observacao_alerta?: string | null
           origem_lead: string
           telefone: string
+          tipo_alerta?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -197,8 +201,10 @@ export type Database = {
           id?: string
           idade?: number | null
           nome?: string
+          observacao_alerta?: string | null
           origem_lead?: string
           telefone?: string
+          tipo_alerta?: string | null
           updated_at?: string | null
         }
         Relationships: [

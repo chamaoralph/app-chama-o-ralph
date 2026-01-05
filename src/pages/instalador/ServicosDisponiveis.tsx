@@ -8,9 +8,11 @@ import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
-import { Lock } from 'lucide-react'
+import { Lock, ArrowUpDown, Calendar, MapPin as MapPinIcon } from 'lucide-react'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { MobileServicoCard } from '@/components/instalador/MobileServicoCard'
+
+type OrdenacaoTipo = 'data' | 'bairro'
 
 interface Servico {
   id: string
@@ -50,9 +52,21 @@ export default function ServicosDisponiveis() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [solicitando, setSolicitando] = useState<string | null>(null)
+  const [ordenacao, setOrdenacao] = useState<OrdenacaoTipo>('data')
   const { user } = useAuth()
   const { toast } = useToast()
   const isMobile = useIsMobile()
+
+  // Ordenar serviços
+  const servicosOrdenados = [...servicos].sort((a, b) => {
+    if (ordenacao === 'data') {
+      return new Date(a.data_servico_agendada).getTime() - new Date(b.data_servico_agendada).getTime()
+    } else {
+      const bairroA = a.clientes?.bairro || ''
+      const bairroB = b.clientes?.bairro || ''
+      return bairroA.localeCompare(bairroB)
+    }
+  })
 
   const { data: certificacoes } = useQuery({
     queryKey: ['minhas-certificacoes', user?.id],
@@ -178,6 +192,30 @@ export default function ServicosDisponiveis() {
           <p className="text-gray-600 mt-1">
             {servicos.length} {servicos.length === 1 ? 'serviço disponível' : 'serviços disponíveis'}
           </p>
+          
+          {/* Botões de ordenação */}
+          {servicos.length > 1 && (
+            <div className="flex gap-2 mt-3">
+              <Button
+                variant={ordenacao === 'data' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setOrdenacao('data')}
+                className={ordenacao === 'data' ? 'bg-blue-600' : ''}
+              >
+                <Calendar className="w-4 h-4 mr-2" />
+                Por Data
+              </Button>
+              <Button
+                variant={ordenacao === 'bairro' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setOrdenacao('bairro')}
+                className={ordenacao === 'bairro' ? 'bg-blue-600' : ''}
+              >
+                <MapPinIcon className="w-4 h-4 mr-2" />
+                Por Bairro
+              </Button>
+            </div>
+          )}
         </div>
 
         {servicos.length === 0 ? (
@@ -192,7 +230,7 @@ export default function ServicosDisponiveis() {
           </div>
         ) : (
           <div className="space-y-4">
-            {servicos.map((servico) => {
+            {servicosOrdenados.map((servico) => {
               const temCertificacao = servico.tipo_servico?.some(tipo => 
                 certificacoes?.has(tipo)
               ) ?? false
