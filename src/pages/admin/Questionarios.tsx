@@ -17,8 +17,6 @@ import { Plus, Pencil, Trash2, FileQuestion, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 
-const tiposServico = ['Elétrica', 'Hidráulica', 'Ar Condicionado', 'Gás', 'Automação'];
-
 export default function Questionarios() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -58,6 +56,19 @@ export default function Questionarios() {
     queryKey: ['treinamentos-select'],
     queryFn: async () => {
       const { data, error } = await supabase.from('treinamentos').select('id, titulo').eq('publicado', true);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: tiposServico } = useQuery({
+    queryKey: ['tipos-servico'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('tipos_servico')
+        .select('id, nome, ativo')
+        .eq('ativo', true)
+        .order('ordem');
       if (error) throw error;
       return data;
     },
@@ -213,14 +224,14 @@ export default function Questionarios() {
                 <div>
                   <Label>Tipos de Serviço Liberados</Label>
                   <div className="flex flex-wrap gap-2 mt-2">
-                    {tiposServico.map((tipo) => (
+                    {tiposServico?.map((tipo) => (
                       <Badge
-                        key={tipo}
-                        variant={form.tipos_servico_liberados.includes(tipo) ? 'default' : 'outline'}
+                        key={tipo.id}
+                        variant={form.tipos_servico_liberados.includes(tipo.nome) ? 'default' : 'outline'}
                         className="cursor-pointer"
-                        onClick={() => toggleTipoServico(tipo)}
+                        onClick={() => toggleTipoServico(tipo.nome)}
                       >
-                        {tipo}
+                        {tipo.nome}
                       </Badge>
                     ))}
                   </div>
