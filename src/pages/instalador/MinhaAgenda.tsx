@@ -4,16 +4,27 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { AgendaSemanal } from "@/components/instalador/AgendaSemanal";
+import { MarcarIndisponibilidadeModal } from "@/components/instalador/MarcarIndisponibilidadeModal";
+import { Indisponibilidade } from "@/components/instalador/IndisponibilidadeCard";
 
 export default function MinhaAgenda() {
   const [servicos, setServicos] = useState<any[]>([]);
+  const [indisponibilidades, setIndisponibilidades] = useState<Indisponibilidade[]>([]);
   const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [indisponibilidadeParaEditar, setIndisponibilidadeParaEditar] = useState<Indisponibilidade | undefined>();
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
-    carregarMeusServicos();
+    carregarDados();
   }, []);
+
+  async function carregarDados() {
+    setLoading(true);
+    await Promise.all([carregarMeusServicos(), carregarIndisponibilidades()]);
+    setLoading(false);
+  }
 
   async function carregarMeusServicos() {
     try {
@@ -42,8 +53,28 @@ export default function MinhaAgenda() {
       setServicos(data || []);
     } catch (error) {
       console.error("Erro ao carregar serviços:", error);
-    } finally {
-      setLoading(false);
+    }
+  }
+
+  async function carregarIndisponibilidades() {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("indisponibilidades_instaladores")
+        .select("*")
+        .eq("instalador_id", user.id)
+        .gte("data_fim", new Date().toISOString().split('T')[0])
+        .order("data_inicio", { ascending: true });
+
+      if (error) throw error;
+      setIndisponibilidades(data || []);
+    } catch (error) {
+      console.error("Erro ao carregar indisponibilidades:", error);
     }
   }
 
@@ -73,6 +104,38 @@ export default function MinhaAgenda() {
     navigate(`/instalador/finalizar-servico/${servicoId}`);
   }
 
+  function handleMarcarIndisponibilidade() {
+    setIndisponibilidadeParaEditar(undefined);
+    setModalOpen(true);
+  }
+
+  function handleEditarIndisponibilidade(indisponibilidade: Indisponibilidade) {
+    setIndisponibilidadeParaEditar(indisponibilidade);
+    setModalOpen(true);
+  }
+
+  async function handleExcluirIndisponibilidade(id: string) {
+    try {
+      const { error } = await supabase
+        .from("indisponibilidades_instaladores")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+      
+      toast({
+        title: "✅ Indisponibilidade removida!",
+      });
+      carregarIndisponibilidades();
+    } catch (error: any) {
+      toast({
+        title: "❌ Erro ao remover",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  }
+
   if (loading) {
     return (
       <InstaladorLayout>
@@ -92,8 +155,19 @@ export default function MinhaAgenda() {
 
         <AgendaSemanal
           servicos={servicos}
+          indisponibilidades={indisponibilidades}
           onIniciar={iniciarServico}
           onFinalizar={finalizarServico}
+          onMarcarIndisponibilidade={handleMarcarIndisponibilidade}
+          onEditarIndisponibilidade={handleEditarIndisponibilidade}
+          onExcluirIndisponibilidade={handleExcluirIndisponibilidade}
+        />
+
+        <MarcarIndisponibilidadeModal
+          open={modalOpen}
+          onOpenChange={setModalOpen}
+          onSuccess={carregarIndisponibilidades}
+          indisponibilidadeParaEditar={indisponibilidadeParaEditar}
         />
       </div>
     </InstaladorLayout>

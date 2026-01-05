@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { format, startOfWeek, addDays, isSameDay, isToday, addWeeks, subWeeks } from "date-fns";
+import { format, startOfWeek, addDays, isSameDay, isToday, addWeeks, subWeeks, isWithinInterval, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, CalendarOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AgendaServicoCard } from "./AgendaServicoCard";
+import { IndisponibilidadeCard, Indisponibilidade } from "./IndisponibilidadeCard";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
@@ -27,11 +28,23 @@ interface Servico {
 
 interface AgendaSemanalProps {
   servicos: Servico[];
+  indisponibilidades: Indisponibilidade[];
   onIniciar: (id: string) => void;
   onFinalizar: (id: string) => void;
+  onMarcarIndisponibilidade: () => void;
+  onEditarIndisponibilidade: (indisponibilidade: Indisponibilidade) => void;
+  onExcluirIndisponibilidade: (id: string) => void;
 }
 
-export function AgendaSemanal({ servicos, onIniciar, onFinalizar }: AgendaSemanalProps) {
+export function AgendaSemanal({ 
+  servicos, 
+  indisponibilidades,
+  onIniciar, 
+  onFinalizar,
+  onMarcarIndisponibilidade,
+  onEditarIndisponibilidade,
+  onExcluirIndisponibilidade,
+}: AgendaSemanalProps) {
   const [semanaBase, setSemanaBase] = useState(new Date());
   const [diaSelecionadoMobile, setDiaSelecionadoMobile] = useState<Date | null>(null);
   const isMobile = useIsMobile();
@@ -44,6 +57,15 @@ export function AgendaSemanal({ servicos, onIniciar, onFinalizar }: AgendaSemana
 
   const diasSemana = gerarDiasSemana(semanaBase);
 
+  // Verificar se um dia tem indisponibilidade
+  const getIndisponibilidadesDoDia = (dia: Date) => {
+    return indisponibilidades.filter(ind => {
+      const inicio = parseISO(ind.data_inicio);
+      const fim = parseISO(ind.data_fim);
+      return isWithinInterval(dia, { start: inicio, end: fim }) || isSameDay(dia, inicio) || isSameDay(dia, fim);
+    });
+  };
+
   // Agrupar serviços por dia
   const servicosPorDia = diasSemana.map(dia => ({
     data: dia,
@@ -51,7 +73,8 @@ export function AgendaSemanal({ servicos, onIniciar, onFinalizar }: AgendaSemana
       isSameDay(new Date(s.data_servico_agendada), dia)
     ).sort((a, b) => 
       new Date(a.data_servico_agendada).getTime() - new Date(b.data_servico_agendada).getTime()
-    )
+    ),
+    indisponibilidades: getIndisponibilidadesDoDia(dia),
   }));
 
   const semanaAnterior = () => setSemanaBase(subWeeks(semanaBase, 1));
@@ -86,9 +109,19 @@ export function AgendaSemanal({ servicos, onIniciar, onFinalizar }: AgendaSemana
           </Button>
         </div>
 
+        {/* Botão marcar indisponibilidade */}
+        <Button 
+          variant="outline" 
+          className="w-full gap-2 border-dashed"
+          onClick={onMarcarIndisponibilidade}
+        >
+          <CalendarOff className="h-4 w-4" />
+          Marcar Indisponibilidade
+        </Button>
+
         {/* Cards de dias (scroll horizontal) */}
         <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4">
-          {servicosPorDia.map(({ data, servicos: servicosDia }) => (
+          {servicosPorDia.map(({ data, servicos: servicosDia, indisponibilidades: indispDia }) => (
             <button
               key={data.toISOString()}
               onClick={() => setDiaSelecionadoMobile(
@@ -100,7 +133,8 @@ export function AgendaSemanal({ servicos, onIniciar, onFinalizar }: AgendaSemana
                 diaSelecionadoMobile && isSameDay(diaSelecionadoMobile, data) 
                   ? "bg-primary text-primary-foreground" 
                   : "bg-card",
-                servicosDia.length > 0 && !diaSelecionadoMobile?.getTime() && "bg-green-50 border-green-200"
+                indispDia.length > 0 && !diaSelecionadoMobile?.getTime() && "bg-destructive/10 border-destructive/30",
+                servicosDia.length > 0 && indispDia.length === 0 && !diaSelecionadoMobile?.getTime() && "bg-green-50 border-green-200"
               )}
             >
               <p className={cn(
@@ -115,11 +149,20 @@ export function AgendaSemanal({ servicos, onIniciar, onFinalizar }: AgendaSemana
                 "text-lg font-bold",
                 diaSelecionadoMobile && isSameDay(diaSelecionadoMobile, data) 
                   ? "text-primary-foreground" 
-                  : "text-foreground"
+                  : indispDia.length > 0 ? "text-destructive" : "text-foreground"
               )}>
                 {format(data, "dd")}
               </p>
-              {servicosDia.length > 0 && (
+              {indispDia.length > 0 ? (
+                <p className={cn(
+                  "text-[10px]",
+                  diaSelecionadoMobile && isSameDay(diaSelecionadoMobile, data) 
+                    ? "text-primary-foreground/80" 
+                    : "text-destructive"
+                )}>
+                  🚫 Indisp.
+                </p>
+              ) : servicosDia.length > 0 ? (
                 <p className={cn(
                   "text-[10px]",
                   diaSelecionadoMobile && isSameDay(diaSelecionadoMobile, data) 
@@ -128,7 +171,7 @@ export function AgendaSemanal({ servicos, onIniciar, onFinalizar }: AgendaSemana
                 )}>
                   {servicosDia.length} serviço{servicosDia.length > 1 ? 's' : ''}
                 </p>
-              )}
+              ) : null}
             </button>
           ))}
         </div>
@@ -140,6 +183,19 @@ export function AgendaSemanal({ servicos, onIniciar, onFinalizar }: AgendaSemana
               <h3 className="font-medium text-foreground">
                 {format(diaSelecionadoMobile, "EEEE, dd 'de' MMMM", { locale: ptBR })}
               </h3>
+              {/* Indisponibilidades do dia */}
+              {servicosPorDia
+                .find(d => isSameDay(d.data, diaSelecionadoMobile))
+                ?.indisponibilidades.map(ind => (
+                  <IndisponibilidadeCard
+                    key={ind.id}
+                    indisponibilidade={ind}
+                    diaAtual={diaSelecionadoMobile}
+                    onEditar={onEditarIndisponibilidade}
+                    onExcluir={onExcluirIndisponibilidade}
+                  />
+                ))}
+              {/* Serviços do dia */}
               {servicosPorDia
                 .find(d => isSameDay(d.data, diaSelecionadoMobile))
                 ?.servicos.map(servico => (
@@ -149,7 +205,10 @@ export function AgendaSemanal({ servicos, onIniciar, onFinalizar }: AgendaSemana
                     onIniciar={onIniciar}
                     onFinalizar={onFinalizar}
                   />
-                )) || (
+                ))}
+              {/* Mensagem se não houver nada */}
+              {servicosPorDia.find(d => isSameDay(d.data, diaSelecionadoMobile))?.servicos.length === 0 && 
+               servicosPorDia.find(d => isSameDay(d.data, diaSelecionadoMobile))?.indisponibilidades.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
                   <Calendar className="h-8 w-8 mx-auto mb-2 opacity-50" />
                   <p>Sem serviços neste dia</p>
@@ -157,9 +216,9 @@ export function AgendaSemanal({ servicos, onIniciar, onFinalizar }: AgendaSemana
               )}
             </>
           ) : (
-            // Mostrar todos os serviços da semana agrupados
-            servicosPorDia.map(({ data, servicos: servicosDia }) => (
-              servicosDia.length > 0 && (
+            // Mostrar todos os serviços e indisponibilidades da semana agrupados
+            servicosPorDia.map(({ data, servicos: servicosDia, indisponibilidades: indispDia }) => (
+              (servicosDia.length > 0 || indispDia.length > 0) && (
                 <div key={data.toISOString()} className="space-y-2">
                   <h3 className={cn(
                     "font-medium text-sm",
@@ -167,6 +226,16 @@ export function AgendaSemanal({ servicos, onIniciar, onFinalizar }: AgendaSemana
                   )}>
                     {isToday(data) ? "Hoje - " : ""}{format(data, "EEEE, dd/MM", { locale: ptBR })}
                   </h3>
+                  {indispDia.map(ind => (
+                    <IndisponibilidadeCard
+                      key={ind.id}
+                      indisponibilidade={ind}
+                      diaAtual={data}
+                      onEditar={onEditarIndisponibilidade}
+                      onExcluir={onExcluirIndisponibilidade}
+                      compact
+                    />
+                  ))}
                   {servicosDia.map(servico => (
                     <AgendaServicoCard
                       key={servico.id}
@@ -180,7 +249,7 @@ export function AgendaSemanal({ servicos, onIniciar, onFinalizar }: AgendaSemana
             ))
           )}
           
-          {!diaSelecionadoMobile && servicos.length === 0 && (
+          {!diaSelecionadoMobile && servicos.length === 0 && indisponibilidades.length === 0 && (
             <div className="text-center py-8 text-muted-foreground bg-card rounded-lg">
               <Calendar className="h-12 w-12 mx-auto mb-2 opacity-50" />
               <p>Nenhum serviço agendado esta semana</p>
@@ -203,9 +272,21 @@ export function AgendaSemanal({ servicos, onIniciar, onFinalizar }: AgendaSemana
         
         <div className="text-center">
           <p className="text-lg font-semibold text-foreground">{periodoSemana}</p>
-          <Button variant="link" size="sm" onClick={irParaHoje}>
-            Ir para hoje
-          </Button>
+          <div className="flex items-center justify-center gap-2 mt-1">
+            <Button variant="link" size="sm" onClick={irParaHoje} className="h-auto p-0">
+              Ir para hoje
+            </Button>
+            <span className="text-muted-foreground">•</span>
+            <Button 
+              variant="link" 
+              size="sm" 
+              onClick={onMarcarIndisponibilidade}
+              className="h-auto p-0 gap-1"
+            >
+              <CalendarOff className="h-3 w-3" />
+              Marcar indisponibilidade
+            </Button>
+          </div>
         </div>
         
         <Button variant="outline" onClick={proximaSemana} className="gap-2">
@@ -216,42 +297,60 @@ export function AgendaSemanal({ servicos, onIniciar, onFinalizar }: AgendaSemana
 
       {/* Grid de dias */}
       <div className="grid grid-cols-6 gap-4">
-        {servicosPorDia.map(({ data, servicos: servicosDia }) => (
+        {servicosPorDia.map(({ data, servicos: servicosDia, indisponibilidades: indispDia }) => (
           <div 
             key={data.toISOString()}
             className={cn(
               "bg-card rounded-lg border min-h-[300px] flex flex-col",
-              isToday(data) && "border-primary border-2"
+              isToday(data) && "border-primary border-2",
+              indispDia.length > 0 && "border-destructive/50"
             )}
           >
             {/* Header do dia */}
             <div className={cn(
               "p-3 border-b text-center",
-              isToday(data) && "bg-primary/10"
+              isToday(data) && "bg-primary/10",
+              indispDia.length > 0 && "bg-destructive/10"
             )}>
               <p className="text-xs uppercase text-muted-foreground">
                 {format(data, "EEEE", { locale: ptBR })}
               </p>
               <p className={cn(
                 "text-2xl font-bold",
-                isToday(data) ? "text-primary" : "text-foreground"
+                indispDia.length > 0 ? "text-destructive" : isToday(data) ? "text-primary" : "text-foreground"
               )}>
                 {format(data, "dd")}
               </p>
+              {indispDia.length > 0 && (
+                <p className="text-[10px] text-destructive mt-1">🚫 Indisponível</p>
+              )}
             </div>
 
-            {/* Lista de serviços */}
+            {/* Lista de serviços e indisponibilidades */}
             <div className="flex-1 p-2 space-y-2 overflow-y-auto">
-              {servicosDia.length > 0 ? (
-                servicosDia.map(servico => (
-                  <AgendaServicoCard
-                    key={servico.id}
-                    servico={servico}
-                    onIniciar={onIniciar}
-                    onFinalizar={onFinalizar}
-                  />
-                ))
-              ) : (
+              {/* Indisponibilidades */}
+              {indispDia.map(ind => (
+                <IndisponibilidadeCard
+                  key={ind.id}
+                  indisponibilidade={ind}
+                  diaAtual={data}
+                  onEditar={onEditarIndisponibilidade}
+                  onExcluir={onExcluirIndisponibilidade}
+                  compact
+                />
+              ))}
+              
+              {/* Serviços */}
+              {servicosDia.map(servico => (
+                <AgendaServicoCard
+                  key={servico.id}
+                  servico={servico}
+                  onIniciar={onIniciar}
+                  onFinalizar={onFinalizar}
+                />
+              ))}
+              
+              {servicosDia.length === 0 && indispDia.length === 0 && (
                 <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
                   Sem serviços
                 </div>
