@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Phone, MapPin, Play, CheckCircle, Clock, Lock } from "lucide-react";
+import { MessageCircle, MapPin, Play, CheckCircle, Clock, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -61,8 +61,9 @@ export function MobileServicoCard({
     return bairro || endereco;
   };
 
-  const handleLigar = () => {
-    window.location.href = `tel:${servico.clientes.telefone}`;
+  const handleWhatsApp = () => {
+    const telefone = servico.clientes.telefone.replace(/\D/g, '');
+    window.open(`https://wa.me/55${telefone}`, '_blank');
   };
 
   const handleMapa = () => {
@@ -133,11 +134,11 @@ export function MobileServicoCard({
         <div className="grid grid-cols-2 gap-2">
           <Button
             variant="outline"
-            onClick={handleLigar}
-            className="h-12 text-base font-medium"
+            onClick={handleWhatsApp}
+            className="h-12 text-base font-medium text-green-600 border-green-200 hover:bg-green-50"
           >
-            <Phone className="w-5 h-5 mr-2" />
-            Ligar
+            <MessageCircle className="w-5 h-5 mr-2" />
+            WhatsApp
           </Button>
           <Button
             variant="outline"

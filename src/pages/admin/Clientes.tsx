@@ -26,7 +26,9 @@ import {
   Crown,
   AlertTriangle,
   UserX,
-  User
+  User,
+  Skull,
+  MessageCircle
 } from "lucide-react"
 import { Link, useNavigate } from "react-router-dom"
 
@@ -39,6 +41,8 @@ interface Cliente {
   origem_lead: string
   idade: number | null
   created_at: string
+  observacao_alerta: string | null
+  tipo_alerta: 'problematico' | 'atencao' | null
 }
 
 interface Cotacao {
@@ -58,7 +62,7 @@ interface ClienteComMetricas extends Cliente {
   cotacoesNaoGerou: number
   valorTotal: number
   taxaConversao: number
-  classificacao: 'vip' | 'bom' | 'regular' | 'atencao' | 'inativo'
+  classificacao: 'vip' | 'bom' | 'regular' | 'atencao' | 'inativo' | 'problematico'
   ultimaInteracao: string | null
   cotacoes: Cotacao[]
 }
@@ -92,7 +96,9 @@ export default function AdminClientes() {
     bairro: "",
     endereco_completo: "",
     idade: "",
-    origem_lead: ""
+    origem_lead: "",
+    tipo_alerta: "" as '' | 'problematico' | 'atencao',
+    observacao_alerta: ""
   })
 
   // Fetch clientes
@@ -142,9 +148,11 @@ export default function AdminClientes() {
         ? cotacoesDoCliente[0].created_at 
         : null
 
-      // Classificação automática
+      // Classificação automática (prioriza tipo_alerta manual)
       let classificacao: ClienteComMetricas['classificacao'] = 'inativo'
-      if (taxaConversao > 70 || valorTotal > 1000) {
+      if (cliente.tipo_alerta === 'problematico') {
+        classificacao = 'problematico'
+      } else if (taxaConversao > 70 || valorTotal > 1000) {
         classificacao = 'vip'
       } else if (taxaConversao > 50 || cotacoesAprovadas >= 3) {
         classificacao = 'bom'
@@ -263,6 +271,8 @@ export default function AdminClientes() {
       endereco_completo: string | null
       idade: number | null
       origem_lead: string
+      tipo_alerta: 'problematico' | 'atencao' | null
+      observacao_alerta: string | null
     }) => {
       const { error } = await supabase
         .from('clientes')
@@ -272,7 +282,9 @@ export default function AdminClientes() {
           bairro: dados.bairro || null,
           endereco_completo: dados.endereco_completo || null,
           idade: dados.idade,
-          origem_lead: dados.origem_lead
+          origem_lead: dados.origem_lead,
+          tipo_alerta: dados.tipo_alerta,
+          observacao_alerta: dados.observacao_alerta
         })
         .eq('id', dados.id)
       
@@ -297,7 +309,9 @@ export default function AdminClientes() {
       bairro: cliente.bairro || "",
       endereco_completo: cliente.endereco_completo || "",
       idade: cliente.idade?.toString() || "",
-      origem_lead: cliente.origem_lead
+      origem_lead: cliente.origem_lead,
+      tipo_alerta: cliente.tipo_alerta || "",
+      observacao_alerta: cliente.observacao_alerta || ""
     })
     setModalEdicaoAberto(true)
   }
@@ -311,7 +325,9 @@ export default function AdminClientes() {
       bairro: formEdicao.bairro || null,
       endereco_completo: formEdicao.endereco_completo || null,
       idade: formEdicao.idade ? parseInt(formEdicao.idade) : null,
-      origem_lead: formEdicao.origem_lead
+      origem_lead: formEdicao.origem_lead,
+      tipo_alerta: formEdicao.tipo_alerta || null,
+      observacao_alerta: formEdicao.observacao_alerta || null
     })
   }
 
@@ -328,8 +344,9 @@ export default function AdminClientes() {
     setModalAberto(true)
   }
 
-  function getClassificacaoBadge(classificacao: ClienteComMetricas['classificacao']) {
+  function getClassificacaoBadge(classificacao: ClienteComMetricas['classificacao'], observacaoAlerta?: string | null) {
     const config = {
+      problematico: { icon: Skull, bg: 'bg-red-100', text: 'text-red-800', label: 'Problemático' },
       vip: { icon: Crown, bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'VIP' },
       bom: { icon: Star, bg: 'bg-green-100', text: 'text-green-800', label: 'Bom' },
       regular: { icon: User, bg: 'bg-blue-100', text: 'text-blue-800', label: 'Regular' },
@@ -339,10 +356,17 @@ export default function AdminClientes() {
     const c = config[classificacao]
     const Icon = c.icon
     return (
-      <Badge className={`${c.bg} ${c.text} gap-1`}>
-        <Icon className="w-3 h-3" />
-        {c.label}
-      </Badge>
+      <div className="flex flex-col gap-1">
+        <Badge className={`${c.bg} ${c.text} gap-1`}>
+          <Icon className="w-3 h-3" />
+          {c.label}
+        </Badge>
+        {classificacao === 'problematico' && observacaoAlerta && (
+          <span className="text-xs text-red-600 max-w-[150px] truncate" title={observacaoAlerta}>
+            ⚠️ {observacaoAlerta}
+          </span>
+        )}
+      </div>
     )
   }
 
@@ -475,6 +499,7 @@ export default function AdminClientes() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todas Classificações</SelectItem>
+                  <SelectItem value="problematico">💀 Problemático</SelectItem>
                   <SelectItem value="vip">🌟 VIP</SelectItem>
                   <SelectItem value="bom">⭐ Bom</SelectItem>
                   <SelectItem value="regular">👤 Regular</SelectItem>
@@ -595,7 +620,7 @@ export default function AdminClientes() {
                             <div className="text-sm text-gray-900">{cliente.taxaConversao.toFixed(1)}%</div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            {getClassificacaoBadge(cliente.classificacao)}
+                            {getClassificacaoBadge(cliente.classificacao, cliente.observacao_alerta)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <Button
@@ -662,11 +687,18 @@ export default function AdminClientes() {
                         </div>
                       )}
                     </div>
-                    {getClassificacaoBadge(clienteSelecionado.classificacao)}
+                    {getClassificacaoBadge(clienteSelecionado.classificacao, clienteSelecionado.observacao_alerta)}
                   </div>
                   <div className="flex items-center gap-2 text-gray-600">
-                    <Phone className="w-4 h-4" />
-                    {clienteSelecionado.telefone}
+                    <MessageCircle className="w-4 h-4 text-green-600" />
+                    <a 
+                      href={`https://wa.me/55${clienteSelecionado.telefone.replace(/\D/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-green-600 hover:underline"
+                    >
+                      {clienteSelecionado.telefone}
+                    </a>
                     {clienteSelecionado.bairro && (
                       <span className="ml-4">📍 {clienteSelecionado.bairro}</span>
                     )}
@@ -879,6 +911,40 @@ export default function AdminClientes() {
                     <SelectItem value="Outro">Outro</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* Alerta de Cliente Problemático */}
+              <div className="border-t pt-4 mt-4">
+                <Label className="text-red-600 font-medium flex items-center gap-2">
+                  <Skull className="w-4 h-4" />
+                  Status de Alerta
+                </Label>
+                <Select 
+                  value={formEdicao.tipo_alerta} 
+                  onValueChange={(value) => setFormEdicao({ ...formEdicao, tipo_alerta: value as '' | 'problematico' | 'atencao' })}
+                >
+                  <SelectTrigger className="mt-2">
+                    <SelectValue placeholder="Normal (sem alerta)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">✅ Normal (sem alerta)</SelectItem>
+                    <SelectItem value="atencao">⚠️ Atenção</SelectItem>
+                    <SelectItem value="problematico">💀 Problemático</SelectItem>
+                  </SelectContent>
+                </Select>
+                
+                {formEdicao.tipo_alerta && (
+                  <div className="mt-2">
+                    <Label htmlFor="edit-observacao-alerta">Observação do Alerta</Label>
+                    <Textarea
+                      id="edit-observacao-alerta"
+                      value={formEdicao.observacao_alerta}
+                      onChange={(e) => setFormEdicao({ ...formEdicao, observacao_alerta: e.target.value })}
+                      placeholder="Descreva o motivo do alerta..."
+                      className="mt-1"
+                    />
+                  </div>
+                )}
               </div>
             </div>
             
