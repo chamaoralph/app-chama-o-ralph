@@ -179,8 +179,8 @@ export function ImportarClientesModal({
         endereco: mapping.endereco ? String(row[mapping.endereco] || "").trim() : "",
       }));
 
-      const { data: result, error } = await supabase.rpc("import_clientes_csv", {
-        p_empresa_id: empresaId,
+      // Note: p_empresa_id is now determined server-side from auth.uid()
+      const { data: result, error } = await supabase.rpc("import_clientes_csv" as any, {
         p_dados: dadosMapeados,
         p_arquivo_nome: selectedFile.name,
       });
