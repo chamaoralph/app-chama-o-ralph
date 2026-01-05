@@ -28,7 +28,50 @@ export function ImportacaoCotacoes() {
   const [arquivo, setArquivo] = useState<File | null>(null)
   const [dadosParsed, setDadosParsed] = useState<CotacaoImportada[]>([])
   const [processando, setProcessando] = useState(false)
+  const [tiposServicoValidos, setTiposServicoValidos] = useState<string[]>([])
   const { toast } = useToast()
+
+  // Buscar tipos de serviço válidos ao montar o componente
+  useState(() => {
+    const fetchTipos = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: userData } = await supabase
+        .from('usuarios')
+        .select('empresa_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!userData) return
+
+      const { data: tipos } = await supabase
+        .from('tipos_servico')
+        .select('nome')
+        .eq('empresa_id', userData.empresa_id)
+        .eq('ativo', true)
+
+      if (tipos) {
+        setTiposServicoValidos(tipos.map(t => t.nome))
+      }
+    }
+    fetchTipos()
+  })
+
+  // Função para normalizar tipo de serviço
+  // Ex: "Tv 75 polegadas" → encontra "TV" → retorna "TV"
+  const normalizarTipoServico = (tipoDigitado: string): string => {
+    const tipoLower = tipoDigitado.toLowerCase().trim()
+    const primeiraPalavra = tipoLower.split(' ')[0]
+    
+    // Procurar um tipo válido que corresponda
+    const tipoEncontrado = tiposServicoValidos.find(tipoValido => {
+      const validoLower = tipoValido.toLowerCase()
+      return primeiraPalavra === validoLower || tipoLower === validoLower
+    })
+    
+    return tipoEncontrado || 'Outros'
+  }
 
   const baixarTemplate = () => {
     const template = [
@@ -232,11 +275,16 @@ export function ImportacaoCotacoes() {
             console.log('Novo cliente criado:', clienteId)
           }
 
-          // Criar cotação
-          const tiposServico = cotacao.tipo_servico
+          // Criar cotação - normalizar tipos de serviço para os padrões cadastrados
+          const tiposServicoRaw = cotacao.tipo_servico
             .split(',')
             .map(t => t.trim())
             .filter(t => t.length > 0)
+          
+          // Normalizar cada tipo para o padrão cadastrado (ex: "Tv 75" → "TV")
+          const tiposServico = tiposServicoRaw.map(tipo => normalizarTipoServico(tipo))
+          // Remover duplicatas após normalização
+          const tiposServicoUnicos = [...new Set(tiposServico)]
 
           // Usar as datas já convertidas
           const dataServicoDesejada = cotacao.data_servico_desejada || null
@@ -245,11 +293,11 @@ export function ImportacaoCotacoes() {
             ? parseFloat(String(cotacao.valor_estimado).replace(/[^\d.,]/g, '').replace(',', '.'))
             : 0
 
-          // Preparar objeto de inserção
+          // Preparar objeto de inserção (usando tipos normalizados)
           const cotacaoInsert: any = {
             cliente_id: clienteId,
             empresa_id: userData.empresa_id,
-            tipo_servico: tiposServico,
+            tipo_servico: tiposServicoUnicos,
             data_servico_desejada: dataServicoDesejada,
             valor_estimado: valorEstimado,
             ocasiao: cotacao.ocasiao || null,
