@@ -94,14 +94,20 @@ export default function ServicosDisponiveis() {
   })
 
   // Função para verificar se instalador tem certificação para o serviço
+  // Compara a primeira palavra do tipo de serviço com a certificação
+  // Ex: "Tv 75 no drywall" → primeira palavra "tv" → match com certificação "tv"
   const temCertificacaoParaServico = (tiposServico: string[]) => {
     if (!certificacoes || certificacoes.length === 0) return false
     
     return tiposServico.some(tipoServico => {
-      const tipoLower = tipoServico.toLowerCase()
-      return certificacoes.some(tipoCert => 
-        tipoLower.includes(tipoCert) || tipoCert.includes(tipoLower)
-      )
+      const tipoLower = tipoServico.toLowerCase().trim()
+      const primeiraPalavra = tipoLower.split(' ')[0]
+      
+      return certificacoes.some(tipoCert => {
+        const certLower = tipoCert.toLowerCase().trim()
+        // Match se: primeira palavra é igual à certificação OU é match exato
+        return primeiraPalavra === certLower || tipoLower === certLower
+      })
     })
   }
 
