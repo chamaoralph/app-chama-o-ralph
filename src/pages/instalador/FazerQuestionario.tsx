@@ -9,9 +9,10 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { TimerQuestionario } from '@/components/TimerQuestionario';
 import { Progress } from '@/components/ui/progress';
-import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface Questionario {
   id: string;
@@ -42,6 +43,7 @@ export default function FazerQuestionario() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const [questionario, setQuestionario] = useState<Questionario | null>(null);
   const [perguntas, setPerguntas] = useState<Pergunta[]>([]);
@@ -50,6 +52,7 @@ export default function FazerQuestionario() {
   const [loading, setLoading] = useState(true);
   const [finalizando, setFinalizando] = useState(false);
   const [iniciadoEm] = useState(new Date());
+  const [perguntaAtual, setPerguntaAtual] = useState(0);
 
   useEffect(() => {
     carregarQuestionario();
@@ -207,6 +210,22 @@ export default function FazerQuestionario() {
     }
   }
 
+  const proximaPergunta = () => {
+    if (perguntaAtual < perguntas.length - 1) {
+      setPerguntaAtual((prev) => prev + 1);
+    }
+  };
+
+  const perguntaAnterior = () => {
+    if (perguntaAtual > 0) {
+      setPerguntaAtual((prev) => prev - 1);
+    }
+  };
+
+  const irParaPergunta = (index: number) => {
+    setPerguntaAtual(index);
+  };
+
   if (loading) {
     return (
       <InstaladorLayout>
@@ -249,7 +268,138 @@ export default function FazerQuestionario() {
   }
 
   const progresso = (Object.keys(respostas).length / perguntas.length) * 100;
+  const perguntaAtualData = perguntas[perguntaAtual];
+  const isUltimaPergunta = perguntaAtual === perguntas.length - 1;
+  const isPrimeiraPergunta = perguntaAtual === 0;
 
+  // Renderização Mobile - Uma pergunta por vez
+  if (isMobile) {
+    return (
+      <InstaladorLayout>
+        <div className="space-y-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">{questionario.titulo}</CardTitle>
+              <CardDescription className="text-xs">
+                Nota mínima: {questionario.nota_minima}%
+                {questionario.tentativas_maximas && (
+                  <> | Tentativa {tentativasRealizadas + 1}/{questionario.tentativas_maximas}</>
+                )}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-0">
+              {questionario.tempo_limite_minutos && (
+                <TimerQuestionario
+                  tempoLimiteMinutos={questionario.tempo_limite_minutos}
+                  onTempoEsgotado={finalizarQuestionario}
+                  iniciado={true}
+                />
+              )}
+
+              {/* Indicadores de progresso por pergunta */}
+              <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                {perguntas.map((pergunta, index) => (
+                  <button
+                    key={pergunta.id}
+                    onClick={() => irParaPergunta(index)}
+                    className={`w-7 h-7 rounded-full text-xs font-medium transition-all ${
+                      index === perguntaAtual
+                        ? 'bg-primary text-primary-foreground scale-110'
+                        : respostas[pergunta.id]
+                        ? 'bg-primary/20 text-primary'
+                        : 'bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    {index + 1}
+                  </button>
+                ))}
+              </div>
+
+              <div className="text-center text-sm text-muted-foreground">
+                Pergunta {perguntaAtual + 1} de {perguntas.length}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Pergunta atual */}
+          {perguntaAtualData && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">
+                  {perguntaAtual + 1}. {perguntaAtualData.enunciado}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RadioGroup
+                  value={respostas[perguntaAtualData.id]}
+                  onValueChange={(value) =>
+                    setRespostas((prev) => ({ ...prev, [perguntaAtualData.id]: value }))
+                  }
+                >
+                  {perguntaAtualData.alternativas
+                    .sort((a, b) => a.ordem - b.ordem)
+                    .map((alternativa) => (
+                      <div key={alternativa.id} className="flex items-center space-x-3 py-2">
+                        <RadioGroupItem value={alternativa.id} id={alternativa.id} />
+                        <Label htmlFor={alternativa.id} className="cursor-pointer text-sm flex-1">
+                          {alternativa.texto}
+                        </Label>
+                      </div>
+                    ))}
+                </RadioGroup>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Navegação fixa no rodapé */}
+          <div className="flex gap-3 pt-2">
+            <Button
+              variant="outline"
+              onClick={perguntaAnterior}
+              disabled={isPrimeiraPergunta}
+              className="flex-1"
+            >
+              <ChevronLeft className="mr-1 h-4 w-4" />
+              Anterior
+            </Button>
+
+            {isUltimaPergunta ? (
+              <Button
+                onClick={finalizarQuestionario}
+                disabled={finalizando}
+                className="flex-1"
+              >
+                {finalizando ? (
+                  'Finalizando...'
+                ) : (
+                  <>
+                    <CheckCircle2 className="mr-1 h-4 w-4" />
+                    Finalizar
+                  </>
+                )}
+              </Button>
+            ) : (
+              <Button onClick={proximaPergunta} className="flex-1">
+                Próxima
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
+            )}
+          </div>
+
+          <Button
+            variant="ghost"
+            onClick={() => navigate('/instalador/conhecimento')}
+            disabled={finalizando}
+            className="w-full text-muted-foreground"
+          >
+            Cancelar
+          </Button>
+        </div>
+      </InstaladorLayout>
+    );
+  }
+
+  // Renderização Desktop - Todas as perguntas visíveis
   return (
     <InstaladorLayout>
       <div className="space-y-6">
