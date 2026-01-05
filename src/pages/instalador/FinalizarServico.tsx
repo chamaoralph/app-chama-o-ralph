@@ -94,7 +94,8 @@ export default function FinalizarServico() {
     setEnviando(true);
 
     try {
-      const fotosUrls: string[] = [];
+      // Armazena apenas o path do arquivo (não URL pública, pois o bucket é privado)
+      const fotosPaths: string[] = [];
       for (let i = 0; i < fotos.length; i++) {
         const foto = fotos[i];
         const fileName = `${servicoId}/${Date.now()}_${i}.jpg`;
@@ -103,14 +104,11 @@ export default function FinalizarServico() {
 
         if (uploadError) throw uploadError;
 
-        const {
-          data: { publicUrl },
-        } = supabase.storage.from("fotos-servicos").getPublicUrl(fileName);
-
-        fotosUrls.push(publicUrl);
+        // Salva apenas o path, não a URL pública
+        fotosPaths.push(fileName);
       }
 
-      let notaFiscalUrl = null;
+      let notaFiscalPath = null;
       if (notaFiscal && temReembolso) {
         const nfFileName = `${servicoId}/nota_fiscal_${Date.now()}.pdf`;
 
@@ -118,11 +116,8 @@ export default function FinalizarServico() {
 
         if (uploadError) throw uploadError;
 
-        const {
-          data: { publicUrl },
-        } = supabase.storage.from("notas-fiscais").getPublicUrl(nfFileName);
-
-        notaFiscalUrl = publicUrl;
+        // Salva apenas o path, não a URL pública
+        notaFiscalPath = nfFileName;
       }
 
       // Buscar o usuário atual
@@ -133,8 +128,8 @@ export default function FinalizarServico() {
         .from("servicos")
         .update({
           status: "aguardando_aprovacao",
-          fotos_conclusao: fotosUrls,
-          nota_fiscal_url: notaFiscalUrl,
+          fotos_conclusao: fotosPaths,
+          nota_fiscal_url: notaFiscalPath,
           valor_reembolso_despesas: temReembolso ? parseFloat(valorReembolso) : servico.valor_reembolso_despesas,
           observacoes_instalador: observacoes,
         })
