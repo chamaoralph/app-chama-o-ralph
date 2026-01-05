@@ -778,6 +778,63 @@ export type Database = {
           },
         ]
       }
+      recibos_diarios: {
+        Row: {
+          created_at: string | null
+          data_referencia: string
+          empresa_id: string
+          id: string
+          instalador_id: string
+          pdf_url: string | null
+          quantidade_servicos: number
+          servicos_ids: string[]
+          valor_mao_obra: number
+          valor_reembolso: number
+          valor_total: number
+        }
+        Insert: {
+          created_at?: string | null
+          data_referencia: string
+          empresa_id: string
+          id?: string
+          instalador_id: string
+          pdf_url?: string | null
+          quantidade_servicos?: number
+          servicos_ids: string[]
+          valor_mao_obra?: number
+          valor_reembolso?: number
+          valor_total?: number
+        }
+        Update: {
+          created_at?: string | null
+          data_referencia?: string
+          empresa_id?: string
+          id?: string
+          instalador_id?: string
+          pdf_url?: string | null
+          quantidade_servicos?: number
+          servicos_ids?: string[]
+          valor_mao_obra?: number
+          valor_reembolso?: number
+          valor_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recibos_diarios_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recibos_diarios_instalador_id_fkey"
+            columns: ["instalador_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       respostas_tentativa: {
         Row: {
           alternativa_escolhida_id: string
