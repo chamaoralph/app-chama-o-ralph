@@ -97,7 +97,7 @@ export default function AdminClientes() {
     endereco_completo: "",
     idade: "",
     origem_lead: "",
-    tipo_alerta: "" as '' | 'problematico' | 'atencao',
+    tipo_alerta: "normal" as 'normal' | 'problematico' | 'atencao',
     observacao_alerta: ""
   })
 
@@ -310,7 +310,7 @@ export default function AdminClientes() {
       endereco_completo: cliente.endereco_completo || "",
       idade: cliente.idade?.toString() || "",
       origem_lead: cliente.origem_lead,
-      tipo_alerta: cliente.tipo_alerta || "",
+      tipo_alerta: cliente.tipo_alerta || "normal",
       observacao_alerta: cliente.observacao_alerta || ""
     })
     setModalEdicaoAberto(true)
@@ -326,7 +326,7 @@ export default function AdminClientes() {
       endereco_completo: formEdicao.endereco_completo || null,
       idade: formEdicao.idade ? parseInt(formEdicao.idade) : null,
       origem_lead: formEdicao.origem_lead,
-      tipo_alerta: formEdicao.tipo_alerta || null,
+      tipo_alerta: formEdicao.tipo_alerta === 'normal' ? null : formEdicao.tipo_alerta,
       observacao_alerta: formEdicao.observacao_alerta || null
     })
   }
@@ -921,19 +921,19 @@ export default function AdminClientes() {
                 </Label>
                 <Select 
                   value={formEdicao.tipo_alerta} 
-                  onValueChange={(value) => setFormEdicao({ ...formEdicao, tipo_alerta: value as '' | 'problematico' | 'atencao' })}
+                  onValueChange={(value) => setFormEdicao({ ...formEdicao, tipo_alerta: value as 'normal' | 'problematico' | 'atencao' })}
                 >
                   <SelectTrigger className="mt-2">
                     <SelectValue placeholder="Normal (sem alerta)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">✅ Normal (sem alerta)</SelectItem>
+                    <SelectItem value="normal">✅ Normal (sem alerta)</SelectItem>
                     <SelectItem value="atencao">⚠️ Atenção</SelectItem>
                     <SelectItem value="problematico">💀 Problemático</SelectItem>
                   </SelectContent>
                 </Select>
                 
-                {formEdicao.tipo_alerta && (
+                {formEdicao.tipo_alerta && formEdicao.tipo_alerta !== 'normal' && (
                   <div className="mt-2">
                     <Label htmlFor="edit-observacao-alerta">Observação do Alerta</Label>
                     <Textarea
