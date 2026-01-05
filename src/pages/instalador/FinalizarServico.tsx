@@ -125,16 +125,22 @@ export default function FinalizarServico() {
         notaFiscalUrl = publicUrl;
       }
 
+      // Buscar o usuário atual
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+
       const { error: updateError } = await supabase
         .from("servicos")
         .update({
           status: "aguardando_aprovacao",
           fotos_conclusao: fotosUrls,
           nota_fiscal_url: notaFiscalUrl,
-          valor_reembolso_despesas: temReembolso ? parseFloat(valorReembolso) : 0,
+          valor_reembolso_despesas: temReembolso ? parseFloat(valorReembolso) : servico.valor_reembolso_despesas,
           observacoes_instalador: observacoes,
         })
-        .eq("id", servicoId);
+        .eq("id", servicoId)
+        .eq("instalador_id", user.id)
+        .in("status", ["atribuido", "em_andamento"]);
 
       if (updateError) throw updateError;
 
