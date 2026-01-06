@@ -27,7 +27,7 @@ export default function NovaCotacao() {
     endereco_completo: '',
     cep: '',
     bairro: '',
-    origem_lead: 'WhatsApp',
+    origem_lead: 'Google',
     ocasiao: '',
     data_servico_desejada: '',
     horario_inicio: '',
@@ -214,9 +214,10 @@ export default function NovaCotacao() {
               <div>
                 <label className="block text-sm font-medium mb-2">Origem *</label>
                 <select value={formData.origem_lead} onChange={(e) => setFormData({...formData, origem_lead: e.target.value})} className="w-full px-3 py-2 border rounded-md">
-                  <option value="WhatsApp">WhatsApp</option>
-                  <option value="Instagram">Instagram</option>
                   <option value="Google">Google</option>
+                  <option value="Instagram">Instagram</option>
+                  <option value="Já era cliente">Já era cliente</option>
+                  <option value="Indicação">Indicação</option>
                 </select>
               </div>
               <div className="col-span-2">
