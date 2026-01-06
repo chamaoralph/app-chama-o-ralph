@@ -1,5 +1,3 @@
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { Phone, MapPin, Play, CheckCircle, Clock, User } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -29,8 +27,22 @@ interface AgendaServicoCardProps {
   onFinalizar: (id: string) => void;
 }
 
+// Extrai horário diretamente da string para evitar conversão de timezone
+function formatarHorario(dataString: string): string {
+  const timePart = dataString.split('T')[1];
+  return timePart ? timePart.substring(0, 5) : '00:00';
+}
+
+// Formata data e horário sem usar new Date()
+function formatarDataServico(dataString: string): string {
+  const [dataPart, timePart] = dataString.split('T');
+  const [ano, mes, dia] = dataPart.split('-');
+  const horario = timePart ? timePart.substring(0, 5) : '00:00';
+  return `${dia}/${mes}/${ano} às ${horario}`;
+}
+
 export function AgendaServicoCard({ servico, onIniciar, onFinalizar }: AgendaServicoCardProps) {
-  const horario = format(new Date(servico.data_servico_agendada), "HH:mm");
+  const horario = formatarHorario(servico.data_servico_agendada);
 
   const getStatusConfig = (status: string) => {
     switch (status) {
@@ -101,7 +113,7 @@ export function AgendaServicoCard({ servico, onIniciar, onFinalizar }: AgendaSer
             <div className="flex items-center gap-2 text-sm">
               <Clock className="h-4 w-4 text-muted-foreground" />
               <span>
-                {format(new Date(servico.data_servico_agendada), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                {formatarDataServico(servico.data_servico_agendada)}
               </span>
             </div>
 

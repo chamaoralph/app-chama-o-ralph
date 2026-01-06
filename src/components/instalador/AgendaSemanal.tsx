@@ -66,16 +66,22 @@ export function AgendaSemanal({
     });
   };
 
-  // Agrupar serviços por dia
-  const servicosPorDia = diasSemana.map(dia => ({
-    data: dia,
-    servicos: servicos.filter(s => 
-      isSameDay(new Date(s.data_servico_agendada), dia)
-    ).sort((a, b) => 
-      new Date(a.data_servico_agendada).getTime() - new Date(b.data_servico_agendada).getTime()
-    ),
-    indisponibilidades: getIndisponibilidadesDoDia(dia),
-  }));
+  // Extrai a data (YYYY-MM-DD) diretamente da string para comparação timezone-agnostic
+  const getDateString = (dataServico: string) => dataServico.split('T')[0];
+  
+  // Agrupar serviços por dia (usando extração direta da string para evitar problemas de timezone)
+  const servicosPorDia = diasSemana.map(dia => {
+    const diaString = format(dia, 'yyyy-MM-dd');
+    return {
+      data: dia,
+      servicos: servicos.filter(s => 
+        getDateString(s.data_servico_agendada) === diaString
+      ).sort((a, b) => 
+        a.data_servico_agendada.localeCompare(b.data_servico_agendada)
+      ),
+      indisponibilidades: getIndisponibilidadesDoDia(dia),
+    };
+  });
 
   const semanaAnterior = () => setSemanaBase(subWeeks(semanaBase, 1));
   const proximaSemana = () => setSemanaBase(addWeeks(semanaBase, 1));
