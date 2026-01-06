@@ -1218,10 +1218,16 @@ export type Database = {
         }
         Returns: boolean
       }
-      import_clientes_csv: {
-        Args: { p_arquivo_nome?: string; p_dados: Json; p_empresa_id: string }
-        Returns: Json
-      }
+      import_clientes_csv:
+        | { Args: { p_arquivo_nome?: string; p_dados: Json }; Returns: Json }
+        | {
+            Args: {
+              p_arquivo_nome?: string
+              p_dados: Json
+              p_empresa_id: string
+            }
+            Returns: Json
+          }
       instalador_certificado_para_tipo: {
         Args: { _instalador_id: string; _tipos_servico: string[] }
         Returns: boolean
