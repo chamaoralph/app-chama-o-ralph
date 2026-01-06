@@ -42,17 +42,34 @@ export function AgendaSemanalDisponiveis({
   const isMobile = useIsMobile();
 
   // Função para verificar certificação
+  // Se não encontrar match específico (TV, Fechadura), verifica se tem "outros"
   const temCertificacaoParaServico = (tiposServico: string[]) => {
     if (!certificacoes || certificacoes.length === 0) return false;
+    
+    const certificacoesPadrao = ['tv', 'fechadura'];
     
     return tiposServico.some(tipoServico => {
       const tipoLower = tipoServico.toLowerCase().trim();
       const primeiraPalavra = tipoLower.split(' ')[0];
       
-      return certificacoes.some(tipoCert => {
+      // Match direto com certificação específica
+      const temMatchEspecifico = certificacoes.some(tipoCert => {
         const certLower = tipoCert.toLowerCase().trim();
-        return primeiraPalavra === certLower || tipoLower === certLower;
+        return (primeiraPalavra === certLower || tipoLower === certLower) && certLower !== 'outros';
       });
+      
+      if (temMatchEspecifico) return true;
+      
+      // Se não é categoria específica, verifica certificação "outros"
+      const ehCategoriaEspecifica = certificacoesPadrao.some(cat => 
+        primeiraPalavra === cat || tipoLower.startsWith(cat)
+      );
+      
+      if (!ehCategoriaEspecifica) {
+        return certificacoes.some(c => c.toLowerCase() === 'outros');
+      }
+      
+      return false;
     });
   };
 
