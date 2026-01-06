@@ -780,7 +780,9 @@ export type Database = {
       }
       recibos_diarios: {
         Row: {
+          comprovante_pix_url: string | null
           created_at: string | null
+          data_pagamento: string | null
           data_referencia: string
           empresa_id: string
           id: string
@@ -788,12 +790,15 @@ export type Database = {
           pdf_url: string | null
           quantidade_servicos: number
           servicos_ids: string[]
+          status_pagamento: string | null
           valor_mao_obra: number
           valor_reembolso: number
           valor_total: number
         }
         Insert: {
+          comprovante_pix_url?: string | null
           created_at?: string | null
+          data_pagamento?: string | null
           data_referencia: string
           empresa_id: string
           id?: string
@@ -801,12 +806,15 @@ export type Database = {
           pdf_url?: string | null
           quantidade_servicos?: number
           servicos_ids: string[]
+          status_pagamento?: string | null
           valor_mao_obra?: number
           valor_reembolso?: number
           valor_total?: number
         }
         Update: {
+          comprovante_pix_url?: string | null
           created_at?: string | null
+          data_pagamento?: string | null
           data_referencia?: string
           empresa_id?: string
           id?: string
@@ -814,6 +822,7 @@ export type Database = {
           pdf_url?: string | null
           quantidade_servicos?: number
           servicos_ids?: string[]
+          status_pagamento?: string | null
           valor_mao_obra?: number
           valor_reembolso?: number
           valor_total?: number
