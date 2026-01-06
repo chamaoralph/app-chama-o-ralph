@@ -107,18 +107,38 @@ export default function ServicosDisponiveis() {
   // Função para verificar se instalador tem certificação para o serviço
   // Compara a primeira palavra do tipo de serviço com a certificação
   // Ex: "Tv 75 no drywall" → primeira palavra "tv" → match com certificação "tv"
+  // Se não encontrar match específico, verifica se tem certificação "outros"
   const temCertificacaoParaServico = (tiposServico: string[]) => {
     if (!certificacoes || certificacoes.length === 0) return false
+    
+    // Lista de certificações padrão (exceto "outros")
+    const certificacoesPadrao = ['tv', 'fechadura']
     
     return tiposServico.some(tipoServico => {
       const tipoLower = tipoServico.toLowerCase().trim()
       const primeiraPalavra = tipoLower.split(' ')[0]
       
-      return certificacoes.some(tipoCert => {
+      // Primeiro, verifica se há match direto com certificações específicas
+      const temMatchEspecifico = certificacoes.some(tipoCert => {
         const certLower = tipoCert.toLowerCase().trim()
         // Match se: primeira palavra é igual à certificação OU é match exato
-        return primeiraPalavra === certLower || tipoLower === certLower
+        return (primeiraPalavra === certLower || tipoLower === certLower) && certLower !== 'outros'
       })
+      
+      if (temMatchEspecifico) return true
+      
+      // Se não encontrou match específico, verifica se o tipo NÃO é uma categoria padrão
+      // e se o instalador tem certificação de "outros"
+      const ehCategoriaEspecifica = certificacoesPadrao.some(cat => 
+        primeiraPalavra === cat || tipoLower.startsWith(cat)
+      )
+      
+      if (!ehCategoriaEspecifica) {
+        // O serviço não é TV nem Fechadura, então verifica se tem certificação "outros"
+        return certificacoes.includes('outros')
+      }
+      
+      return false
     })
   }
 
