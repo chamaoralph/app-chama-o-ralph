@@ -353,8 +353,8 @@ export default function FazerQuestionario() {
             )}
           </div>
 
-          {/* Navegação fixa no rodapé */}
-          <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4 z-50">
+          {/* Navegação fixa no rodapé - z-index maior que a nav do layout */}
+          <div className="fixed bottom-16 left-0 right-0 bg-background border-t p-4 z-[60]">
             <div className="flex gap-3 max-w-lg mx-auto">
               <Button
                 variant="outline"
