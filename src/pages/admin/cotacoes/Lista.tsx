@@ -7,13 +7,17 @@ import { useToast } from '@/hooks/use-toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ImportacaoCotacoes } from '@/components/admin/ImportacaoCotacoes'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Trash2, XCircle, Pencil, Users, Undo2 } from 'lucide-react'
+import { Trash2, XCircle, Pencil, Users, Undo2, List, Calendar, CalendarDays } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { CalendarioCotacoesSemanal } from '@/components/admin/CalendarioCotacoesSemanal'
+import { CalendarioCotacoesMensal } from '@/components/admin/CalendarioCotacoesMensal'
+
+type VisualizacaoTipo = 'lista' | 'semanal' | 'mensal'
 
 interface Cotacao {
   id: string
@@ -135,6 +139,7 @@ export default function ListaCotacoes() {
   })
   const [tiposServico, setTiposServico] = useState<TipoServico[]>([])
   const [showOutroInput, setShowOutroInput] = useState(false)
+  const [visualizacao, setVisualizacao] = useState<VisualizacaoTipo>('lista')
 
   useEffect(() => {
     fetchCotacoes()
@@ -522,33 +527,99 @@ export default function ListaCotacoes() {
           </TabsList>
 
           <TabsContent value="lista">
-            <div className="mb-4 flex items-center justify-between">
+            {/* Botões de visualização */}
+            <div className="mb-4 flex items-center justify-between flex-wrap gap-4">
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-600">Mostrar</span>
-                <Select value={String(itensPorPagina)} onValueChange={(v) => {
-                  setItensPorPagina(Number(v))
-                  setPaginaAtual(1)
-                }}>
-                  <SelectTrigger className="w-20">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="25">25</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                  </SelectContent>
-                </Select>
-                <span className="text-sm text-gray-600">por página</span>
+                <Button
+                  variant={visualizacao === 'lista' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setVisualizacao('lista')}
+                >
+                  <List className="w-4 h-4 mr-2" />
+                  Lista
+                </Button>
+                <Button
+                  variant={visualizacao === 'semanal' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setVisualizacao('semanal')}
+                >
+                  <Calendar className="w-4 h-4 mr-2" />
+                  Semanal
+                </Button>
+                <Button
+                  variant={visualizacao === 'mensal' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setVisualizacao('mensal')}
+                >
+                  <CalendarDays className="w-4 h-4 mr-2" />
+                  Mensal
+                </Button>
               </div>
-              <div className="text-sm text-gray-600">
-                Total: {cotacoes.length} cotações
-              </div>
+              
+              {visualizacao === 'lista' && (
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">Mostrar</span>
+                    <Select value={String(itensPorPagina)} onValueChange={(v) => {
+                      setItensPorPagina(Number(v))
+                      setPaginaAtual(1)
+                    }}>
+                      <SelectTrigger className="w-20">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="25">25</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <span className="text-sm text-gray-600">por página</span>
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    Total: {cotacoes.length} cotações
+                  </div>
+                </div>
+              )}
+              
+              {visualizacao !== 'lista' && (
+                <div className="text-sm text-gray-600">
+                  Total: {cotacoes.length} cotações
+                </div>
+              )}
             </div>
 
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
+            {/* Visualização em Calendário Semanal */}
+            {visualizacao === 'semanal' && (
+              <CalendarioCotacoesSemanal
+                cotacoes={cotacoes}
+                onAprovar={async (id) => {
+                  await supabase.from('cotacoes').update({ status: 'aprovada' }).eq('id', id)
+                  toast({ title: '✅ Cotação aprovada!' })
+                  fetchCotacoes()
+                }}
+                onEditar={abrirEdicao}
+              />
+            )}
+
+            {/* Visualização em Calendário Mensal */}
+            {visualizacao === 'mensal' && (
+              <CalendarioCotacoesMensal
+                cotacoes={cotacoes}
+                onAprovar={async (id) => {
+                  await supabase.from('cotacoes').update({ status: 'aprovada' }).eq('id', id)
+                  toast({ title: '✅ Cotação aprovada!' })
+                  fetchCotacoes()
+                }}
+                onEditar={abrirEdicao}
+              />
+            )}
+
+            {/* Visualização em Lista */}
+            {visualizacao === 'lista' && (
+              <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
                       <th 
@@ -754,10 +825,10 @@ export default function ListaCotacoes() {
                     )}
                   </tbody>
                 </table>
+                </div>
               </div>
-            </div>
-
-            {totalPaginas > 1 && (
+            )}
+            {visualizacao === 'lista' && totalPaginas > 1 && (
               <div className="mt-4 flex items-center justify-between">
                 <div className="text-sm text-gray-600">
                   Página {paginaAtual} de {totalPaginas}
