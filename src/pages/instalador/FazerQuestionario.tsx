@@ -276,124 +276,119 @@ export default function FazerQuestionario() {
   if (isMobile) {
     return (
       <InstaladorLayout>
-        <div className="space-y-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">{questionario.titulo}</CardTitle>
-              <CardDescription className="text-xs">
-                Nota mínima: {questionario.nota_minima}%
-                {questionario.tentativas_maximas && (
-                  <> | Tentativa {tentativasRealizadas + 1}/{questionario.tentativas_maximas}</>
-                )}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 pt-0">
-              {questionario.tempo_limite_minutos && (
-                <TimerQuestionario
-                  tempoLimiteMinutos={questionario.tempo_limite_minutos}
-                  onTempoEsgotado={finalizarQuestionario}
-                  iniciado={true}
-                />
-              )}
-
-              {/* Indicadores de progresso por pergunta */}
-              <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                {perguntas.map((pergunta, index) => (
-                  <button
-                    key={pergunta.id}
-                    onClick={() => irParaPergunta(index)}
-                    className={`w-7 h-7 rounded-full text-xs font-medium transition-all ${
-                      index === perguntaAtual
-                        ? 'bg-primary text-primary-foreground scale-110'
-                        : respostas[pergunta.id]
-                        ? 'bg-primary/20 text-primary'
-                        : 'bg-muted text-muted-foreground'
-                    }`}
-                  >
-                    {index + 1}
-                  </button>
-                ))}
-              </div>
-
-              <div className="text-center text-sm text-muted-foreground">
-                Pergunta {perguntaAtual + 1} de {perguntas.length}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Pergunta atual */}
-          {perguntaAtualData && (
+        <div className="pb-24">
+          <div className="space-y-4">
             <Card>
-              <CardHeader>
-                <CardTitle className="text-base">
-                  {perguntaAtual + 1}. {perguntaAtualData.enunciado}
-                </CardTitle>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">{questionario.titulo}</CardTitle>
+                <CardDescription className="text-xs">
+                  Nota mínima: {questionario.nota_minima}%
+                  {questionario.tentativas_maximas && (
+                    <> | Tentativa {tentativasRealizadas + 1}/{questionario.tentativas_maximas}</>
+                  )}
+                </CardDescription>
               </CardHeader>
-              <CardContent>
-                <RadioGroup
-                  value={respostas[perguntaAtualData.id]}
-                  onValueChange={(value) =>
-                    setRespostas((prev) => ({ ...prev, [perguntaAtualData.id]: value }))
-                  }
-                >
-                  {perguntaAtualData.alternativas
-                    .sort((a, b) => a.ordem - b.ordem)
-                    .map((alternativa) => (
-                      <div key={alternativa.id} className="flex items-center space-x-3 py-2">
-                        <RadioGroupItem value={alternativa.id} id={alternativa.id} />
-                        <Label htmlFor={alternativa.id} className="cursor-pointer text-sm flex-1">
-                          {alternativa.texto}
-                        </Label>
-                      </div>
-                    ))}
-                </RadioGroup>
+              <CardContent className="space-y-3 pt-0">
+                {questionario.tempo_limite_minutos && (
+                  <TimerQuestionario
+                    tempoLimiteMinutos={questionario.tempo_limite_minutos}
+                    onTempoEsgotado={finalizarQuestionario}
+                    iniciado={true}
+                  />
+                )}
+
+                {/* Indicadores de progresso por pergunta */}
+                <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                  {perguntas.map((pergunta, index) => (
+                    <button
+                      key={pergunta.id}
+                      onClick={() => irParaPergunta(index)}
+                      className={`w-7 h-7 rounded-full text-xs font-medium transition-all ${
+                        index === perguntaAtual
+                          ? 'bg-primary text-primary-foreground scale-110'
+                          : respostas[pergunta.id]
+                          ? 'bg-primary/20 text-primary'
+                          : 'bg-muted text-muted-foreground'
+                      }`}
+                    >
+                      {index + 1}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="text-center text-sm text-muted-foreground">
+                  Pergunta {perguntaAtual + 1} de {perguntas.length}
+                </div>
               </CardContent>
             </Card>
-          )}
 
-          {/* Navegação fixa no rodapé */}
-          <div className="flex gap-3 pt-2">
-            <Button
-              variant="outline"
-              onClick={perguntaAnterior}
-              disabled={isPrimeiraPergunta}
-              className="flex-1"
-            >
-              <ChevronLeft className="mr-1 h-4 w-4" />
-              Anterior
-            </Button>
-
-            {isUltimaPergunta ? (
-              <Button
-                onClick={finalizarQuestionario}
-                disabled={finalizando}
-                className="flex-1"
-              >
-                {finalizando ? (
-                  'Finalizando...'
-                ) : (
-                  <>
-                    <CheckCircle2 className="mr-1 h-4 w-4" />
-                    Finalizar
-                  </>
-                )}
-              </Button>
-            ) : (
-              <Button onClick={proximaPergunta} className="flex-1">
-                Próxima
-                <ChevronRight className="ml-1 h-4 w-4" />
-              </Button>
+            {/* Pergunta atual */}
+            {perguntaAtualData && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    {perguntaAtual + 1}. {perguntaAtualData.enunciado}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <RadioGroup
+                    value={respostas[perguntaAtualData.id]}
+                    onValueChange={(value) =>
+                      setRespostas((prev) => ({ ...prev, [perguntaAtualData.id]: value }))
+                    }
+                  >
+                    {perguntaAtualData.alternativas
+                      .sort((a, b) => a.ordem - b.ordem)
+                      .map((alternativa) => (
+                        <div key={alternativa.id} className="flex items-center space-x-3 py-2">
+                          <RadioGroupItem value={alternativa.id} id={alternativa.id} />
+                          <Label htmlFor={alternativa.id} className="cursor-pointer text-sm flex-1">
+                            {alternativa.texto}
+                          </Label>
+                        </div>
+                      ))}
+                  </RadioGroup>
+                </CardContent>
+              </Card>
             )}
           </div>
 
-          <Button
-            variant="ghost"
-            onClick={() => navigate('/instalador/conhecimento')}
-            disabled={finalizando}
-            className="w-full text-muted-foreground"
-          >
-            Cancelar
-          </Button>
+          {/* Navegação fixa no rodapé */}
+          <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4 z-50">
+            <div className="flex gap-3 max-w-lg mx-auto">
+              <Button
+                variant="outline"
+                onClick={perguntaAnterior}
+                disabled={isPrimeiraPergunta}
+                className="flex-1"
+              >
+                <ChevronLeft className="mr-1 h-4 w-4" />
+                Anterior
+              </Button>
+
+              {isUltimaPergunta ? (
+                <Button
+                  onClick={finalizarQuestionario}
+                  disabled={finalizando}
+                  className="flex-1"
+                >
+                  {finalizando ? (
+                    'Finalizando...'
+                  ) : (
+                    <>
+                      <CheckCircle2 className="mr-1 h-4 w-4" />
+                      Finalizar
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Button onClick={proximaPergunta} className="flex-1">
+                  Próxima
+                  <ChevronRight className="ml-1 h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
       </InstaladorLayout>
     );
