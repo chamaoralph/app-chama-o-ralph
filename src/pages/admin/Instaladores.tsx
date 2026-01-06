@@ -10,8 +10,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from '@/hooks/use-toast'
-
+import { PagamentosInstaladores } from '@/components/admin/PagamentosInstaladores'
 interface Instalador {
   id: string
   nome: string
@@ -185,108 +186,122 @@ export default function Instaladores() {
       <div className="space-y-6">
         <h1 className="text-3xl font-bold">👷 Gestão de Instaladores</h1>
 
-        {/* Cards de Resumo */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg shadow-lg p-6">
-            <div className="flex items-center justify-between mb-2">
-              <Users className="h-8 w-8" />
-              <span className="text-3xl opacity-30">👷</span>
-            </div>
-            <div className="text-2xl font-bold">{totalInstaladores}</div>
-            <div className="text-sm opacity-90">Total de Instaladores</div>
-          </div>
+        <Tabs defaultValue="lista" className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="lista">Lista de Instaladores</TabsTrigger>
+            <TabsTrigger value="pagamentos">Pagamentos</TabsTrigger>
+          </TabsList>
 
-          <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg shadow-lg p-6">
-            <div className="flex items-center justify-between mb-2">
-              <UserCheck className="h-8 w-8" />
-              <span className="text-3xl opacity-30">✅</span>
-            </div>
-            <div className="text-2xl font-bold">{totalAtivos}</div>
-            <div className="text-sm opacity-90">Instaladores Ativos</div>
-          </div>
+          <TabsContent value="lista" className="space-y-6 mt-6">
+            {/* Cards de Resumo */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg shadow-lg p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <Users className="h-8 w-8" />
+                  <span className="text-3xl opacity-30">👷</span>
+                </div>
+                <div className="text-2xl font-bold">{totalInstaladores}</div>
+                <div className="text-sm opacity-90">Total de Instaladores</div>
+              </div>
 
-          <div className="bg-gradient-to-br from-red-500 to-red-600 text-white rounded-lg shadow-lg p-6">
-            <div className="flex items-center justify-between mb-2">
-              <UserX className="h-8 w-8" />
-              <span className="text-3xl opacity-30">❌</span>
-            </div>
-            <div className="text-2xl font-bold">{totalInativos}</div>
-            <div className="text-sm opacity-90">Instaladores Inativos</div>
-          </div>
-        </div>
+              <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg shadow-lg p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <UserCheck className="h-8 w-8" />
+                  <span className="text-3xl opacity-30">✅</span>
+                </div>
+                <div className="text-2xl font-bold">{totalAtivos}</div>
+                <div className="text-sm opacity-90">Instaladores Ativos</div>
+              </div>
 
-        {/* Filtro */}
-        <div className="bg-white rounded-lg shadow p-4">
-          <label className="block text-sm font-medium mb-2">Filtrar por Status</label>
-          <select
-            value={filtroStatus}
-            onChange={(e) => setFiltroStatus(e.target.value)}
-            className="px-3 py-2 border rounded-md"
-          >
-            <option value="todos">Todos</option>
-            <option value="ativos">Ativos</option>
-            <option value="inativos">Inativos</option>
-          </select>
-        </div>
+              <div className="bg-gradient-to-br from-red-500 to-red-600 text-white rounded-lg shadow-lg p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <UserX className="h-8 w-8" />
+                  <span className="text-3xl opacity-30">❌</span>
+                </div>
+                <div className="text-2xl font-bold">{totalInativos}</div>
+                <div className="text-sm opacity-90">Instaladores Inativos</div>
+              </div>
+            </div>
 
-        {/* Tabela */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          {loading ? (
-            <div className="p-8 text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            {/* Filtro */}
+            <div className="bg-card rounded-lg shadow p-4">
+              <label className="block text-sm font-medium mb-2">Filtrar por Status</label>
+              <select
+                value={filtroStatus}
+                onChange={(e) => setFiltroStatus(e.target.value)}
+                className="px-3 py-2 border rounded-md bg-background"
+              >
+                <option value="todos">Todos</option>
+                <option value="ativos">Ativos</option>
+                <option value="inativos">Inativos</option>
+              </select>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Telefone</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qtd Serviços</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Ganho</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {instaladoresFiltrados.map((instalador) => (
-                    <tr key={instalador.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm font-medium">{instalador.nome}</td>
-                      <td className="px-4 py-3 text-sm">{instalador.telefone}</td>
-                      <td className="px-4 py-3 text-sm">
-                        <Badge variant={instalador.ativo ? 'default' : 'destructive'}>
-                          {instalador.ativo ? 'Ativo' : 'Inativo'}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right">{instalador.total_servicos}</td>
-                      <td className="px-4 py-3 text-sm text-right font-bold text-green-600">
-                        R$ {instalador.total_ganho.toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                        <div className="flex gap-2 justify-center">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => abrirHistorico(instalador)}
-                          >
-                            Ver Histórico
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant={instalador.ativo ? 'destructive' : 'default'}
-                            onClick={() => toggleAtivo(instalador.id, instalador.ativo)}
-                          >
-                            {instalador.ativo ? 'Desativar' : 'Ativar'}
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+
+            {/* Tabela */}
+            <div className="bg-card rounded-lg shadow overflow-hidden">
+              {loading ? (
+                <div className="p-8 text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-muted">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Nome</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Telefone</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Status</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Qtd Serviços</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Total Ganho</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {instaladoresFiltrados.map((instalador) => (
+                        <tr key={instalador.id} className="hover:bg-muted/50">
+                          <td className="px-4 py-3 text-sm font-medium">{instalador.nome}</td>
+                          <td className="px-4 py-3 text-sm">{instalador.telefone}</td>
+                          <td className="px-4 py-3 text-sm">
+                            <Badge variant={instalador.ativo ? 'default' : 'destructive'}>
+                              {instalador.ativo ? 'Ativo' : 'Inativo'}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right">{instalador.total_servicos}</td>
+                          <td className="px-4 py-3 text-sm text-right font-bold text-green-600">
+                            R$ {instalador.total_ganho.toFixed(2)}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            <div className="flex gap-2 justify-center">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => abrirHistorico(instalador)}
+                              >
+                                Ver Histórico
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant={instalador.ativo ? 'destructive' : 'default'}
+                                onClick={() => toggleAtivo(instalador.id, instalador.ativo)}
+                              >
+                                {instalador.ativo ? 'Desativar' : 'Ativar'}
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+
+          </TabsContent>
+
+          <TabsContent value="pagamentos" className="mt-6">
+            <PagamentosInstaladores />
+          </TabsContent>
+        </Tabs>
 
         {/* Modal de Histórico */}
         <Dialog open={modalHistorico} onOpenChange={setModalHistorico}>
@@ -299,18 +314,18 @@ export default function Instaladores() {
             
             {loadingHistorico ? (
               <div className="p-8 text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
               </div>
             ) : (
               <div className="space-y-4">
                 <table className="w-full">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-muted">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Data</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Código</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Cliente</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Status</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Valor</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Data</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Código</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Cliente</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Status</th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Valor</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -326,7 +341,7 @@ export default function Instaladores() {
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot className="bg-gray-50">
+                  <tfoot className="bg-muted">
                     <tr>
                       <td colSpan={4} className="px-4 py-2 text-sm font-bold text-right">TOTAL:</td>
                       <td className="px-4 py-2 text-sm font-bold text-right text-green-600">
