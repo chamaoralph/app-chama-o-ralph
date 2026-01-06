@@ -189,7 +189,7 @@ export default function ServicosDisponiveis() {
         .from('servicos')
         .update({
           instalador_id: user.id,
-          status: 'solicitado'
+          status: 'atribuido'
         })
         .eq('id', servicoId)
         .eq('status', 'disponivel')
@@ -197,7 +197,7 @@ export default function ServicosDisponiveis() {
       if (error) throw error
 
       toast({
-        title: "Serviço solicitado!",
+        title: "Serviço atribuído!",
         description: "O serviço foi adicionado à sua agenda.",
       })
       
