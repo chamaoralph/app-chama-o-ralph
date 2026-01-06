@@ -6,11 +6,13 @@ import { useAuth } from '@/lib/auth'
 import { useToast } from '@/hooks/use-toast'
 import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
-import { Lock, ArrowUpDown, Calendar, MapPin as MapPinIcon } from 'lucide-react'
+import { Lock, Calendar, MapPin as MapPinIcon, List, CalendarDays } from 'lucide-react'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { MobileServicoCard } from '@/components/instalador/MobileServicoCard'
+import { AgendaSemanalDisponiveis } from '@/components/instalador/AgendaSemanalDisponiveis'
 
 type OrdenacaoTipo = 'data' | 'bairro'
+type VisualizacaoTipo = 'lista' | 'agenda'
 
 // Função para formatar data sem conversão de timezone
 function formatarDataServico(dataString: string): string {
@@ -61,6 +63,7 @@ export default function ServicosDisponiveis() {
   const [error, setError] = useState<string | null>(null)
   const [solicitando, setSolicitando] = useState<string | null>(null)
   const [ordenacao, setOrdenacao] = useState<OrdenacaoTipo>('data')
+  const [visualizacao, setVisualizacao] = useState<VisualizacaoTipo>('lista')
   const { user } = useAuth()
   const { toast } = useToast()
   const isMobile = useIsMobile()
@@ -216,15 +219,41 @@ export default function ServicosDisponiveis() {
     <InstaladorLayout>
       <div>
         <div className={`mb-4 ${isMobile ? "" : "mb-6"}`}>
-          <h1 className={`font-bold text-gray-900 ${isMobile ? "text-2xl" : "text-3xl"}`}>
-            Serviços Disponíveis
-          </h1>
-          <p className="text-gray-600 mt-1">
-            {servicos.length} {servicos.length === 1 ? 'serviço disponível' : 'serviços disponíveis'}
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className={`font-bold text-gray-900 ${isMobile ? "text-2xl" : "text-3xl"}`}>
+                Serviços Disponíveis
+              </h1>
+              <p className="text-gray-600 mt-1">
+                {servicos.length} {servicos.length === 1 ? 'serviço disponível' : 'serviços disponíveis'}
+              </p>
+            </div>
+            
+            {/* Botões de alternância de visualização */}
+            <div className="flex gap-1 bg-muted rounded-lg p-1">
+              <Button
+                variant={visualizacao === 'lista' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setVisualizacao('lista')}
+                className={visualizacao === 'lista' ? 'bg-blue-600' : ''}
+              >
+                <List className="w-4 h-4" />
+                {!isMobile && <span className="ml-2">Lista</span>}
+              </Button>
+              <Button
+                variant={visualizacao === 'agenda' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setVisualizacao('agenda')}
+                className={visualizacao === 'agenda' ? 'bg-blue-600' : ''}
+              >
+                <CalendarDays className="w-4 h-4" />
+                {!isMobile && <span className="ml-2">Agenda</span>}
+              </Button>
+            </div>
+          </div>
           
-          {/* Botões de ordenação */}
-          {servicos.length > 1 && (
+          {/* Botões de ordenação - só aparecem na visualização em lista */}
+          {servicos.length > 1 && visualizacao === 'lista' && (
             <div className="flex gap-2 mt-3">
               <Button
                 variant={ordenacao === 'data' ? 'default' : 'outline'}
@@ -258,6 +287,13 @@ export default function ServicosDisponiveis() {
               Novos serviços aparecerão aqui assim que forem disponibilizados
             </p>
           </div>
+        ) : visualizacao === 'agenda' ? (
+          <AgendaSemanalDisponiveis
+            servicos={servicos}
+            certificacoes={certificacoes || []}
+            onSolicitar={solicitarServico}
+            solicitandoId={solicitando}
+          />
         ) : (
           <div className="space-y-4">
             {servicosOrdenados.map((servico) => {
