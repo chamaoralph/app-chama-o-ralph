@@ -229,6 +229,7 @@ export default function ListaServicos() {
     const badges: Record<string, { bg: string; text: string; label: string }> = {
       aguardando_distribuicao: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Aguardando Distribuição' },
       disponivel: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Disponível' },
+      solicitado: { bg: 'bg-amber-100', text: 'text-amber-800', label: 'Solicitado' },
       atribuido: { bg: 'bg-purple-100', text: 'text-purple-800', label: 'Atribuído' },
       em_andamento: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Em Andamento' },
       aguardando_aprovacao: { bg: 'bg-cyan-100', text: 'text-cyan-800', label: 'Aguardando Aprovação' },
