@@ -1,8 +1,21 @@
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { MessageCircle, MapPin, Play, CheckCircle, Clock, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+
+// Função para formatar data sem conversão de timezone
+// O banco armazena em UTC, mas queremos mostrar o horário exatamente como foi salvo
+function formatarDataServico(dataString: string): string {
+  // Extrai a data/hora sem aplicar conversão de timezone
+  const match = dataString.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+  if (match) {
+    const [, , mes, dia, hora, minuto] = match;
+    return `${dia}/${mes} às ${hora}:${minuto}`;
+  }
+  // Fallback para o formato original
+  return format(parseISO(dataString), "dd/MM 'às' HH:mm", { locale: ptBR });
+}
 
 interface Cliente {
   nome: string;
@@ -40,11 +53,7 @@ export function MobileServicoCard({
   temCertificacao = true,
   variant = "agenda",
 }: MobileServicoCardProps) {
-  const dataFormatada = format(
-    new Date(servico.data_servico_agendada),
-    "dd/MM 'às' HH:mm",
-    { locale: ptBR }
-  );
+  const dataFormatada = formatarDataServico(servico.data_servico_agendada);
 
   const endereco = servico.clientes?.endereco_completo || servico.endereco_completo || "";
   const bairro = servico.clientes?.bairro;

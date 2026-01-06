@@ -5,14 +5,22 @@ import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/lib/auth'
 import { useToast } from '@/hooks/use-toast'
 import { useQuery } from '@tanstack/react-query'
-import { format } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
 import { Lock, ArrowUpDown, Calendar, MapPin as MapPinIcon } from 'lucide-react'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { MobileServicoCard } from '@/components/instalador/MobileServicoCard'
 
 type OrdenacaoTipo = 'data' | 'bairro'
+
+// Função para formatar data sem conversão de timezone
+function formatarDataServico(dataString: string): string {
+  const match = dataString.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+  if (match) {
+    const [, ano, mes, dia, hora, minuto] = match;
+    return `${dia}/${mes}/${ano} às ${hora}:${minuto}`;
+  }
+  return dataString;
+}
 
 interface Servico {
   id: string
@@ -294,7 +302,7 @@ export default function ServicosDisponiveis() {
                     <div>
                       <p className="text-sm text-gray-600">📅 Data e Hora</p>
                       <p className="font-medium">
-                        {format(new Date(servico.data_servico_agendada), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                        {formatarDataServico(servico.data_servico_agendada)}
                       </p>
                     </div>
                     <div>
