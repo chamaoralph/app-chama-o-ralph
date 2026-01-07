@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { ReciboPreview } from './ReciboPreview'
@@ -6,7 +6,6 @@ import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
 import { Download, Share2, Loader2, FileText } from 'lucide-react'
 import { format } from 'date-fns'
-import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 
 interface ServicoRecibo {
@@ -34,38 +33,40 @@ export function GerarReciboModal({
   instaladorNome
 }: GerarReciboModalProps) {
   const [gerando, setGerando] = useState(false)
+  const hiddenContainerRef = useRef<HTMLDivElement>(null)
 
   const totalMaoObra = servicos.reduce((sum, s) => sum + s.valor_mao_obra_instalador, 0)
   const totalReembolso = servicos.reduce((sum, s) => sum + s.valor_reembolso_despesas, 0)
   const totalGeral = totalMaoObra + totalReembolso
 
-  async function gerarPDF(): Promise<Blob | null> {
-    const reciboElement = document.getElementById('recibo-content')
-    if (!reciboElement) return null
+  async function gerarImagem(): Promise<Blob | null> {
+    const hiddenContainer = hiddenContainerRef.current
+    if (!hiddenContainer) return null
 
     try {
-      const canvas = await html2canvas(reciboElement, {
+      // Capturar o conteúdo do container oculto
+      const canvas = await html2canvas(hiddenContainer, {
         scale: 2,
         useCORS: true,
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        width: 800,
+        windowWidth: 800,
+        logging: false
       })
 
-      const imgData = canvas.toDataURL('image/png')
-      const pdf = new jsPDF('p', 'mm', 'a4')
-      
-      const pdfWidth = pdf.internal.pageSize.getWidth()
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width
-
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight)
-
-      return pdf.output('blob')
+      // Converter canvas para blob PNG
+      return new Promise((resolve) => {
+        canvas.toBlob((blob) => {
+          resolve(blob)
+        }, 'image/png', 1.0)
+      })
     } catch (error) {
-      console.error('Erro ao gerar PDF:', error)
+      console.error('Erro ao gerar imagem:', error)
       return null
     }
   }
 
-  async function salvarRecibo(pdfBlob: Blob) {
+  async function salvarRecibo() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Usuário não autenticado')
@@ -128,20 +129,20 @@ export function GerarReciboModal({
   async function handleDownload() {
     setGerando(true)
     try {
-      const pdfBlob = await gerarPDF()
-      if (!pdfBlob) {
-        toast.error('Erro ao gerar o PDF')
+      const imageBlob = await gerarImagem()
+      if (!imageBlob) {
+        toast.error('Erro ao gerar a imagem')
         return
       }
 
       // Salvar registro no banco
-      await salvarRecibo(pdfBlob)
+      await salvarRecibo()
 
       // Download do arquivo
-      const url = URL.createObjectURL(pdfBlob)
+      const url = URL.createObjectURL(imageBlob)
       const link = document.createElement('a')
       link.href = url
-      link.download = `recibo_${format(dataReferencia, 'dd-MM-yyyy')}.pdf`
+      link.download = `recibo_${format(dataReferencia, 'dd-MM-yyyy')}.png`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
@@ -160,17 +161,17 @@ export function GerarReciboModal({
   async function handleShare() {
     setGerando(true)
     try {
-      const pdfBlob = await gerarPDF()
-      if (!pdfBlob) {
-        toast.error('Erro ao gerar o PDF')
+      const imageBlob = await gerarImagem()
+      if (!imageBlob) {
+        toast.error('Erro ao gerar a imagem')
         return
       }
 
       // Salvar registro no banco
-      await salvarRecibo(pdfBlob)
+      await salvarRecibo()
 
-      const file = new File([pdfBlob], `recibo_${format(dataReferencia, 'dd-MM-yyyy')}.pdf`, {
-        type: 'application/pdf'
+      const file = new File([imageBlob], `recibo_${format(dataReferencia, 'dd-MM-yyyy')}.png`, {
+        type: 'image/png'
       })
 
       if (navigator.share && navigator.canShare({ files: [file] })) {
@@ -239,8 +240,26 @@ export function GerarReciboModal({
           </div>
         </div>
 
-        {/* Preview do Recibo */}
-        <div className="border rounded-lg overflow-hidden bg-white">
+        {/* Preview visível do Recibo */}
+        <div className="border rounded-lg overflow-x-auto bg-white">
+          <ReciboPreview
+            instaladorNome={instaladorNome}
+            dataReferencia={dataReferencia}
+            servicos={servicos}
+          />
+        </div>
+
+        {/* Container oculto para captura - posição fixa fora da tela */}
+        <div
+          ref={hiddenContainerRef}
+          style={{
+            position: 'fixed',
+            left: '-9999px',
+            top: '0',
+            width: '800px',
+            backgroundColor: '#ffffff'
+          }}
+        >
           <ReciboPreview
             instaladorNome={instaladorNome}
             dataReferencia={dataReferencia}
@@ -274,7 +293,7 @@ export function GerarReciboModal({
             ) : (
               <Download className="h-4 w-4" />
             )}
-            Baixar PDF
+            Baixar Imagem
           </Button>
         </DialogFooter>
       </DialogContent>
