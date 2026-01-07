@@ -21,41 +21,134 @@ export function ReciboPreview({ instaladorNome, dataReferencia, servicos }: Reci
   const totalReembolso = servicos.reduce((sum, s) => sum + s.valor_reembolso_despesas, 0)
   const totalGeral = totalMaoObra + totalReembolso
 
+  // Estilos inline para garantir captura correta pelo html2canvas
+  const styles = {
+    container: {
+      width: '800px',
+      padding: '32px',
+      backgroundColor: '#ffffff',
+      fontFamily: 'Arial, sans-serif',
+      color: '#1f2937'
+    },
+    header: {
+      borderBottom: '2px solid #1f2937',
+      paddingBottom: '16px',
+      marginBottom: '24px'
+    },
+    title: {
+      fontSize: '24px',
+      fontWeight: 'bold',
+      textAlign: 'center' as const,
+      color: '#1f2937',
+      marginBottom: '8px'
+    },
+    subtitle: {
+      textAlign: 'center' as const,
+      color: '#4b5563'
+    },
+    section: {
+      marginBottom: '24px',
+      padding: '16px',
+      backgroundColor: '#f9fafb',
+      borderRadius: '8px'
+    },
+    sectionTitle: {
+      fontSize: '16px',
+      fontWeight: '600',
+      marginBottom: '8px'
+    },
+    table: {
+      width: '100%',
+      borderCollapse: 'collapse' as const,
+      fontSize: '12px'
+    },
+    th: {
+      border: '1px solid #d1d5db',
+      padding: '8px',
+      textAlign: 'left' as const,
+      backgroundColor: '#f3f4f6',
+      fontWeight: '600'
+    },
+    thRight: {
+      border: '1px solid #d1d5db',
+      padding: '8px',
+      textAlign: 'right' as const,
+      backgroundColor: '#f3f4f6',
+      fontWeight: '600'
+    },
+    td: {
+      border: '1px solid #d1d5db',
+      padding: '8px',
+      textAlign: 'left' as const
+    },
+    tdRight: {
+      border: '1px solid #d1d5db',
+      padding: '8px',
+      textAlign: 'right' as const
+    },
+    summaryRow: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      marginBottom: '8px'
+    },
+    totalRow: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      borderTop: '1px solid #d1d5db',
+      paddingTop: '8px',
+      marginTop: '8px'
+    },
+    totalLabel: {
+      fontSize: '18px',
+      fontWeight: 'bold'
+    },
+    totalValue: {
+      fontSize: '18px',
+      fontWeight: 'bold',
+      color: '#16a34a'
+    },
+    footer: {
+      borderTop: '2px solid #d1d5db',
+      paddingTop: '16px',
+      marginTop: '24px',
+      textAlign: 'center' as const
+    },
+    footerText: {
+      fontSize: '12px',
+      color: '#6b7280',
+      marginBottom: '8px'
+    }
+  }
+
   return (
-    <div 
-      id="recibo-content"
-      className="bg-white p-8 max-w-[800px] mx-auto"
-      style={{ fontFamily: 'Arial, sans-serif' }}
-    >
+    <div id="recibo-content" style={styles.container}>
       {/* Header */}
-      <div className="border-b-2 border-gray-800 pb-4 mb-6">
-        <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">
-          RECIBO DE SERVIÇOS EXECUTADOS
-        </h1>
-        <div className="text-center text-gray-600">
+      <div style={styles.header}>
+        <h1 style={styles.title}>RECIBO DE SERVIÇOS EXECUTADOS</h1>
+        <div style={styles.subtitle}>
           <p>Data: {format(dataReferencia, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</p>
         </div>
       </div>
 
       {/* Dados do Instalador */}
-      <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-        <h2 className="text-lg font-semibold mb-2">Instalador</h2>
-        <p className="text-gray-700"><strong>Nome:</strong> {instaladorNome}</p>
-        <p className="text-gray-700"><strong>Período:</strong> Serviços do dia {format(dataReferencia, 'dd/MM/yyyy')}</p>
+      <div style={styles.section}>
+        <h2 style={styles.sectionTitle}>Instalador</h2>
+        <p><strong>Nome:</strong> {instaladorNome}</p>
+        <p><strong>Período:</strong> Serviços do dia {format(dataReferencia, 'dd/MM/yyyy')}</p>
       </div>
 
       {/* Tabela de Serviços */}
-      <div className="mb-6">
-        <h2 className="text-lg font-semibold mb-3">Serviços Realizados</h2>
-        <table className="w-full border-collapse border border-gray-300">
+      <div style={{ marginBottom: '24px' }}>
+        <h2 style={{ ...styles.sectionTitle, marginBottom: '12px' }}>Serviços Realizados</h2>
+        <table style={styles.table}>
           <thead>
-            <tr className="bg-gray-100">
-              <th className="border border-gray-300 px-3 py-2 text-left text-sm">Código</th>
-              <th className="border border-gray-300 px-3 py-2 text-left text-sm">Cliente</th>
-              <th className="border border-gray-300 px-3 py-2 text-left text-sm">Tipo</th>
-              <th className="border border-gray-300 px-3 py-2 text-right text-sm">Mão de Obra</th>
-              <th className="border border-gray-300 px-3 py-2 text-right text-sm">Reembolso</th>
-              <th className="border border-gray-300 px-3 py-2 text-right text-sm">Total</th>
+            <tr>
+              <th style={styles.th}>Código</th>
+              <th style={styles.th}>Cliente</th>
+              <th style={styles.th}>Tipo</th>
+              <th style={styles.thRight}>M. Obra</th>
+              <th style={styles.thRight}>Reemb.</th>
+              <th style={styles.thRight}>Total</th>
             </tr>
           </thead>
           <tbody>
@@ -63,24 +156,12 @@ export function ReciboPreview({ instaladorNome, dataReferencia, servicos }: Reci
               const total = servico.valor_mao_obra_instalador + servico.valor_reembolso_despesas
               return (
                 <tr key={servico.id}>
-                  <td className="border border-gray-300 px-3 py-2 text-sm font-medium">
-                    {servico.codigo}
-                  </td>
-                  <td className="border border-gray-300 px-3 py-2 text-sm">
-                    {servico.cliente_nome}
-                  </td>
-                  <td className="border border-gray-300 px-3 py-2 text-sm">
-                    {servico.tipo_servico.join(', ')}
-                  </td>
-                  <td className="border border-gray-300 px-3 py-2 text-sm text-right">
-                    R$ {servico.valor_mao_obra_instalador.toFixed(2)}
-                  </td>
-                  <td className="border border-gray-300 px-3 py-2 text-sm text-right">
-                    R$ {servico.valor_reembolso_despesas.toFixed(2)}
-                  </td>
-                  <td className="border border-gray-300 px-3 py-2 text-sm text-right font-medium">
-                    R$ {total.toFixed(2)}
-                  </td>
+                  <td style={{ ...styles.td, fontWeight: '500' }}>{servico.codigo}</td>
+                  <td style={styles.td}>{servico.cliente_nome}</td>
+                  <td style={styles.td}>{servico.tipo_servico.join(', ')}</td>
+                  <td style={styles.tdRight}>R$ {servico.valor_mao_obra_instalador.toFixed(2)}</td>
+                  <td style={styles.tdRight}>R$ {servico.valor_reembolso_despesas.toFixed(2)}</td>
+                  <td style={{ ...styles.tdRight, fontWeight: '500' }}>R$ {total.toFixed(2)}</td>
                 </tr>
               )
             })}
@@ -89,30 +170,28 @@ export function ReciboPreview({ instaladorNome, dataReferencia, servicos }: Reci
       </div>
 
       {/* Resumo Financeiro */}
-      <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-        <h2 className="text-lg font-semibold mb-3">Resumo Financeiro</h2>
-        <div className="space-y-2">
-          <div className="flex justify-between">
-            <span>Total Mão de Obra:</span>
-            <span className="font-medium">R$ {totalMaoObra.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Total Reembolsos:</span>
-            <span className="font-medium">R$ {totalReembolso.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between border-t border-gray-300 pt-2 mt-2">
-            <span className="font-bold text-lg">TOTAL A RECEBER:</span>
-            <span className="font-bold text-lg text-green-600">R$ {totalGeral.toFixed(2)}</span>
-          </div>
+      <div style={styles.section}>
+        <h2 style={styles.sectionTitle}>Resumo Financeiro</h2>
+        <div style={styles.summaryRow}>
+          <span>Total Mão de Obra:</span>
+          <span style={{ fontWeight: '500' }}>R$ {totalMaoObra.toFixed(2)}</span>
+        </div>
+        <div style={styles.summaryRow}>
+          <span>Total Reembolsos:</span>
+          <span style={{ fontWeight: '500' }}>R$ {totalReembolso.toFixed(2)}</span>
+        </div>
+        <div style={styles.totalRow}>
+          <span style={styles.totalLabel}>TOTAL A RECEBER:</span>
+          <span style={styles.totalValue}>R$ {totalGeral.toFixed(2)}</span>
         </div>
       </div>
 
       {/* Rodapé */}
-      <div className="border-t-2 border-gray-300 pt-4 mt-6">
-        <p className="text-sm text-gray-600 text-center mb-2">
+      <div style={styles.footer}>
+        <p style={styles.footerText}>
           Recibo gerado em: {format(new Date(), "dd/MM/yyyy 'às' HH:mm")}
         </p>
-        <p className="text-sm text-gray-500 text-center italic">
+        <p style={{ ...styles.footerText, fontStyle: 'italic' }}>
           Por favor, envie este recibo por email para confirmação dos valores.
         </p>
       </div>
