@@ -78,21 +78,47 @@ export function GerarReciboModal({
 
       if (!usuario) throw new Error('Usuário não encontrado')
 
-      // Salvar registro do recibo
-      const { error } = await supabase
-        .from('recibos_diarios')
-        .insert({
-          empresa_id: usuario.empresa_id,
-          instalador_id: user.id,
-          data_referencia: format(dataReferencia, 'yyyy-MM-dd'),
-          valor_mao_obra: totalMaoObra,
-          valor_reembolso: totalReembolso,
-          valor_total: totalGeral,
-          quantidade_servicos: servicos.length,
-          servicos_ids: servicos.map(s => s.id)
-        })
+      const dataFormatada = format(dataReferencia, 'yyyy-MM-dd')
 
-      if (error) throw error
+      // Verificar se já existe recibo para esta data
+      const { data: reciboExistente } = await supabase
+        .from('recibos_diarios')
+        .select('id')
+        .eq('instalador_id', user.id)
+        .eq('data_referencia', dataFormatada)
+        .maybeSingle()
+
+      if (reciboExistente) {
+        // Atualizar recibo existente
+        const { error } = await supabase
+          .from('recibos_diarios')
+          .update({
+            valor_mao_obra: totalMaoObra,
+            valor_reembolso: totalReembolso,
+            valor_total: totalGeral,
+            quantidade_servicos: servicos.length,
+            servicos_ids: servicos.map(s => s.id)
+          })
+          .eq('id', reciboExistente.id)
+
+        if (error) throw error
+      } else {
+        // Criar novo recibo
+        const { error } = await supabase
+          .from('recibos_diarios')
+          .insert({
+            empresa_id: usuario.empresa_id,
+            instalador_id: user.id,
+            data_referencia: dataFormatada,
+            valor_mao_obra: totalMaoObra,
+            valor_reembolso: totalReembolso,
+            valor_total: totalGeral,
+            quantidade_servicos: servicos.length,
+            servicos_ids: servicos.map(s => s.id)
+          })
+
+        if (error) throw error
+      }
     } catch (error) {
       console.error('Erro ao salvar recibo:', error)
       // Não bloquear o download se falhar o salvamento
