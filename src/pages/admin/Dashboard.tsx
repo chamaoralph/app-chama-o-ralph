@@ -6,6 +6,7 @@ import { DollarSign, Package, Users, FileText, TrendingUp, ChevronRight, Plus, C
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { formatarDataBR } from '@/lib/utils'
 
 interface Metricas {
   receitaMes: number
@@ -263,7 +264,7 @@ export default function AdminDashboard() {
                     </div>
                     <div className="flex items-center justify-between text-sm text-gray-500">
                       <span>👷 {servico.instalador_nome || '-'}</span>
-                      <span>{new Date(servico.data_servico_agendada).toLocaleDateString('pt-BR')}</span>
+                      <span>{formatarDataBR(servico.data_servico_agendada)}</span>
                     </div>
                   </div>
                 ))}
@@ -375,7 +376,7 @@ export default function AdminDashboard() {
                       <td className="px-4 py-3 text-sm">{servico.instalador_nome || '-'}</td>
                       <td className="px-4 py-3 text-sm">{getStatusBadge(servico.status)}</td>
                       <td className="px-4 py-3 text-sm">
-                        {new Date(servico.data_servico_agendada).toLocaleDateString('pt-BR')}
+                        {formatarDataBR(servico.data_servico_agendada)}
                       </td>
                     </tr>
                   ))}

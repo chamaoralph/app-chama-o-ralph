@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { subDays, format, isToday } from 'date-fns'
 import { GerarReciboModal } from '@/components/instalador/GerarReciboModal'
+import { formatarDataBR } from '@/lib/utils'
 
 interface Servico {
   id: string
@@ -160,7 +161,7 @@ export default function MeuExtrato() {
     const headers = ['Data', 'Código', 'Cliente', 'Status', 'Tipo de Serviço', 'Mão de Obra', 'Reembolso', 'Total']
     
     const rows = servicosFiltrados.map(s => [
-      format(new Date(s.data_servico_agendada), 'dd/MM/yyyy'),
+      formatarDataBR(s.data_servico_agendada),
       s.codigo,
       s.cliente_nome,
       s.status,
@@ -321,7 +322,7 @@ export default function MeuExtrato() {
                       return (
                         <tr key={servico.id} className="hover:bg-gray-50">
                           <td className="px-4 py-3 text-sm">
-                            {new Date(servico.data_servico_agendada).toLocaleDateString('pt-BR')}
+                            {formatarDataBR(servico.data_servico_agendada)}
                           </td>
                           <td className="px-4 py-3 text-sm font-medium">{servico.codigo}</td>
                           <td className="px-4 py-3 text-sm">{servico.cliente_nome}</td>

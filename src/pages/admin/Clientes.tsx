@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
+import { formatarDataBR } from "@/lib/utils"
 import { 
   Search, 
   Users, 
@@ -800,7 +801,7 @@ export default function AdminClientes() {
                           {clienteSelecionado.cotacoes.map(cotacao => (
                             <tr key={cotacao.id} className="hover:bg-gray-50">
                               <td className="px-4 py-2 text-sm">
-                                {new Date(cotacao.created_at).toLocaleDateString('pt-BR')}
+                                {formatarDataBR(cotacao.created_at)}
                               </td>
                               <td className="px-4 py-2 text-sm">
                                 {cotacao.tipo_servico?.join(', ') || '-'}
@@ -815,7 +816,7 @@ export default function AdminClientes() {
                               </td>
                               <td className="px-4 py-2 text-sm">
                                 {cotacao.data_servico_desejada 
-                                  ? new Date(cotacao.data_servico_desejada).toLocaleDateString('pt-BR')
+                                  ? formatarDataBR(cotacao.data_servico_desejada)
                                   : '-'}
                               </td>
                               <td className="px-4 py-2">

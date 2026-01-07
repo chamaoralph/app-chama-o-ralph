@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import { UserPlus, Users, CheckCircle, ArrowUpDown, ArrowUp, ArrowDown, Calendar, User, DollarSign } from 'lucide-react'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { MobileServicoCardAdmin } from '@/components/admin/MobileServicoCardAdmin'
+import { formatarDataBR } from '@/lib/utils'
 
 type SortField = 'codigo' | 'cliente' | 'tipo_servico' | 'instalador' | 'status' | 'valor_total' | 'data_servico_agendada'
 type SortDirection = 'asc' | 'desc'
@@ -533,7 +534,7 @@ export default function ListaServicos() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-foreground">
-                            {new Date(servico.data_servico_agendada).toLocaleDateString('pt-BR')}
+                            {formatarDataBR(servico.data_servico_agendada)}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
