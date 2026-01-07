@@ -91,6 +91,14 @@ const duracoesDisponiveis = [
   { valor: '480', label: '8 horas' },
 ]
 
+// Formata data sem conversão de timezone (DD/MM/YYYY)
+function formatarDataBR(dataString: string | null): string {
+  if (!dataString) return '-';
+  const [dataPart] = dataString.split('T');
+  const [ano, mes, dia] = dataPart.split('-');
+  return `${dia}/${mes}/${ano}`;
+}
+
 // Função para calcular horário fim
 function calcularHorarioFim(horarioInicio: string, duracaoMinutos: string): string {
   if (!horarioInicio) return ''
@@ -709,9 +717,7 @@ export default function ListaCotacoes() {
                         <tr key={cotacao.id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
-                              {cotacao.data_servico_desejada 
-                                ? new Date(cotacao.data_servico_desejada).toLocaleDateString('pt-BR')
-                                : '-'}
+                              {formatarDataBR(cotacao.data_servico_desejada)}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -750,7 +756,7 @@ export default function ListaCotacoes() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
-                              {new Date(cotacao.created_at).toLocaleDateString('pt-BR')}
+                              {formatarDataBR(cotacao.created_at)}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
