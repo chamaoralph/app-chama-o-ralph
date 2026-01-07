@@ -1,8 +1,7 @@
-import { format } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { UserPlus, CheckCircle, Eye, User, Wrench, Calendar } from 'lucide-react'
+import { formatarDataBR } from '@/lib/utils'
 
 interface Servico {
   id: string
@@ -67,7 +66,7 @@ export function MobileServicoCardAdmin({
     )
   }
 
-  const dataFormatada = format(new Date(servico.data_servico_agendada), 'dd/MM/yyyy', { locale: ptBR })
+  const dataFormatada = formatarDataBR(servico.data_servico_agendada)
   const valorFormatado = Number(servico.valor_total).toLocaleString('pt-BR', { 
     style: 'currency', 
     currency: 'BRL' 

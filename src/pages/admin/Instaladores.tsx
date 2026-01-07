@@ -13,6 +13,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from '@/hooks/use-toast'
 import { PagamentosInstaladores } from '@/components/admin/PagamentosInstaladores'
+import { formatarDataBR } from '@/lib/utils'
 interface Instalador {
   id: string
   nome: string
@@ -332,7 +333,7 @@ export default function Instaladores() {
                     {historico.map((item, idx) => (
                       <tr key={idx}>
                         <td className="px-4 py-2 text-sm">
-                          {new Date(item.data_servico_agendada).toLocaleDateString('pt-BR')}
+                          {formatarDataBR(item.data_servico_agendada)}
                         </td>
                         <td className="px-4 py-2 text-sm font-medium">{item.codigo}</td>
                         <td className="px-4 py-2 text-sm">{item.cliente_nome}</td>

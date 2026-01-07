@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, User, MapPin, Calendar, Phone, DollarSign, FileText } from 'lucide-react'
+import { formatarDataBR, formatarDataHoraBR } from '@/lib/utils'
 
 interface Servico {
   id: string
@@ -127,7 +128,7 @@ export default function DetalheServico() {
               {getStatusBadge(servico.status)}
             </div>
             <p className="text-gray-600 mt-1">
-              Criado em {new Date(servico.created_at).toLocaleDateString('pt-BR')}
+              Criado em {formatarDataBR(servico.created_at)}
             </p>
           </div>
         </div>
@@ -179,7 +180,7 @@ export default function DetalheServico() {
                 <p className="text-sm text-gray-600">Data Agendada</p>
                 <p className="font-medium flex items-center gap-2">
                   <Calendar className="w-4 h-4" />
-                  {new Date(servico.data_servico_agendada).toLocaleDateString('pt-BR')} às {new Date(servico.data_servico_agendada).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                  {formatarDataHoraBR(servico.data_servico_agendada)}
                 </p>
               </div>
               <div>

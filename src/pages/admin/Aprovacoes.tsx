@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react'
+import { formatarDataBR } from '@/lib/utils'
 
 interface Servico {
   id: string
@@ -340,7 +341,7 @@ export default function Aprovacoes() {
                     <div>
                       <h3 className="font-semibold text-gray-900 mb-2">Data do Serviço</h3>
                       <p className="text-gray-700">
-                        {new Date(servico.data_servico_agendada).toLocaleDateString('pt-BR')}
+                        {formatarDataBR(servico.data_servico_agendada)}
                       </p>
                     </div>
 
