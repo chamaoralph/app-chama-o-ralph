@@ -105,6 +105,7 @@ export function MobileServicoCard({
         <div className="flex items-center gap-3">
           <div className="bg-green-500 text-white font-bold px-3 py-1.5 rounded-lg text-lg">
             R$ {servico.valor_mao_obra_instalador?.toFixed(0) || "0"}
+            {variant === "disponivel" && <span className="text-xs">*</span>}
           </div>
           {getStatusBadge()}
         </div>
@@ -221,6 +222,10 @@ export function MobileServicoCard({
                 Certificação Necessária
               </Button>
             )}
+            
+            <p className="text-[10px] text-gray-500 text-center">
+              * O valor final será calculado de acordo com seu percentual configurado.
+            </p>
           </>
         )}
       </div>

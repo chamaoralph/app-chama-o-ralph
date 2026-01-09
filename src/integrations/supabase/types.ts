@@ -1173,6 +1173,7 @@ export type Database = {
           empresa_id: string
           id: string
           nome: string
+          percentual_mao_obra: number | null
           telefone: string | null
           tipo: string
           updated_at: string
@@ -1184,6 +1185,7 @@ export type Database = {
           empresa_id: string
           id: string
           nome: string
+          percentual_mao_obra?: number | null
           telefone?: string | null
           tipo: string
           updated_at?: string
@@ -1195,6 +1197,7 @@ export type Database = {
           empresa_id?: string
           id?: string
           nome?: string
+          percentual_mao_obra?: number | null
           telefone?: string | null
           tipo?: string
           updated_at?: string
