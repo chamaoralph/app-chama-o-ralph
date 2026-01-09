@@ -77,9 +77,11 @@ export function AgendaServicoDisponivel({
           </p>
 
           {/* Valor */}
-          <p className="text-xs font-bold text-green-600 mt-1">
-            R$ {servico.valor_mao_obra_instalador?.toFixed(2) || "0.00"}
-          </p>
+          <div className="mt-1">
+            <p className="text-xs font-bold text-green-600">
+              R$ {servico.valor_mao_obra_instalador?.toFixed(2) || "0.00"}*
+            </p>
+          </div>
         </div>
       </SheetTrigger>
 
@@ -114,7 +116,7 @@ export function AgendaServicoDisponivel({
             )}
 
             <div className="flex items-center justify-between pt-2 border-t">
-              <span className="text-sm text-muted-foreground">Seu ganho:</span>
+              <span className="text-sm text-muted-foreground">Seu ganho estimado*:</span>
               <span className="text-xl font-bold text-green-600">
                 R$ {servico.valor_mao_obra_instalador?.toFixed(2) || "0.00"}
               </span>
@@ -143,6 +145,10 @@ export function AgendaServicoDisponivel({
               Certificação necessária para este tipo de serviço
             </div>
           )}
+          
+          <p className="text-[10px] text-muted-foreground text-center">
+            * O valor final será calculado de acordo com seu percentual configurado.
+          </p>
         </div>
       </SheetContent>
     </Sheet>

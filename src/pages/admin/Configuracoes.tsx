@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { AdminLayout } from '@/components/layout/AdminLayout'
 import { supabase } from '@/integrations/supabase/client'
 import { useToast } from '@/hooks/use-toast'
-import { Plus, Pencil, Trash2, GripVertical } from 'lucide-react'
+import { Plus, Pencil, Trash2, GripVertical, Users, Percent } from 'lucide-react'
 import { RFMConfigCard } from '@/components/admin/RFMConfigCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -38,6 +38,12 @@ interface TipoServico {
   ordem: number
 }
 
+interface Instalador {
+  id: string
+  nome: string
+  percentual_mao_obra: number | null
+}
+
 export default function Configuracoes() {
   const { toast } = useToast()
   const [tiposServico, setTiposServico] = useState<TipoServico[]>([])
@@ -46,10 +52,69 @@ export default function Configuracoes() {
   const [editingTipo, setEditingTipo] = useState<TipoServico | null>(null)
   const [novoNome, setNovoNome] = useState('')
   const [saving, setSaving] = useState(false)
+  
+  // Estados para percentuais
+  const [instaladores, setInstaladores] = useState<Instalador[]>([])
+  const [percentuais, setPercentuais] = useState<Record<string, number>>({})
+  const [savingPercentual, setSavingPercentual] = useState<string | null>(null)
 
   useEffect(() => {
     fetchTiposServico()
+    fetchInstaladores()
   }, [])
+
+  async function fetchInstaladores() {
+    try {
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select('id, nome, percentual_mao_obra')
+        .eq('tipo', 'instalador')
+        .eq('ativo', true)
+        .order('nome')
+
+      if (error) throw error
+      
+      setInstaladores(data || [])
+      const percs: Record<string, number> = {}
+      data?.forEach(i => {
+        percs[i.id] = i.percentual_mao_obra ?? 50
+      })
+      setPercentuais(percs)
+    } catch (error: any) {
+      console.error('Erro ao buscar instaladores:', error)
+    }
+  }
+
+  async function salvarPercentual(id: string) {
+    setSavingPercentual(id)
+    try {
+      const { error } = await supabase
+        .from('usuarios')
+        .update({ percentual_mao_obra: percentuais[id] })
+        .eq('id', id)
+
+      if (error) throw error
+      
+      toast({
+        title: '✅ Salvo!',
+        description: 'Percentual atualizado com sucesso'
+      })
+      
+      // Atualizar lista local
+      setInstaladores(prev =>
+        prev.map(i => i.id === id ? { ...i, percentual_mao_obra: percentuais[id] } : i)
+      )
+    } catch (error: any) {
+      console.error('Erro ao salvar percentual:', error)
+      toast({
+        title: '❌ Erro',
+        description: 'Não foi possível salvar o percentual',
+        variant: 'destructive'
+      })
+    } finally {
+      setSavingPercentual(null)
+    }
+  }
 
   async function fetchTiposServico() {
     try {
@@ -276,6 +341,71 @@ export default function Configuracoes() {
                 </TableBody>
               </Table>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Percentual dos Instaladores */}
+        <Card className="mt-6">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <CardTitle>Percentual dos Instaladores</CardTitle>
+                <CardDescription>
+                  Defina o percentual da mão de obra que cada instalador recebe ao aceitar um serviço
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {instaladores.length === 0 ? (
+              <p className="text-muted-foreground text-sm">Nenhum instalador ativo encontrado</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Instalador</TableHead>
+                    <TableHead className="w-40 text-center">Percentual</TableHead>
+                    <TableHead className="w-24 text-right">Ação</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {instaladores.map((inst) => (
+                    <TableRow key={inst.id}>
+                      <TableCell className="font-medium">{inst.nome}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-center gap-2">
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={percentuais[inst.id] ?? 50}
+                            onChange={(e) => setPercentuais(prev => ({
+                              ...prev,
+                              [inst.id]: Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
+                            }))}
+                            className="w-20 text-center"
+                          />
+                          <Percent className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          onClick={() => salvarPercentual(inst.id)}
+                          disabled={savingPercentual === inst.id || percentuais[inst.id] === inst.percentual_mao_obra}
+                        >
+                          {savingPercentual === inst.id ? 'Salvando...' : 'Salvar'}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+            <p className="text-xs text-muted-foreground mt-4">
+              💡 O valor será recalculado automaticamente quando o instalador aceitar um serviço.
+            </p>
           </CardContent>
         </Card>
 
