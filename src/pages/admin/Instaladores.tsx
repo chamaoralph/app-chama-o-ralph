@@ -344,9 +344,9 @@ export default function Instaladores() {
                   </tbody>
                   <tfoot className="bg-muted">
                     <tr>
-                      <td colSpan={4} className="px-4 py-2 text-sm font-bold text-right">TOTAL:</td>
+                      <td colSpan={4} className="px-4 py-2 text-sm font-bold text-right">TOTAL (Concluídos):</td>
                       <td className="px-4 py-2 text-sm font-bold text-right text-green-600">
-                        R$ {historico.reduce((s, h) => s + h.valor, 0).toFixed(2)}
+                        R$ {historico.filter(h => h.status === 'concluido').reduce((s, h) => s + h.valor, 0).toFixed(2)}
                       </td>
                     </tr>
                   </tfoot>
