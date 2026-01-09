@@ -1,9 +1,11 @@
 import { ReactNode, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileAdminLayout } from "./MobileAdminLayout";
 import { supabase } from "@/integrations/supabase/client";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown } from "lucide-react";
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -12,8 +14,14 @@ interface AdminLayoutProps {
 export function AdminLayout({ children }: AdminLayoutProps) {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const isMobile = useIsMobile();
   const [pendingCount, setPendingCount] = useState(0);
+  
+  // Manter grupo Capacitação aberto se estiver em uma das rotas
+  const capacitacaoRoutes = ["/admin/conteudo", "/admin/questionarios", "/admin/certificacoes"];
+  const isCapacitacaoActive = capacitacaoRoutes.some(route => location.pathname.startsWith(route));
+  const [capacitacaoOpen, setCapacitacaoOpen] = useState(isCapacitacaoActive);
 
   useEffect(() => {
     async function fetchPendingCount() {
@@ -91,15 +99,23 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           <Link to="/admin/despesas" className="block px-4 py-2 rounded hover:bg-gray-800 transition-colors">
             💸 Despesas
           </Link>
-          <Link to="/admin/conteudo" className="block px-4 py-2 rounded hover:bg-gray-800 transition-colors">
-            📚 Gerenciar Conteúdo
-          </Link>
-          <Link to="/admin/questionarios" className="block px-4 py-2 rounded hover:bg-gray-800 transition-colors">
-            📝 Questionários
-          </Link>
-          <Link to="/admin/certificacoes" className="block px-4 py-2 rounded hover:bg-gray-800 transition-colors">
-            🏆 Certificações
-          </Link>
+          <Collapsible open={capacitacaoOpen} onOpenChange={setCapacitacaoOpen}>
+            <CollapsibleTrigger className="flex items-center justify-between w-full px-4 py-2 rounded hover:bg-gray-800 transition-colors text-left">
+              <span>🎓 Capacitação</span>
+              <ChevronDown className={`h-4 w-4 transition-transform ${capacitacaoOpen ? "rotate-180" : ""}`} />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pl-4 space-y-1 mt-1">
+              <Link to="/admin/conteudo" className={`block px-4 py-2 rounded hover:bg-gray-800 transition-colors ${location.pathname.startsWith("/admin/conteudo") ? "bg-gray-800" : ""}`}>
+                📚 Conteúdo
+              </Link>
+              <Link to="/admin/questionarios" className={`block px-4 py-2 rounded hover:bg-gray-800 transition-colors ${location.pathname.startsWith("/admin/questionarios") ? "bg-gray-800" : ""}`}>
+                📝 Questionários
+              </Link>
+              <Link to="/admin/certificacoes" className={`block px-4 py-2 rounded hover:bg-gray-800 transition-colors ${location.pathname.startsWith("/admin/certificacoes") ? "bg-gray-800" : ""}`}>
+                🏆 Certificações
+              </Link>
+            </CollapsibleContent>
+          </Collapsible>
           <Link to="/admin/relatorios" className="block px-4 py-2 rounded hover:bg-gray-800 transition-colors">
             📊 Relatórios
           </Link>

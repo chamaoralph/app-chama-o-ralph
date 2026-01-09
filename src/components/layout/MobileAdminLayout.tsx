@@ -17,7 +17,8 @@ import {
   CheckCircle,
   TrendingUp,
   Receipt,
-  Settings
+  Settings,
+  GraduationCap
 } from "lucide-react";
 import {
   Drawer,
@@ -45,13 +46,16 @@ const moreItems = [
   { to: "/admin/clientes", icon: Users, label: "Clientes" },
   { to: "/admin/instaladores", icon: Users, label: "Instaladores" },
   { to: "/admin/despesas", icon: Receipt, label: "Despesas" },
-  { to: "/admin/conteudo", icon: BookOpen, label: "Gerenciar Conteúdo" },
-  { to: "/admin/questionarios", icon: ClipboardList, label: "Questionários" },
-  { to: "/admin/certificacoes", icon: Award, label: "Certificações" },
   { to: "/admin/relatorios", icon: BarChart3, label: "Relatórios" },
   { to: "/admin/marketing", icon: TrendingUp, label: "Marketing" },
   { to: "/admin/aprovacoes", icon: CheckCircle, label: "Aprovações" },
   { to: "/admin/configuracoes", icon: Settings, label: "Configurações" },
+];
+
+const capacitacaoItems = [
+  { to: "/admin/conteudo", icon: BookOpen, label: "Conteúdo" },
+  { to: "/admin/questionarios", icon: ClipboardList, label: "Questionários" },
+  { to: "/admin/certificacoes", icon: Award, label: "Certificações" },
 ];
 
 export function MobileAdminLayout({ children, pendingCount = 0 }: MobileAdminLayoutProps) {
@@ -174,6 +178,30 @@ export function MobileAdminLayout({ children, pendingCount = 0 }: MobileAdminLay
                     </Link>
                   );
                 })}
+                
+                {/* Seção Capacitação */}
+                <div className="border-t my-4" />
+                <div className="flex items-center gap-2 px-4 py-2 text-gray-500 text-sm font-medium">
+                  <GraduationCap className="h-4 w-4" />
+                  <span>Capacitação</span>
+                </div>
+                {capacitacaoItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      onClick={() => setDrawerOpen(false)}
+                      className={`flex items-center gap-4 p-4 pl-10 rounded-lg hover:bg-gray-100 transition-colors ${
+                        isActive(item.to) ? "bg-gray-100" : ""
+                      }`}
+                    >
+                      <Icon className="h-5 w-5 text-gray-600" />
+                      <span className="text-gray-900 font-medium">{item.label}</span>
+                    </Link>
+                  );
+                })}
+                
                 <div className="border-t my-4" />
                 <button
                   onClick={handleSignOut}
