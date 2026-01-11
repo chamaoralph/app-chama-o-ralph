@@ -84,7 +84,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error
   }
 
-  async function signUp(email: string, password: string, userData: any) {
+  async function signUp(
+    email: string, 
+    password: string, 
+    userData: { 
+      empresa_id: string
+      nome: string
+      telefone: string
+      tipo: 'admin' | 'instalador' 
+    }
+  ) {
+    // Role comes from server-validated invitation, not user input
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -107,7 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (userError) throw userError
 
-    // Insert user role
+    // Insert user role (role is validated server-side via invitation)
     const { error: roleError } = await supabase.from('user_roles').insert({
       user_id: authData.user.id,
       role: userData.tipo,
