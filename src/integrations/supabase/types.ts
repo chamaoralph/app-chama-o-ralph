@@ -1144,6 +1144,57 @@ export type Database = {
           },
         ]
       }
+      user_invitations: {
+        Row: {
+          created_at: string | null
+          email: string
+          empresa_id: string
+          expires_at: string
+          id: string
+          invited_by: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          token: string
+          used_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          empresa_id: string
+          expires_at?: string
+          id?: string
+          invited_by?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          token?: string
+          used_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          empresa_id?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          token?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_invitations_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_invitations_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -1213,6 +1264,13 @@ export type Database = {
         Args: { p_empresa_id: string; p_periodo_dias?: number }
         Returns: Json
       }
+      create_user_invitation: {
+        Args: {
+          p_email: string
+          p_role?: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: string
+      }
       get_empresa_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
@@ -1234,6 +1292,13 @@ export type Database = {
       instalador_certificado_para_tipo: {
         Args: { _instalador_id: string; _tipos_servico: string[] }
         Returns: boolean
+      }
+      validate_signup_invitation: {
+        Args: { p_email: string; p_token: string }
+        Returns: {
+          empresa_id: string
+          role: Database["public"]["Enums"]["app_role"]
+        }[]
       }
     }
     Enums: {
