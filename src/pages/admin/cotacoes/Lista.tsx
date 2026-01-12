@@ -29,6 +29,7 @@ interface Cotacao {
   horario_inicio: string | null
   horario_fim: string | null
   valor_estimado: number | null
+  valor_material: number | null
   ocasiao: string | null
   origem_lead: string | null
   descricao_servico: string | null
@@ -60,6 +61,7 @@ interface EditForm {
   tipo_servico: string
   tipo_servico_outro: string
   valor_estimado: string
+  valor_material: string
   observacoes: string
 }
 
@@ -134,6 +136,7 @@ export default function ListaCotacoes() {
     tipo_servico: '',
     tipo_servico_outro: '',
     valor_estimado: '',
+    valor_material: '',
     observacoes: ''
   })
   const [editLoading, setEditLoading] = useState(false)
@@ -211,6 +214,7 @@ export default function ListaCotacoes() {
       tipo_servico: ehTipoCadastrado ? tipoAtual : (tipoAtual ? 'Outros' : ''),
       tipo_servico_outro: ehTipoCadastrado ? '' : tipoAtual,
       valor_estimado: cotacao.valor_estimado?.toString() || '',
+      valor_material: cotacao.valor_material?.toString() || '',
       observacoes: cotacao.observacoes || ''
     })
     setShowOutroInput(!ehTipoCadastrado && !!tipoAtual)
@@ -256,6 +260,7 @@ export default function ListaCotacoes() {
           horario_fim: horarioFim,
           created_at: editForm.data_criacao ? new Date(editForm.data_criacao).toISOString() : undefined,
           valor_estimado: editForm.valor_estimado ? parseFloat(editForm.valor_estimado) : null,
+          valor_material: editForm.valor_material ? parseFloat(editForm.valor_material) : null,
           origem_lead: editForm.origem_lead || null,
           ocasiao: editForm.ocasiao || null,
           observacoes: editForm.observacoes || null,
@@ -977,12 +982,23 @@ export default function ListaCotacoes() {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Valor Estimado</Label>
+                  <Label>Valor Mão de Obra (R$)</Label>
                   <Input 
                     type="number"
                     step="0.01"
                     value={editForm.valor_estimado}
                     onChange={(e) => setEditForm({...editForm, valor_estimado: e.target.value})}
+                    placeholder="0,00"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Valor do Material (R$)</Label>
+                  <Input 
+                    type="number"
+                    step="0.01"
+                    value={editForm.valor_material}
+                    onChange={(e) => setEditForm({...editForm, valor_material: e.target.value})}
+                    placeholder="0,00"
                   />
                 </div>
                 <div className="space-y-2">
