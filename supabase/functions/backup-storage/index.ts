@@ -84,38 +84,72 @@ Deno.serve(async (req) => {
     const resultado: Record<string, BucketInfo> = {};
 
     for (const bucketName of buckets) {
-      const { data: arquivos, error: listError } = await supabaseAdmin.storage
-        .from(bucketName)
-        .list('', { limit: 1000, sortBy: { column: 'created_at', order: 'desc' } });
-
-      if (listError) {
-        console.error(`Erro ao listar bucket ${bucketName}:`, listError);
-        resultado[bucketName] = { total_arquivos: 0, tamanho_bytes: 0, arquivos: [] };
-        continue;
-      }
-
       const arquivosComUrl: ArquivoBucket[] = [];
       let tamanhoTotal = 0;
 
-      for (const arquivo of arquivos || []) {
-        if (!arquivo.name || arquivo.name.startsWith('.')) continue;
-
-        // Gerar URL assinada válida por 24 horas
-        const { data: urlData } = await supabaseAdmin.storage
+      try {
+        // Listar itens na raiz (podem ser pastas ou arquivos)
+        const { data: itensRaiz, error: listError } = await supabaseAdmin.storage
           .from(bucketName)
-          .createSignedUrl(arquivo.name, 86400); // 24 horas
+          .list('', { limit: 1000 });
 
-        if (urlData?.signedUrl) {
-          const tamanho = arquivo.metadata?.size || 0;
-          tamanhoTotal += tamanho;
-
-          arquivosComUrl.push({
-            nome: arquivo.name,
-            tamanho,
-            url: urlData.signedUrl,
-            criado_em: arquivo.created_at || new Date().toISOString(),
-          });
+        if (listError) {
+          console.error(`Erro ao listar bucket ${bucketName}:`, listError);
+          resultado[bucketName] = { total_arquivos: 0, tamanho_bytes: 0, arquivos: [] };
+          continue;
         }
+
+        for (const item of itensRaiz || []) {
+          if (!item.name || item.name.startsWith('.')) continue;
+
+          // Se item.id é null, é uma pasta - listar conteúdo recursivamente
+          if (item.id === null) {
+            const { data: arquivosPasta } = await supabaseAdmin.storage
+              .from(bucketName)
+              .list(item.name, { limit: 1000 });
+
+            for (const arquivo of arquivosPasta || []) {
+              if (!arquivo.name || arquivo.name.startsWith('.') || arquivo.id === null) continue;
+
+              const caminhoCompleto = `${item.name}/${arquivo.name}`;
+              
+              const { data: urlData } = await supabaseAdmin.storage
+                .from(bucketName)
+                .createSignedUrl(caminhoCompleto, 86400);
+
+              if (urlData?.signedUrl) {
+                const tamanho = arquivo.metadata?.size || 0;
+                tamanhoTotal += tamanho;
+
+                arquivosComUrl.push({
+                  nome: caminhoCompleto,
+                  tamanho,
+                  url: urlData.signedUrl,
+                  criado_em: arquivo.created_at || new Date().toISOString(),
+                });
+              }
+            }
+          } else {
+            // É um arquivo na raiz
+            const { data: urlData } = await supabaseAdmin.storage
+              .from(bucketName)
+              .createSignedUrl(item.name, 86400);
+
+            if (urlData?.signedUrl) {
+              const tamanho = item.metadata?.size || 0;
+              tamanhoTotal += tamanho;
+
+              arquivosComUrl.push({
+                nome: item.name,
+                tamanho,
+                url: urlData.signedUrl,
+                criado_em: item.created_at || new Date().toISOString(),
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.error(`Erro processando bucket ${bucketName}:`, err);
       }
 
       resultado[bucketName] = {
