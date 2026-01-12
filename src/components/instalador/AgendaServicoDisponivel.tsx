@@ -82,6 +82,13 @@ export function AgendaServicoDisponivel({
               R$ {servico.valor_mao_obra_instalador?.toFixed(2) || "0.00"}*
             </p>
           </div>
+
+          {/* Descrição resumida */}
+          {servico.descricao && (
+            <p className="text-[10px] text-muted-foreground mt-1 line-clamp-2">
+              📝 {servico.descricao}
+            </p>
+          )}
         </div>
       </SheetTrigger>
 

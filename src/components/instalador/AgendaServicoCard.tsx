@@ -99,6 +99,13 @@ export function AgendaServicoCard({ servico, onIniciar, onFinalizar }: AgendaSer
           <p className="text-xs font-bold text-green-600 mt-1">
             R$ {servico.valor_mao_obra_instalador?.toFixed(2)}
           </p>
+
+          {/* Descrição resumida */}
+          {servico.descricao && (
+            <p className="text-[10px] text-muted-foreground mt-1 line-clamp-2">
+              📝 {servico.descricao}
+            </p>
+          )}
         </div>
       </SheetTrigger>
 
