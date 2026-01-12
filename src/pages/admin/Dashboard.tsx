@@ -11,7 +11,7 @@ import { formatarDataBR } from '@/lib/utils'
 interface Metricas {
   receitaMes: number
   servicosConcluidosMes: number
-  saldoInstaladores: number
+  saldoCaixa: number
   cotacoesPendentes: number
 }
 
@@ -27,7 +27,7 @@ export default function AdminDashboard() {
   const [metricas, setMetricas] = useState<Metricas>({
     receitaMes: 0,
     servicosConcluidosMes: 0,
-    saldoInstaladores: 0,
+    saldoCaixa: 0,
     cotacoesPendentes: 0
   })
   const [ultimosServicos, setUltimosServicos] = useState<UltimoServico[]>([])
@@ -56,15 +56,16 @@ export default function AdminDashboard() {
       const now = new Date()
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
-      // Receita do mês
+      // Lançamentos do caixa do mês
       const { data: lancamentos } = await supabase
         .from('lancamentos_caixa')
-        .select('valor')
+        .select('tipo, valor')
         .eq('empresa_id', userData.empresa_id)
-        .eq('tipo', 'receita')
         .gte('data_lancamento', startOfMonth.toISOString().split('T')[0])
 
-      const receitaMes = lancamentos?.reduce((sum, l) => sum + Number(l.valor), 0) || 0
+      const receitaMes = lancamentos?.filter(l => l.tipo === 'receita').reduce((sum, l) => sum + Number(l.valor), 0) || 0
+      const despesasMes = lancamentos?.filter(l => l.tipo === 'despesa').reduce((sum, l) => sum + Number(l.valor), 0) || 0
+      const saldoCaixa = receitaMes - despesasMes
 
       // Serviços concluídos no mês
       const { data: servicos } = await supabase
@@ -75,15 +76,6 @@ export default function AdminDashboard() {
         .gte('updated_at', startOfMonth.toISOString())
 
       const servicosConcluidosMes = servicos?.length || 0
-
-      // Saldo a pagar instaladores
-      const { data: instaladores } = await supabase
-        .from('instaladores')
-        .select('saldo_a_receber')
-        .eq('empresa_id', userData.empresa_id)
-        .eq('ativo', true)
-
-      const saldoInstaladores = instaladores?.reduce((sum, i) => sum + Number(i.saldo_a_receber || 0), 0) || 0
 
       // Cotações pendentes
       const { data: cotacoes } = await supabase
@@ -106,7 +98,7 @@ export default function AdminDashboard() {
       setMetricas({
         receitaMes,
         servicosConcluidosMes,
-        saldoInstaladores,
+        saldoCaixa,
         cotacoesPendentes
       })
 
@@ -187,8 +179,8 @@ export default function AdminDashboard() {
 
             <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl p-4 min-w-[140px] flex-shrink-0">
               <DollarSign className="h-6 w-6 mb-2 opacity-80" />
-              <div className="text-xl font-bold">R$ {metricas.saldoInstaladores.toFixed(0)}</div>
-              <div className="text-xs opacity-90">Saldo a Pagar</div>
+              <div className="text-xl font-bold">R$ {metricas.saldoCaixa.toFixed(0)}</div>
+              <div className="text-xs opacity-90">Saldo</div>
             </div>
 
             <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-xl p-4 min-w-[140px] flex-shrink-0">
@@ -304,10 +296,10 @@ export default function AdminDashboard() {
           <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
             <div className="flex items-center justify-between mb-2">
               <DollarSign className="h-8 w-8" />
-              <span className="text-3xl opacity-30">💸</span>
+              <span className="text-3xl opacity-30">💰</span>
             </div>
-            <div className="text-2xl font-bold">R$ {metricas.saldoInstaladores.toFixed(2)}</div>
-            <div className="text-sm opacity-90">Saldo a Pagar</div>
+            <div className="text-2xl font-bold">R$ {metricas.saldoCaixa.toFixed(2)}</div>
+            <div className="text-sm opacity-90">Saldo do Mês</div>
           </div>
 
           <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
