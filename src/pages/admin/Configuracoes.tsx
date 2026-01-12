@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client'
 import { useToast } from '@/hooks/use-toast'
 import { Plus, Pencil, Trash2, GripVertical, Users, Percent } from 'lucide-react'
 import { RFMConfigCard } from '@/components/admin/RFMConfigCard'
+import { BackupStorageCard } from '@/components/admin/BackupStorageCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -412,6 +413,11 @@ export default function Configuracoes() {
         {/* Critérios RFM */}
         <div className="mt-6">
           <RFMConfigCard />
+        </div>
+
+        {/* Backup e Storage */}
+        <div className="mt-6">
+          <BackupStorageCard />
         </div>
 
         {/* Espaço para futuras configurações */}
