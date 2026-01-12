@@ -73,6 +73,82 @@ const getBucketLabel = (bucket: string) => {
   }
 };
 
+// Função para comprimir imagem para no máximo 1MB
+const comprimirImagem = async (blob: Blob, nomeArquivo: string, maxSizeBytes = 1024 * 1024): Promise<Blob> => {
+  // Se não for imagem ou já está pequeno, retorna original
+  const extensao = nomeArquivo.toLowerCase().split('.').pop();
+  const isImagem = ['jpg', 'jpeg', 'png', 'webp'].includes(extensao || '');
+  
+  if (!isImagem || blob.size <= maxSizeBytes) {
+    return blob;
+  }
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(blob);
+    
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      
+      // Calcular dimensões mantendo proporção
+      let { width, height } = img;
+      const maxDimension = 1920; // Máximo de 1920px
+      
+      if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+          height = (height * maxDimension) / width;
+          width = maxDimension;
+        } else {
+          width = (width * maxDimension) / height;
+          height = maxDimension;
+        }
+      }
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(blob);
+        return;
+      }
+      
+      ctx.drawImage(img, 0, 0, width, height);
+      
+      // Tentar diferentes qualidades até ficar abaixo de 1MB
+      const tentarComprimir = (qualidade: number): void => {
+        canvas.toBlob(
+          (novoBlob) => {
+            if (!novoBlob) {
+              resolve(blob);
+              return;
+            }
+            
+            // Se ainda está grande e podemos reduzir mais
+            if (novoBlob.size > maxSizeBytes && qualidade > 0.3) {
+              tentarComprimir(qualidade - 0.1);
+            } else {
+              resolve(novoBlob);
+            }
+          },
+          'image/jpeg',
+          qualidade
+        );
+      };
+      
+      tentarComprimir(0.7); // Começa com 70% de qualidade
+    };
+    
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(blob); // Em caso de erro, retorna original
+    };
+    
+    img.src = url;
+  });
+};
+
 export function BackupStorageCard() {
   const [loading, setLoading] = useState(false);
   const [downloadingZip, setDownloadingZip] = useState(false);
@@ -208,8 +284,21 @@ export function BackupStorageCard() {
                 return;
               }
               
-              const blob = await response.blob();
-              const caminho = `backup-${dataAtual}/${bucket}/${arquivo.nome}`;
+              let blob = await response.blob();
+              
+              // Comprimir imagens para no máximo 1MB
+              if (bucket === 'fotos-servicos') {
+                blob = await comprimirImagem(blob, arquivo.nome);
+              }
+              
+              // Ajustar extensão para .jpg se foi convertido
+              let nomeArquivo = arquivo.nome;
+              const extensao = nomeArquivo.toLowerCase().split('.').pop();
+              if (['png', 'webp'].includes(extensao || '') && blob.type === 'image/jpeg') {
+                nomeArquivo = nomeArquivo.replace(/\.(png|webp)$/i, '.jpg');
+              }
+              
+              const caminho = `backup-${dataAtual}/${bucket}/${nomeArquivo}`;
               zip.file(caminho, blob);
             } catch (err) {
               console.error(`Erro ao baixar ${arquivo.nome}:`, err);
