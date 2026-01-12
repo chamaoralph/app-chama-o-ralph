@@ -16,7 +16,8 @@ import {
   ExternalLink,
   RefreshCw,
   Copy,
-  Check
+  Check,
+  Archive
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -73,6 +74,7 @@ const getBucketLabel = (bucket: string) => {
 
 export function BackupStorageCard() {
   const [loading, setLoading] = useState(false);
+  const [downloadingZip, setDownloadingZip] = useState(false);
   const [backupData, setBackupData] = useState<BackupData | null>(null);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [expandedBucket, setExpandedBucket] = useState<string | null>(null);
@@ -127,6 +129,49 @@ export function BackupStorageCard() {
     toast.success('Arquivo JSON exportado!');
   };
 
+  const baixarTudoZip = async () => {
+    setDownloadingZip(true);
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) {
+        toast.error('Você precisa estar logado');
+        return;
+      }
+
+      toast.info('Gerando arquivo ZIP... Isso pode levar alguns minutos.');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gerar-backup-zip`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session.session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Falha ao gerar backup');
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `backup-${new Date().toISOString().split('T')[0]}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      
+      toast.success('Backup ZIP baixado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao baixar ZIP:', error);
+      toast.error('Erro ao gerar backup ZIP');
+    } finally {
+      setDownloadingZip(false);
+    }
+  };
+
   // Limite de storage (estimativa baseada no plano)
   const limiteStorageMb = 1024; // 1GB
   const usadoMb = backupData?.resumo.tamanho_total_mb || 0;
@@ -176,25 +221,37 @@ export function BackupStorageCard() {
             Download Manual
           </h4>
           
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button 
               onClick={gerarListaBackup} 
-              disabled={loading}
+              disabled={loading || downloadingZip}
               variant="outline"
-              className="flex-1"
             >
               {loading ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
                 <RefreshCw className="h-4 w-4 mr-2" />
               )}
-              {backupData ? 'Atualizar Lista' : 'Gerar Lista de Download'}
+              {backupData ? 'Atualizar Lista' : 'Gerar Lista'}
+            </Button>
+
+            <Button 
+              onClick={baixarTudoZip} 
+              disabled={downloadingZip || loading}
+              variant="default"
+            >
+              {downloadingZip ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Archive className="h-4 w-4 mr-2" />
+              )}
+              {downloadingZip ? 'Gerando ZIP...' : 'Baixar Tudo (ZIP)'}
             </Button>
             
             {backupData && (
               <Button onClick={exportarComoJson} variant="secondary">
                 <Download className="h-4 w-4 mr-2" />
-                Exportar JSON
+                JSON
               </Button>
             )}
           </div>
