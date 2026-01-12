@@ -1,9 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 
 // Categorias consideradas como custos de instaladores
 const CATEGORIAS_INSTALADORES = new Set(["Pagamento Instalador", "Reembolso Materiais"]);
+
+// Cores para o gráfico pizza
+const CORES_PIZZA = [
+  '#EF4444', '#F59E0B', '#10B981', '#3B82F6', 
+  '#8B5CF6', '#EC4899', '#06B6D4', '#F97316',
+  '#6366F1', '#84CC16', '#14B8A6', '#64748B'
+];
 
 export default function Caixa() {
   const [lancamentos, setLancamentos] = useState<any[]>([]);
@@ -112,6 +120,40 @@ export default function Caixa() {
     return "Todos os Lançamentos";
   };
 
+  // Dados agregados para o gráfico pizza (apenas despesas gerais)
+  const dadosGraficoDespesas = useMemo(() => {
+    const despesasGerais = lancamentos.filter(
+      l => l.tipo === 'despesa' && !CATEGORIAS_INSTALADORES.has(l.categoria)
+    );
+    
+    const agregado = despesasGerais.reduce((acc, item) => {
+      const cat = item.categoria || 'Outros';
+      acc[cat] = (acc[cat] || 0) + Number(item.valor);
+      return acc;
+    }, {} as Record<string, number>);
+    
+    return Object.entries(agregado)
+      .map(([categoria, valor]) => ({ categoria, valor: valor as number }))
+      .sort((a, b) => b.valor - a.valor);
+  }, [lancamentos]);
+
+  const totalGraficoDespesas = dadosGraficoDespesas.reduce((s, d) => s + d.valor, 0);
+
+  // Tooltip customizado para o gráfico
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (!active || !payload?.length) return null;
+    const { categoria, valor } = payload[0].payload;
+    const percentual = ((valor / totalGraficoDespesas) * 100).toFixed(1);
+    
+    return (
+      <div className="bg-white border rounded-lg shadow-lg p-3">
+        <p className="font-semibold">{categoria}</p>
+        <p className="text-red-600">R$ {valor.toFixed(2)}</p>
+        <p className="text-gray-500 text-sm">{percentual}%</p>
+      </div>
+    );
+  };
+
   return (
     <AdminLayout>
       <div>
@@ -183,6 +225,69 @@ export default function Caixa() {
             >
               (ver todos)
             </button>
+          </div>
+        )}
+
+        {/* Gráfico Pizza - Visível apenas no filtro Despesas Gerais */}
+        {filtroTipo === "despesas_gerais" && dadosGraficoDespesas.length > 0 && (
+          <div className="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 className="text-lg font-bold mb-4">📊 Despesas por Categoria</h2>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Gráfico Pizza */}
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={dadosGraficoDespesas}
+                      dataKey="valor"
+                      nameKey="categoria"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={100}
+                      label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                    >
+                      {dadosGraficoDespesas.map((_, index) => (
+                        <Cell key={index} fill={CORES_PIZZA[index % CORES_PIZZA.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              
+              {/* Legenda detalhada com valores */}
+              <div className="space-y-2">
+                {dadosGraficoDespesas.map((item, index) => {
+                  const percentual = ((item.valor / totalGraficoDespesas) * 100).toFixed(1);
+                  
+                  return (
+                    <div key={item.categoria} className="flex items-center justify-between p-2 rounded hover:bg-gray-50">
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-4 h-4 rounded"
+                          style={{ backgroundColor: CORES_PIZZA[index % CORES_PIZZA.length] }}
+                        />
+                        <span className="font-medium">{item.categoria}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-bold text-red-600">R$ {item.valor.toFixed(2)}</span>
+                        <span className="text-gray-500 text-sm ml-2">({percentual}%)</span>
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {/* Linha de Total */}
+                <div className="border-t pt-2 mt-2 flex justify-between font-bold">
+                  <span>Total:</span>
+                  <span className="text-red-600">
+                    R$ {totalGraficoDespesas.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
