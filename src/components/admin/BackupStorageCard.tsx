@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import JSZip from 'jszip';
 
 interface ArquivoBucket {
   nome: string;
@@ -75,6 +76,7 @@ const getBucketLabel = (bucket: string) => {
 export function BackupStorageCard() {
   const [loading, setLoading] = useState(false);
   const [downloadingZip, setDownloadingZip] = useState(false);
+  const [zipProgress, setZipProgress] = useState({ current: 0, total: 0 });
   const [backupData, setBackupData] = useState<BackupData | null>(null);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [expandedBucket, setExpandedBucket] = useState<string | null>(null);
@@ -130,45 +132,117 @@ export function BackupStorageCard() {
   };
 
   const baixarTudoZip = async () => {
+    // Primeiro, garantir que temos a lista de arquivos
+    let dados = backupData;
+    
+    if (!dados) {
+      setLoading(true);
+      try {
+        const { data: session } = await supabase.auth.getSession();
+        if (!session.session) {
+          toast.error('Você precisa estar logado');
+          setLoading(false);
+          return;
+        }
+
+        const response = await supabase.functions.invoke('backup-storage', {
+          headers: {
+            Authorization: `Bearer ${session.session.access_token}`,
+          },
+        });
+
+        if (response.error) {
+          throw new Error(response.error.message);
+        }
+
+        dados = response.data;
+        setBackupData(dados);
+      } catch (error) {
+        console.error('Erro ao gerar lista:', error);
+        toast.error('Erro ao obter lista de arquivos');
+        setLoading(false);
+        return;
+      }
+      setLoading(false);
+    }
+
+    if (!dados) return;
+
     setDownloadingZip(true);
+    
     try {
-      const { data: session } = await supabase.auth.getSession();
-      if (!session.session) {
-        toast.error('Você precisa estar logado');
+      const zip = new JSZip();
+      const dataAtual = new Date().toISOString().split('T')[0];
+      
+      // Coletar todos os arquivos de todos os buckets
+      const todosArquivos: { bucket: string; arquivo: ArquivoBucket }[] = [];
+      
+      for (const [bucket, info] of Object.entries(dados.buckets)) {
+        for (const arquivo of info.arquivos) {
+          todosArquivos.push({ bucket, arquivo });
+        }
+      }
+
+      const total = todosArquivos.length;
+      setZipProgress({ current: 0, total });
+
+      if (total === 0) {
+        toast.warning('Nenhum arquivo para baixar');
+        setDownloadingZip(false);
         return;
       }
 
-      toast.info('Gerando arquivo ZIP... Isso pode levar alguns minutos.');
+      toast.info(`Baixando ${total} arquivos... Isso pode levar alguns minutos.`);
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gerar-backup-zip`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${session.session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      // Baixar arquivos em lotes de 5 para não sobrecarregar
+      const batchSize = 5;
+      for (let i = 0; i < todosArquivos.length; i += batchSize) {
+        const batch = todosArquivos.slice(i, i + batchSize);
+        
+        await Promise.all(
+          batch.map(async ({ bucket, arquivo }) => {
+            try {
+              const response = await fetch(arquivo.url);
+              if (!response.ok) {
+                console.error(`Erro ao baixar ${arquivo.nome}`);
+                return;
+              }
+              
+              const blob = await response.blob();
+              const caminho = `backup-${dataAtual}/${bucket}/${arquivo.nome}`;
+              zip.file(caminho, blob);
+            } catch (err) {
+              console.error(`Erro ao baixar ${arquivo.nome}:`, err);
+            }
+          })
+        );
 
-      if (!response.ok) {
-        throw new Error('Falha ao gerar backup');
+        setZipProgress({ current: Math.min(i + batchSize, total), total });
       }
 
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+      // Gerar o ZIP
+      toast.info('Gerando arquivo ZIP...');
+      const zipBlob = await zip.generateAsync({ 
+        type: 'blob',
+        compression: 'DEFLATE',
+        compressionOptions: { level: 6 }
+      });
+
+      // Baixar o ZIP
+      const url = URL.createObjectURL(zipBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `backup-${new Date().toISOString().split('T')[0]}.zip`;
+      a.download = `backup-${dataAtual}.zip`;
       a.click();
       URL.revokeObjectURL(url);
-      
-      toast.success('Backup ZIP baixado com sucesso!');
+
+      toast.success(`Backup ZIP baixado com sucesso! (${total} arquivos)`);
     } catch (error) {
-      console.error('Erro ao baixar ZIP:', error);
+      console.error('Erro ao gerar ZIP:', error);
       toast.error('Erro ao gerar backup ZIP');
     } finally {
       setDownloadingZip(false);
+      setZipProgress({ current: 0, total: 0 });
     }
   };
 
@@ -245,7 +319,9 @@ export function BackupStorageCard() {
               ) : (
                 <Archive className="h-4 w-4 mr-2" />
               )}
-              {downloadingZip ? 'Gerando ZIP...' : 'Baixar Tudo (ZIP)'}
+              {downloadingZip 
+                ? `Baixando... ${zipProgress.current}/${zipProgress.total}` 
+                : 'Baixar Tudo (ZIP)'}
             </Button>
             
             {backupData && (
