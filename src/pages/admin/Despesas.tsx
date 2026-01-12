@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client'
 import { Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/hooks/use-toast'
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts'
+
 
 interface Despesa {
   categoria: string
@@ -24,16 +24,6 @@ interface DespesaSalva {
   created_at: string
 }
 
-interface DadoGrafico {
-  categoria: string
-  valor: number
-}
-
-const CORES_PIZZA = [
-  '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6',
-  '#EC4899', '#06B6D4', '#F97316', '#6366F1', '#84CC16',
-  '#14B8A6', '#64748B'
-]
 
 export default function Despesas() {
   const [despesas, setDespesas] = useState<Despesa[]>([{
@@ -46,7 +36,7 @@ export default function Despesas() {
   const [loading, setLoading] = useState(false)
   const [despesasSalvas, setDespesasSalvas] = useState<DespesaSalva[]>([])
   const [loadingLista, setLoadingLista] = useState(true)
-  const [dadosGrafico, setDadosGrafico] = useState<DadoGrafico[]>([])
+  
 
   const categorias = [
     'Combustível',
@@ -96,27 +86,6 @@ export default function Despesas() {
       if (error) throw error
       setDespesasSalvas(data || [])
 
-      // Buscar totais por categoria (todas as despesas)
-      const { data: totaisPorCategoria } = await supabase
-        .from('lancamentos_caixa')
-        .select('categoria, valor')
-        .eq('empresa_id', userData.empresa_id)
-        .eq('tipo', 'despesa')
-        .is('servico_id', null)
-
-      if (totaisPorCategoria) {
-        const agregado = totaisPorCategoria.reduce((acc, item) => {
-          const cat = item.categoria || 'Outros'
-          acc[cat] = (acc[cat] || 0) + Number(item.valor)
-          return acc
-        }, {} as Record<string, number>)
-
-        const dados = Object.entries(agregado)
-          .map(([categoria, valor]) => ({ categoria, valor }))
-          .sort((a, b) => b.valor - a.valor)
-
-        setDadosGrafico(dados)
-      }
     } catch (error) {
       console.error('Erro ao carregar despesas:', error)
     } finally {
@@ -352,83 +321,6 @@ export default function Despesas() {
           </div>
         </div>
 
-        {/* Gráfico Pizza por Categoria */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-bold mb-4">📊 Despesas por Categoria</h2>
-          
-          {loadingLista ? (
-            <div className="p-8 text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            </div>
-          ) : dadosGrafico.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">Nenhum dado para exibir</p>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Gráfico */}
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={dadosGrafico}
-                      dataKey="valor"
-                      nameKey="categoria"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={100}
-                      label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
-                    >
-                      {dadosGrafico.map((_, index) => (
-                        <Cell key={index} fill={CORES_PIZZA[index % CORES_PIZZA.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value: number) => `R$ ${value.toFixed(2)}`}
-                      contentStyle={{ borderRadius: '8px' }}
-                    />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              
-              {/* Legenda detalhada com valores */}
-              <div className="space-y-2">
-                {dadosGrafico.map((item, index) => {
-                  const total = dadosGrafico.reduce((s, d) => s + d.valor, 0)
-                  const percentual = ((item.valor / total) * 100).toFixed(1)
-                  
-                  return (
-                    <div key={item.categoria} 
-                         className="flex items-center justify-between p-2 rounded hover:bg-gray-50">
-                      <div className="flex items-center gap-2">
-                        <div 
-                          className="w-4 h-4 rounded"
-                          style={{ backgroundColor: CORES_PIZZA[index % CORES_PIZZA.length] }}
-                        />
-                        <span className="font-medium">{item.categoria}</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="font-bold text-red-600">
-                          R$ {item.valor.toFixed(2)}
-                        </span>
-                        <span className="text-gray-500 text-sm ml-2">
-                          ({percentual}%)
-                        </span>
-                      </div>
-                    </div>
-                  )
-                })}
-                
-                {/* Total */}
-                <div className="border-t pt-2 mt-2 flex justify-between font-bold">
-                  <span>Total:</span>
-                  <span className="text-red-600">
-                    R$ {dadosGrafico.reduce((s, d) => s + d.valor, 0).toFixed(2)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
 
         {/* Lista de Despesas Recentes */}
         <div className="bg-white rounded-lg shadow p-6">
