@@ -6,6 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ImportacaoCotacoes } from '@/components/admin/ImportacaoCotacoes'
 import { useToast } from '@/hooks/use-toast'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Search, X, Loader2 } from 'lucide-react'
 
 interface TipoServico {
   id: string
@@ -19,6 +21,9 @@ export default function NovaCotacao() {
   const [error, setError] = useState('')
   const [tiposServico, setTiposServico] = useState<TipoServico[]>([])
   const [showOutroInput, setShowOutroInput] = useState(false)
+  const [clienteBuscado, setClienteBuscado] = useState(false)
+  const [clienteEncontrado, setClienteEncontrado] = useState(false)
+  const [buscandoCliente, setBuscandoCliente] = useState(false)
   
   const [formData, setFormData] = useState({
     cliente_nome: '',
@@ -85,6 +90,79 @@ export default function NovaCotacao() {
     const horaFim = Math.floor(totalMinutos / 60)
     const minutoFim = totalMinutos % 60
     return `${horaFim.toString().padStart(2, '0')}:${minutoFim.toString().padStart(2, '0')}`
+  }
+
+  async function buscarCliente() {
+    if (!formData.cliente_telefone) {
+      toast({ title: "Digite um telefone", variant: "destructive" })
+      return
+    }
+    
+    setBuscandoCliente(true)
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Usuário não autenticado')
+
+      const { data: userData } = await supabase
+        .from('usuarios')
+        .select('empresa_id')
+        .eq('id', user.id)
+        .maybeSingle()
+      
+      if (!userData) throw new Error('Dados do usuário não encontrados')
+
+      const { data: cliente } = await supabase
+        .from('clientes')
+        .select('*')
+        .eq('telefone', formData.cliente_telefone)
+        .eq('empresa_id', userData.empresa_id)
+        .maybeSingle()
+      
+      if (cliente) {
+        setFormData({
+          ...formData,
+          cliente_nome: cliente.nome || '',
+          bairro: cliente.bairro || '',
+          endereco_completo: cliente.endereco_completo || '',
+          origem_lead: cliente.origem_lead || 'Google',
+          cliente_idade: cliente.idade?.toString() || ''
+        })
+        setClienteEncontrado(true)
+        toast({ title: "✅ Cliente encontrado!", description: cliente.nome })
+      } else {
+        setFormData({
+          ...formData,
+          cliente_nome: '',
+          bairro: '',
+          endereco_completo: '',
+          origem_lead: 'Google',
+          cliente_idade: ''
+        })
+        setClienteEncontrado(false)
+        toast({ title: "Cliente não encontrado", description: "Preencha os dados do novo cliente" })
+      }
+      
+      setClienteBuscado(true)
+    } catch (error: any) {
+      toast({ title: "Erro ao buscar cliente", description: error.message, variant: "destructive" })
+    } finally {
+      setBuscandoCliente(false)
+    }
+  }
+
+  function limparBusca() {
+    setClienteBuscado(false)
+    setClienteEncontrado(false)
+    setFormData({
+      ...formData,
+      cliente_telefone: '',
+      cliente_nome: '',
+      bairro: '',
+      endereco_completo: '',
+      origem_lead: 'Google',
+      cliente_idade: ''
+    })
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -198,33 +276,86 @@ export default function NovaCotacao() {
             <form onSubmit={handleSubmit} className="bg-white shadow rounded-lg p-6 space-y-6">
           <div>
             <h2 className="text-xl font-semibold mb-4">Dados do Cliente</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Nome *</label>
-                <input type="text" required value={formData.cliente_nome} onChange={(e) => setFormData({...formData, cliente_nome: e.target.value})} className="w-full px-3 py-2 border rounded-md" />
-              </div>
-              <div>
+            
+            {/* Linha de busca - sempre visível */}
+            <div className="flex gap-4 items-end mb-4">
+              <div className="flex-1">
                 <label className="block text-sm font-medium mb-2">Telefone *</label>
-                <input type="tel" required value={formData.cliente_telefone} onChange={(e) => setFormData({...formData, cliente_telefone: e.target.value})} className="w-full px-3 py-2 border rounded-md" />
+                <Input 
+                  type="tel" 
+                  required 
+                  value={formData.cliente_telefone} 
+                  onChange={(e) => {
+                    setFormData({...formData, cliente_telefone: e.target.value})
+                    if (clienteBuscado) {
+                      setClienteBuscado(false)
+                      setClienteEncontrado(false)
+                    }
+                  }} 
+                  placeholder="Ex: 11999998888"
+                />
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Bairro *</label>
-                <input type="text" required value={formData.bairro} onChange={(e) => setFormData({...formData, bairro: e.target.value})} className="w-full px-3 py-2 border rounded-md" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Origem *</label>
-                <select value={formData.origem_lead} onChange={(e) => setFormData({...formData, origem_lead: e.target.value})} className="w-full px-3 py-2 border rounded-md">
-                  <option value="Google">Google</option>
-                  <option value="Instagram">Instagram</option>
-                  <option value="Já era cliente">Já era cliente</option>
-                  <option value="Indicação">Indicação</option>
-                </select>
-              </div>
-              <div className="col-span-2">
-                <label className="block text-sm font-medium mb-2">Endereço *</label>
-                <input type="text" required value={formData.endereco_completo} onChange={(e) => setFormData({...formData, endereco_completo: e.target.value})} className="w-full px-3 py-2 border rounded-md" />
-              </div>
+              {!clienteBuscado ? (
+                <Button 
+                  type="button" 
+                  onClick={buscarCliente}
+                  disabled={buscandoCliente || !formData.cliente_telefone}
+                  className="gap-2"
+                >
+                  {buscandoCliente ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  Buscar Cliente
+                </Button>
+              ) : (
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  onClick={limparBusca}
+                  className="gap-2"
+                >
+                  <X className="h-4 w-4" /> Limpar
+                </Button>
+              )}
             </div>
+            
+            {/* Indicador de status */}
+            {clienteBuscado && (
+              <div className={`mb-4 p-3 rounded-md ${clienteEncontrado ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-yellow-50 text-yellow-700 border border-yellow-200'}`}>
+                {clienteEncontrado 
+                  ? '✅ Cliente encontrado! Dados preenchidos automaticamente.'
+                  : '⚠️ Cliente novo. Preencha os dados abaixo.'}
+              </div>
+            )}
+            
+            {/* Campos expandidos - só aparecem após busca */}
+            {clienteBuscado && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Nome *</label>
+                  <Input type="text" required value={formData.cliente_nome} onChange={(e) => setFormData({...formData, cliente_nome: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Bairro *</label>
+                  <Input type="text" required value={formData.bairro} onChange={(e) => setFormData({...formData, bairro: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Origem *</label>
+                  <select value={formData.origem_lead} onChange={(e) => setFormData({...formData, origem_lead: e.target.value})} className="w-full px-3 py-2 border rounded-md bg-background">
+                    <option value="Google">Google</option>
+                    <option value="Instagram">Instagram</option>
+                    <option value="Já era cliente">Já era cliente</option>
+                    <option value="Indicação">Indicação</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Idade</label>
+                  <Input type="number" value={formData.cliente_idade} onChange={(e) => setFormData({...formData, cliente_idade: e.target.value})} placeholder="Ex: 35" />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium mb-2">Endereço *</label>
+                  <Input type="text" required value={formData.endereco_completo} onChange={(e) => setFormData({...formData, endereco_completo: e.target.value})} placeholder="Rua, número, complemento" />
+                </div>
+              </div>
+            )}
           </div>
 
           <div>
