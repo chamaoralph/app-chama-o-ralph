@@ -39,6 +39,7 @@ interface BucketInfo {
 interface BackupData {
   sucesso: boolean;
   buckets: Record<string, BucketInfo>;
+  mapa_servicos?: Record<string, string>;
   resumo: {
     total_arquivos: number;
     tamanho_total_mb: number;
@@ -296,6 +297,16 @@ export function BackupStorageCard() {
               const extensao = nomeArquivo.toLowerCase().split('.').pop();
               if (['png', 'webp'].includes(extensao || '') && blob.type === 'image/jpeg') {
                 nomeArquivo = nomeArquivo.replace(/\.(png|webp)$/i, '.jpg');
+              }
+              
+              // Substituir UUID da pasta pelo código do serviço (se disponível)
+              const partes = nomeArquivo.split('/');
+              if (partes.length > 1 && dados.mapa_servicos) {
+                const pastaNome = partes[0];
+                if (dados.mapa_servicos[pastaNome]) {
+                  partes[0] = dados.mapa_servicos[pastaNome];
+                  nomeArquivo = partes.join('/');
+                }
               }
               
               const caminho = `backup-${dataAtual}/${bucket}/${nomeArquivo}`;

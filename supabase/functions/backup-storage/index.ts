@@ -80,6 +80,17 @@ Deno.serve(async (req) => {
     // Usar service role para acessar storage
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Buscar mapeamento UUID -> código do serviço
+    const { data: servicos } = await supabaseAdmin
+      .from('servicos')
+      .select('id, codigo')
+      .eq('empresa_id', usuario.empresa_id);
+
+    const mapaServicos: Record<string, string> = {};
+    for (const servico of servicos || []) {
+      mapaServicos[servico.id] = servico.codigo;
+    }
+
     const buckets = ['fotos-servicos', 'notas-fiscais', 'comprovantes'];
     const resultado: Record<string, BucketInfo> = {};
 
@@ -167,6 +178,7 @@ Deno.serve(async (req) => {
       sucesso: true,
       empresa_id: usuario.empresa_id,
       buckets: resultado,
+      mapa_servicos: mapaServicos,
       resumo: {
         total_arquivos: totalArquivos,
         tamanho_total_mb: Math.round(tamanhoTotalBytes / 1024 / 1024 * 100) / 100,
