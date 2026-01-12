@@ -56,6 +56,11 @@ export function PagamentosInstaladores() {
   const [modalComprovante, setModalComprovante] = useState(false)
   const [urlComprovante, setUrlComprovante] = useState('')
 
+  // Modal de detalhes
+  const [modalDetalhes, setModalDetalhes] = useState(false)
+  const [servicosDetalhes, setServicosDetalhes] = useState<any[]>([])
+  const [carregandoDetalhes, setCarregandoDetalhes] = useState(false)
+
   // Cálculos
   const totalPendente = recibos
     .filter(r => r.status_pagamento === 'pendente')
@@ -246,6 +251,55 @@ export function PagamentosInstaladores() {
     setModalComprovante(true)
   }
 
+  async function verDetalhes(recibo: ReciboComInstalador) {
+    setReciboSelecionado(recibo)
+    setCarregandoDetalhes(true)
+    setModalDetalhes(true)
+    setServicosDetalhes([])
+
+    try {
+      // Buscar os serviços usando os IDs do array servicos_ids do recibo
+      const { data: reciboData } = await supabase
+        .from('recibos_diarios')
+        .select('servicos_ids')
+        .eq('id', recibo.id)
+        .single()
+
+      if (!reciboData?.servicos_ids || reciboData.servicos_ids.length === 0) {
+        return
+      }
+
+      const { data: servicos } = await supabase
+        .from('servicos')
+        .select(`
+          id, codigo, tipo_servico, valor_total,
+          valor_mao_obra_instalador, valor_reembolso_despesas,
+          cliente_id
+        `)
+        .in('id', reciboData.servicos_ids)
+
+      // Buscar nomes dos clientes
+      const clienteIds = servicos?.map(s => s.cliente_id) || []
+      const { data: clientes } = await supabase
+        .from('clientes')
+        .select('id, nome')
+        .in('id', clienteIds)
+
+      const clientesMap = new Map(clientes?.map(c => [c.id, c.nome]))
+      
+      const servicosFormatados = servicos?.map(s => ({
+        ...s,
+        cliente_nome: clientesMap.get(s.cliente_id) || 'Cliente'
+      })) || []
+
+      setServicosDetalhes(servicosFormatados)
+    } catch (error) {
+      console.error('Erro ao carregar detalhes:', error)
+    } finally {
+      setCarregandoDetalhes(false)
+    }
+  }
+
   const recibosFiltrados = recibos.filter(r => {
     if (filtroStatus === 'todos') return true
     return r.status_pagamento === filtroStatus
@@ -342,6 +396,16 @@ export function PagamentosInstaladores() {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2 justify-center">
+                      {/* Botão de Detalhes - sempre visível */}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => verDetalhes(recibo)}
+                      >
+                        <FileText className="h-4 w-4 mr-1" />
+                        Detalhes
+                      </Button>
+
                       {recibo.status_pagamento === 'pendente' ? (
                         <Button
                           size="sm"
@@ -462,6 +526,97 @@ export function PagamentosInstaladores() {
               )
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Detalhes */}
+      <Dialog open={modalDetalhes} onOpenChange={setModalDetalhes}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Detalhes do Recibo</DialogTitle>
+          </DialogHeader>
+          
+          {reciboSelecionado && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center bg-muted p-3 rounded-lg">
+                <span className="font-medium">{reciboSelecionado.instalador_nome}</span>
+                <span className="text-muted-foreground">{formatarDataBR(reciboSelecionado.data_referencia)}</span>
+              </div>
+
+              {carregandoDetalhes ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin h-8 w-8 border-b-2 border-primary mx-auto rounded-full"></div>
+                  <p className="text-sm text-muted-foreground mt-2">Carregando serviços...</p>
+                </div>
+              ) : servicosDetalhes.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Nenhum serviço encontrado para este recibo.
+                </div>
+              ) : (
+                <>
+                  {/* Tabela com cada serviço */}
+                  <div className="border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead>Código</TableHead>
+                          <TableHead>Cliente</TableHead>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead className="text-right">Valor Serviço</TableHead>
+                          <TableHead className="text-right">Mão de Obra</TableHead>
+                          <TableHead className="text-right">Reembolso</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {servicosDetalhes.map((servico) => (
+                          <TableRow key={servico.id}>
+                            <TableCell className="font-mono text-sm">{servico.codigo}</TableCell>
+                            <TableCell>{servico.cliente_nome}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-xs">
+                                {servico.tipo_servico?.join(', ') || '-'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right text-muted-foreground">
+                              R$ {Number(servico.valor_total || 0).toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-right text-green-600 font-medium">
+                              R$ {Number(servico.valor_mao_obra_instalador || 0).toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-right text-blue-600 font-medium">
+                              R$ {Number(servico.valor_reembolso_despesas || 0).toFixed(2)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Resumo final */}
+                  <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Total Mão de Obra:</span>
+                      <span className="font-semibold text-green-600">
+                        R$ {reciboSelecionado.valor_mao_obra.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Total Reembolso Materiais:</span>
+                      <span className="font-semibold text-blue-600">
+                        R$ {reciboSelecionado.valor_reembolso.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="border-t pt-3 flex justify-between items-center">
+                      <span className="text-lg font-medium">Total a Pagar:</span>
+                      <span className="text-xl font-bold text-primary">
+                        R$ {reciboSelecionado.valor_total.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
