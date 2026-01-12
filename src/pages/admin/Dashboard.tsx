@@ -23,6 +23,26 @@ interface UltimoServico {
   data_servico_agendada: string
 }
 
+interface DadoInstaladorDia {
+  quantidade: number
+  valor: number
+}
+
+interface DadosInstaladorSemana {
+  instalador_id: string
+  instalador_nome: string
+  dias: Record<number, DadoInstaladorDia> // 1=seg, 2=ter, ..., 6=sab
+  total_quantidade: number
+  total_valor: number
+}
+
+interface DadosSemana {
+  numero_semana: number
+  inicio: Date
+  fim: Date
+  instaladores: DadosInstaladorSemana[]
+}
+
 export default function AdminDashboard() {
   const [metricas, setMetricas] = useState<Metricas>({
     receitaMes: 0,
@@ -33,6 +53,7 @@ export default function AdminDashboard() {
   const [ultimosServicos, setUltimosServicos] = useState<UltimoServico[]>([])
   const [loading, setLoading] = useState(true)
   const [servicosDisponiveis, setServicosDisponiveis] = useState(0)
+  const [dadosSemana, setDadosSemana] = useState<DadosSemana | null>(null)
   const isMobile = useIsMobile()
 
   useEffect(() => {
@@ -126,11 +147,102 @@ export default function AdminDashboard() {
 
       setUltimosServicos(servicosFormatados)
 
+      // Calcular semana atual (segunda a sábado)
+      const hoje = new Date()
+      const diaSemana = hoje.getDay()
+      const inicioSemana = new Date(hoje)
+      // Se for domingo (0), volta 6 dias para segunda anterior
+      // Se for outro dia, volta (dia-1) para segunda
+      inicioSemana.setDate(hoje.getDate() - (diaSemana === 0 ? 6 : diaSemana - 1))
+      inicioSemana.setHours(0, 0, 0, 0)
+
+      const fimSemana = new Date(inicioSemana)
+      fimSemana.setDate(inicioSemana.getDate() + 5) // Sábado
+      fimSemana.setHours(23, 59, 59, 999)
+
+      // Calcular número da semana
+      const startOfYear = new Date(hoje.getFullYear(), 0, 1)
+      const weekNumber = Math.ceil(((hoje.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7)
+
+      // Buscar serviços concluídos da semana
+      const { data: servicosSemana } = await supabase
+        .from('servicos')
+        .select(`
+          instalador_id,
+          valor_total,
+          data_servico_agendada,
+          instalador:usuarios!fk_servicos_instalador(nome)
+        `)
+        .eq('empresa_id', userData.empresa_id)
+        .eq('status', 'concluido')
+        .gte('data_servico_agendada', inicioSemana.toISOString())
+        .lte('data_servico_agendada', fimSemana.toISOString())
+        .not('instalador_id', 'is', null)
+
+      // Agrupar por instalador e dia
+      const instaladoresMap: Record<string, DadosInstaladorSemana> = {}
+
+      servicosSemana?.forEach((s: any) => {
+        if (!s.instalador_id) return
+        
+        const dataServico = new Date(s.data_servico_agendada)
+        const diaSemanaServico = dataServico.getDay() // 0=dom, 1=seg, ..., 6=sab
+
+        if (!instaladoresMap[s.instalador_id]) {
+          instaladoresMap[s.instalador_id] = {
+            instalador_id: s.instalador_id,
+            instalador_nome: s.instalador?.nome || 'Sem nome',
+            dias: {},
+            total_quantidade: 0,
+            total_valor: 0
+          }
+        }
+
+        if (!instaladoresMap[s.instalador_id].dias[diaSemanaServico]) {
+          instaladoresMap[s.instalador_id].dias[diaSemanaServico] = { quantidade: 0, valor: 0 }
+        }
+
+        instaladoresMap[s.instalador_id].dias[diaSemanaServico].quantidade += 1
+        instaladoresMap[s.instalador_id].dias[diaSemanaServico].valor += Number(s.valor_total) || 0
+        instaladoresMap[s.instalador_id].total_quantidade += 1
+        instaladoresMap[s.instalador_id].total_valor += Number(s.valor_total) || 0
+      })
+
+      setDadosSemana({
+        numero_semana: weekNumber,
+        inicio: inicioSemana,
+        fim: fimSemana,
+        instaladores: Object.values(instaladoresMap).sort((a, b) => b.total_valor - a.total_valor)
+      })
+
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
     } finally {
       setLoading(false)
     }
+  }
+
+  const diasSemana = [
+    { key: 1, label: 'segunda' },
+    { key: 2, label: 'terça' },
+    { key: 3, label: 'quarta' },
+    { key: 4, label: 'quinta' },
+    { key: 5, label: 'sexta' },
+    { key: 6, label: 'sábado' }
+  ]
+
+  const formatarValorCurto = (valor: number) => {
+    if (valor >= 1000) {
+      return `R$${(valor / 1000).toFixed(1)}k`
+    }
+    return `R$${valor.toFixed(0)}`
+  }
+
+  const getDataDia = (diaKey: number) => {
+    if (!dadosSemana) return ''
+    const data = new Date(dadosSemana.inicio)
+    data.setDate(data.getDate() + (diaKey - 1))
+    return `${data.getDate().toString().padStart(2, '0')}/${(data.getMonth() + 1).toString().padStart(2, '0')}`
   }
 
   function getStatusBadge(status: string) {
@@ -208,6 +320,58 @@ export default function AdminDashboard() {
               </div>
             </Link>
           </div>
+
+          {/* Tabela Semanal de Serviços - Mobile */}
+          {dadosSemana && dadosSemana.instaladores.length > 0 && (
+            <div>
+              <h2 className="text-lg font-bold mb-3">📊 Semana {dadosSemana.numero_semana}</h2>
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-2 py-2 text-left font-medium text-gray-600 sticky left-0 bg-gray-50">Instalador</th>
+                        {diasSemana.map(dia => (
+                          <th key={dia.key} className="px-2 py-2 text-center font-medium text-gray-600 min-w-[60px]">
+                            {dia.label.slice(0, 3)}
+                          </th>
+                        ))}
+                        <th className="px-2 py-2 text-center font-medium text-gray-600 bg-gray-100">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {dadosSemana.instaladores.map((instalador, idx) => (
+                        <tr key={instalador.instalador_id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                          <td className="px-2 py-2 font-medium text-gray-900 sticky left-0 bg-inherit whitespace-nowrap">
+                            {instalador.instalador_nome.split(' ')[0]}
+                          </td>
+                          {diasSemana.map(dia => {
+                            const dados = instalador.dias[dia.key]
+                            return (
+                              <td key={dia.key} className="px-2 py-2 text-center">
+                                {dados ? (
+                                  <div>
+                                    <div className="font-bold text-gray-900">{dados.quantidade}</div>
+                                    <div className="text-gray-500 text-[10px]">{formatarValorCurto(dados.valor)}</div>
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-300">-</span>
+                                )}
+                              </td>
+                            )
+                          })}
+                          <td className="px-2 py-2 text-center bg-gray-100">
+                            <div className="font-bold text-gray-900">{instalador.total_quantidade}</div>
+                            <div className="text-green-600 text-[10px] font-medium">{formatarValorCurto(instalador.total_valor)}</div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Links Rápidos */}
           <div className="space-y-2">
@@ -341,6 +505,56 @@ export default function AdminDashboard() {
             </Link>
           </div>
         </div>
+
+        {/* Tabela Semanal de Serviços por Instalador - Desktop */}
+        {dadosSemana && dadosSemana.instaladores.length > 0 && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-bold mb-4">📊 Semana {dadosSemana.numero_semana} - Serviços por Instalador</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Instalador</th>
+                    {diasSemana.map(dia => (
+                      <th key={dia.key} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                        {dia.label}<br />
+                        <span className="text-[10px] text-gray-400 font-normal">{getDataDia(dia.key)}</span>
+                      </th>
+                    ))}
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase bg-gray-100">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {dadosSemana.instaladores.map((instalador, idx) => (
+                    <tr key={instalador.instalador_id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{instalador.instalador_nome}</td>
+                      {diasSemana.map(dia => {
+                        const dados = instalador.dias[dia.key]
+                        return (
+                          <td key={dia.key} className="px-4 py-3 text-center">
+                            {dados ? (
+                              <div>
+                                <span className="font-bold text-gray-900">{dados.quantidade}</span>
+                                <span className="text-gray-500 mx-1">-</span>
+                                <span className="text-green-600 font-medium">R${dados.valor.toFixed(0)}</span>
+                              </div>
+                            ) : (
+                              <span className="text-gray-300">0 - R$0</span>
+                            )}
+                          </td>
+                        )
+                      })}
+                      <td className="px-4 py-3 text-center bg-gray-100">
+                        <div className="font-bold text-gray-900">{instalador.total_quantidade} serviços</div>
+                        <div className="text-green-600 font-medium">R${instalador.total_valor.toFixed(2)}</div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Últimos Serviços */}
         <div className="bg-white rounded-lg shadow p-6">
