@@ -1127,6 +1127,8 @@ export default function ListaCotacoes() {
                   <SelectItem value="nao_gerou_longe">Local muito longe</SelectItem>
                   <SelectItem value="nao_gerou_caro">Cliente achou caro</SelectItem>
                   <SelectItem value="nao_gerou_cliente_sumiu">Cliente sumiu/não respondeu</SelectItem>
+                  <SelectItem value="nao_gerou_instalador_atrasou">Instalador atrasou</SelectItem>
+                  <SelectItem value="nao_gerou_chamou_outra">Chamou outra pessoa</SelectItem>
                 </SelectContent>
               </Select>
             </div>
