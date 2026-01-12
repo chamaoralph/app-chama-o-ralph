@@ -1,6 +1,6 @@
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
-import { UserPlus, CheckCircle, Eye, User, Wrench, Calendar } from 'lucide-react'
+import { UserPlus, CheckCircle, Eye, User, Wrench, Calendar, RefreshCw } from 'lucide-react'
 import { formatarDataBR } from '@/lib/utils'
 
 interface Servico {
@@ -26,6 +26,7 @@ interface MobileServicoCardAdminProps {
   onToggleSelect: () => void
   onAtribuir: () => void
   onFinalizar: () => void
+  onAlterarStatus: () => void
   onVerDetalhes: () => void
 }
 
@@ -35,6 +36,7 @@ export function MobileServicoCardAdmin({
   onToggleSelect,
   onAtribuir,
   onFinalizar,
+  onAlterarStatus,
   onVerDetalhes
 }: MobileServicoCardAdminProps) {
   // Abreviar código: SRV-2025-048 -> #048
@@ -119,12 +121,12 @@ export function MobileServicoCardAdmin({
       </div>
 
       {/* Ações */}
-      <div className="flex gap-2 mt-2">
+      <div className="flex gap-2 mt-2 flex-wrap">
         {podeAtribuir && (
           <Button
             size="sm"
             variant="outline"
-            className="flex-1 text-xs"
+            className="flex-1 text-xs min-w-[80px]"
             onClick={onAtribuir}
           >
             <UserPlus className="w-3.5 h-3.5 mr-1" />
@@ -135,7 +137,7 @@ export function MobileServicoCardAdmin({
           <Button
             size="sm"
             variant="outline"
-            className="flex-1 text-xs text-green-600 border-green-200 hover:bg-green-50"
+            className="flex-1 text-xs text-green-600 border-green-200 hover:bg-green-50 min-w-[80px]"
             onClick={onFinalizar}
           >
             <CheckCircle className="w-3.5 h-3.5 mr-1" />
@@ -144,8 +146,17 @@ export function MobileServicoCardAdmin({
         )}
         <Button
           size="sm"
+          variant="outline"
+          className="flex-1 text-xs text-amber-600 border-amber-200 hover:bg-amber-50 min-w-[80px]"
+          onClick={onAlterarStatus}
+        >
+          <RefreshCw className="w-3.5 h-3.5 mr-1" />
+          Status
+        </Button>
+        <Button
+          size="sm"
           variant="default"
-          className="flex-1 text-xs"
+          className="flex-1 text-xs min-w-[80px]"
           onClick={onVerDetalhes}
         >
           <Eye className="w-3.5 h-3.5 mr-1" />
