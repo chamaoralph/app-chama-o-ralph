@@ -9,6 +9,7 @@ export default function Caixa() {
   const [lancamentos, setLancamentos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtroMes, setFiltroMes] = useState("");
+  const [filtroTipo, setFiltroTipo] = useState<"todos" | "receitas" | "despesas_gerais" | "instaladores">("todos");
 
   useEffect(() => {
     // Setar mês atual como padrão
@@ -63,6 +64,21 @@ export default function Caixa() {
 
   const saldo = totalReceitas - totalDespesasGerais - totalInstaladores;
 
+  // Lançamentos filtrados para exibição
+  const lancamentosFiltrados = lancamentos.filter((l) => {
+    if (filtroTipo === "receitas") return l.tipo === "receita";
+    if (filtroTipo === "despesas_gerais") return l.tipo === "despesa" && !CATEGORIAS_INSTALADORES.has(l.categoria);
+    if (filtroTipo === "instaladores") return CATEGORIAS_INSTALADORES.has(l.categoria);
+    return true;
+  });
+
+  const getTituloFiltro = () => {
+    if (filtroTipo === "receitas") return "Receitas";
+    if (filtroTipo === "despesas_gerais") return "Despesas Gerais";
+    if (filtroTipo === "instaladores") return "Pagamentos Instaladores";
+    return "Todos os Lançamentos";
+  };
+
   return (
     <AdminLayout>
       <div>
@@ -82,17 +98,32 @@ export default function Caixa() {
 
         {/* Cards de Resumo */}
         <div className="grid grid-cols-4 gap-4 mb-6">
-          <div className="bg-green-50 border-2 border-green-200 rounded-lg p-6">
+          <div 
+            onClick={() => setFiltroTipo(filtroTipo === "receitas" ? "todos" : "receitas")}
+            className={`bg-green-50 border-2 rounded-lg p-6 cursor-pointer transition-all hover:shadow-lg ${
+              filtroTipo === "receitas" ? "border-green-500 ring-2 ring-green-300" : "border-green-200"
+            }`}
+          >
             <p className="text-sm text-green-600 font-medium mb-1">RECEITAS</p>
             <p className="text-3xl font-bold text-green-700">R$ {totalReceitas.toFixed(2)}</p>
           </div>
 
-          <div className="bg-red-50 border-2 border-red-200 rounded-lg p-6">
+          <div 
+            onClick={() => setFiltroTipo(filtroTipo === "despesas_gerais" ? "todos" : "despesas_gerais")}
+            className={`bg-red-50 border-2 rounded-lg p-6 cursor-pointer transition-all hover:shadow-lg ${
+              filtroTipo === "despesas_gerais" ? "border-red-500 ring-2 ring-red-300" : "border-red-200"
+            }`}
+          >
             <p className="text-sm text-red-600 font-medium mb-1">DESPESAS GERAIS</p>
             <p className="text-3xl font-bold text-red-700">R$ {totalDespesasGerais.toFixed(2)}</p>
           </div>
 
-          <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-6">
+          <div 
+            onClick={() => setFiltroTipo(filtroTipo === "instaladores" ? "todos" : "instaladores")}
+            className={`bg-purple-50 border-2 rounded-lg p-6 cursor-pointer transition-all hover:shadow-lg ${
+              filtroTipo === "instaladores" ? "border-purple-500 ring-2 ring-purple-300" : "border-purple-200"
+            }`}
+          >
             <p className="text-sm text-purple-600 font-medium mb-1">INSTALADORES</p>
             <p className="text-3xl font-bold text-purple-700">R$ {totalInstaladores.toFixed(2)}</p>
           </div>
@@ -109,12 +140,25 @@ export default function Caixa() {
           </div>
         </div>
 
+        {/* Título com filtro ativo */}
+        {filtroTipo !== "todos" && (
+          <div className="flex items-center gap-2 mb-4">
+            <h2 className="text-xl font-semibold">{getTituloFiltro()}</h2>
+            <button 
+              onClick={() => setFiltroTipo("todos")}
+              className="text-sm text-gray-500 hover:text-gray-700 underline"
+            >
+              (ver todos)
+            </button>
+          </div>
+        )}
+
         {/* Lista de Lançamentos */}
         {loading ? (
           <div className="flex justify-center items-center h-64">
             <div className="text-gray-500">Carregando...</div>
           </div>
-        ) : lancamentos.length === 0 ? (
+        ) : lancamentosFiltrados.length === 0 ? (
           <div className="bg-white rounded-lg shadow p-8 text-center">
             <p className="text-gray-500">Nenhum lançamento neste período</p>
           </div>
@@ -132,7 +176,7 @@ export default function Caixa() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {lancamentos.map((lanc) => (
+                {lancamentosFiltrados.map((lanc) => (
                   <tr key={lanc.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       {new Date(lanc.data_lancamento).toLocaleDateString("pt-BR")}
