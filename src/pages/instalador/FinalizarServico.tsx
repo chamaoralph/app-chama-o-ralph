@@ -18,8 +18,8 @@ async function comprimirImagem(file: File, qualidade = 0.7): Promise<File> {
     const img = new Image();
 
     img.onload = () => {
-      // Redimensionar se muito grande (máx 1920px)
-      const maxSize = 1920;
+      // Redimensionar se muito grande (máx 1000px)
+      const maxSize = 1000;
       let { width, height } = img;
 
       if (width > maxSize || height > maxSize) {
