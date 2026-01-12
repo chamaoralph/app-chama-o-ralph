@@ -235,7 +235,7 @@ export default function Caixa() {
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Gráfico Pizza */}
-              <div className="h-80">
+              <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -244,7 +244,7 @@ export default function Caixa() {
                       nameKey="categoria"
                       cx="50%"
                       cy="50%"
-                      outerRadius={100}
+                      outerRadius={90}
                       label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                     >
                       {dadosGraficoDespesas.map((_, index) => (
