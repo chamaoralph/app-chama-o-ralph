@@ -252,7 +252,6 @@ export default function Caixa() {
                       ))}
                     </Pie>
                     <Tooltip content={<CustomTooltip />} />
-                    <Legend />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
