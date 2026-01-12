@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { formatarDataBR } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -327,7 +328,7 @@ export function PagamentosInstaladores() {
               {recibosFiltrados.map((recibo) => (
                 <TableRow key={recibo.id}>
                   <TableCell>
-                    {format(new Date(recibo.data_referencia), 'dd/MM/yyyy', { locale: ptBR })}
+                    {formatarDataBR(recibo.data_referencia)}
                   </TableCell>
                   <TableCell className="font-medium">{recibo.instalador_nome}</TableCell>
                   <TableCell className="text-center">{recibo.quantidade_servicos}</TableCell>
@@ -388,7 +389,7 @@ export function PagamentosInstaladores() {
             <div className="space-y-4">
               <div className="bg-muted p-4 rounded-lg space-y-2">
                 <p><strong>Instalador:</strong> {reciboSelecionado.instalador_nome}</p>
-                <p><strong>Data do Recibo:</strong> {format(new Date(reciboSelecionado.data_referencia), 'dd/MM/yyyy')}</p>
+                <p><strong>Data do Recibo:</strong> {formatarDataBR(reciboSelecionado.data_referencia)}</p>
                 <p><strong>Mão de Obra:</strong> R$ {reciboSelecionado.valor_mao_obra.toFixed(2)}</p>
                 <p><strong>Reembolso:</strong> R$ {reciboSelecionado.valor_reembolso.toFixed(2)}</p>
                 <p className="text-lg font-bold text-primary">
