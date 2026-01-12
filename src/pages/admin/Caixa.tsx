@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
+import { formatarDataBR } from "@/lib/utils";
 
 // Categorias consideradas como custos de instaladores
 const CATEGORIAS_INSTALADORES = new Set(["Pagamento Instalador", "Reembolso Materiais"]);
@@ -376,7 +377,7 @@ export default function Caixa() {
                 {lancamentosOrdenados.map((lanc) => (
                   <tr key={lanc.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {new Date(lanc.data_lancamento).toLocaleDateString("pt-BR")}
+                      {formatarDataBR(lanc.data_lancamento)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
