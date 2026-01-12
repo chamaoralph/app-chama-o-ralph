@@ -302,7 +302,13 @@ export default function Aprovacoes() {
         {servicos.length === 0 ? (
           <Card>
             <CardContent className="p-8 text-center">
-              <p className="text-gray-500">Nenhum serviço aguardando aprovação</p>
+              <p className="text-gray-500">
+                {filtroStatus === 'pendentes' 
+                  ? 'Nenhum serviço aguardando aprovação' 
+                  : filtroStatus === 'aprovados'
+                  ? 'Nenhum serviço aprovado encontrado'
+                  : 'Nenhum serviço encontrado'}
+              </p>
             </CardContent>
           </Card>
         ) : (
@@ -320,8 +326,21 @@ export default function Aprovacoes() {
                         Instalador: {servico.instalador_nome || 'Não atribuído'}
                       </p>
                     </div>
-                    <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
-                      Aguardando Aprovação
+                    <Badge 
+                      variant="outline" 
+                      className={
+                        servico.status === 'concluido' 
+                          ? 'bg-green-50 text-green-700 border-green-200'
+                          : servico.status === 'correcao_solicitada'
+                          ? 'bg-red-50 text-red-700 border-red-200'
+                          : 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                      }
+                    >
+                      {servico.status === 'concluido' 
+                        ? 'Aprovado' 
+                        : servico.status === 'correcao_solicitada'
+                        ? 'Correção Solicitada'
+                        : 'Aguardando Aprovação'}
                     </Badge>
                   </div>
                 </CardHeader>
