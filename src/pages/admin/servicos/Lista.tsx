@@ -7,9 +7,10 @@ import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
-import { UserPlus, Users, CheckCircle, ArrowUpDown, ArrowUp, ArrowDown, Calendar, User, DollarSign } from 'lucide-react'
+import { UserPlus, Users, CheckCircle, ArrowUpDown, ArrowUp, ArrowDown, Calendar, User, DollarSign, RefreshCw } from 'lucide-react'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { MobileServicoCardAdmin } from '@/components/admin/MobileServicoCardAdmin'
 import { formatarDataBR } from '@/lib/utils'
@@ -61,6 +62,14 @@ export default function ListaServicos() {
   const [modalAberto, setModalAberto] = useState(false)
   const [instaladorSelecionado, setInstaladorSelecionado] = useState<string>("")
   const [servicoParaAtribuir, setServicoParaAtribuir] = useState<string | null>(null)
+  
+  // Estado para confirmação de finalização
+  const [servicoParaFinalizar, setServicoParaFinalizar] = useState<string | null>(null)
+  
+  // Estado para modal de alterar status
+  const [modalStatusAberto, setModalStatusAberto] = useState(false)
+  const [servicoParaMudarStatus, setServicoParaMudarStatus] = useState<Servico | null>(null)
+  const [novoStatus, setNovoStatus] = useState<string>("")
   
   // Estado para ordenação
   const [sortField, setSortField] = useState<SortField>('data_servico_agendada')
@@ -198,7 +207,13 @@ export default function ListaServicos() {
     }
   }
 
-  async function finalizarComoAdmin(servicoId: string) {
+  function abrirConfirmacaoFinalizar(servicoId: string) {
+    setServicoParaFinalizar(servicoId)
+  }
+
+  async function confirmarFinalizacao() {
+    if (!servicoParaFinalizar) return
+    
     try {
       const { error } = await supabase
         .from('servicos')
@@ -206,7 +221,7 @@ export default function ListaServicos() {
           status: 'concluido',
           observacoes_instalador: 'Finalizado pelo administrador'
         })
-        .eq('id', servicoId)
+        .eq('id', servicoParaFinalizar)
 
       if (error) throw error
 
@@ -215,6 +230,7 @@ export default function ListaServicos() {
         description: "O serviço foi finalizado pelo administrador",
       })
 
+      setServicoParaFinalizar(null)
       fetchServicos()
     } catch (err) {
       console.error('Erro ao finalizar serviço:', err)
@@ -224,6 +240,55 @@ export default function ListaServicos() {
         variant: "destructive",
       })
     }
+  }
+
+  function abrirModalAlterarStatus(servico: Servico) {
+    setServicoParaMudarStatus(servico)
+    setNovoStatus(servico.status)
+    setModalStatusAberto(true)
+  }
+
+  async function confirmarAlteracaoStatus() {
+    if (!servicoParaMudarStatus || !novoStatus) return
+
+    try {
+      const { error } = await supabase
+        .from('servicos')
+        .update({ status: novoStatus })
+        .eq('id', servicoParaMudarStatus.id)
+
+      if (error) throw error
+
+      toast({
+        title: "Status alterado",
+        description: `O serviço foi alterado para "${getStatusLabel(novoStatus)}"`,
+      })
+
+      setModalStatusAberto(false)
+      setServicoParaMudarStatus(null)
+      fetchServicos()
+    } catch (err) {
+      console.error('Erro ao alterar status:', err)
+      toast({
+        title: "Erro",
+        description: "Não foi possível alterar o status do serviço",
+        variant: "destructive",
+      })
+    }
+  }
+
+  function getStatusLabel(status: string): string {
+    const labels: Record<string, string> = {
+      aguardando_distribuicao: 'Aguardando Distribuição',
+      disponivel: 'Disponível',
+      solicitado: 'Solicitado',
+      atribuido: 'Atribuído',
+      em_andamento: 'Em Andamento',
+      aguardando_aprovacao: 'Aguardando Aprovação',
+      concluido: 'Concluído',
+      cancelado: 'Cancelado',
+    }
+    return labels[status] || status
   }
 
   const getStatusBadge = (status: string, observacoes?: string | null) => {
@@ -405,7 +470,8 @@ export default function ListaServicos() {
                     isSelected={servicosSelecionados.has(servico.id)}
                     onToggleSelect={() => toggleSelecao(servico.id)}
                     onAtribuir={() => abrirModalAtribuicao(servico.id)}
-                    onFinalizar={() => finalizarComoAdmin(servico.id)}
+                    onFinalizar={() => abrirConfirmacaoFinalizar(servico.id)}
+                    onAlterarStatus={() => abrirModalAlterarStatus(servico)}
                     onVerDetalhes={() => navigate(`/admin/servicos/${servico.id}`)}
                   />
                 ))}
@@ -557,13 +623,20 @@ export default function ListaServicos() {
                           )}
                           {(servico.status === 'em_andamento' || servico.status === 'atribuido') && (
                             <button
-                              onClick={() => finalizarComoAdmin(servico.id)}
+                              onClick={() => abrirConfirmacaoFinalizar(servico.id)}
                               className="text-green-600 hover:text-green-800 font-medium"
                             >
                               <CheckCircle className="w-4 h-4 inline mr-1" />
                               Finalizar
                             </button>
                           )}
+                          <button
+                            onClick={() => abrirModalAlterarStatus(servico)}
+                            className="text-amber-600 hover:text-amber-800 font-medium"
+                          >
+                            <RefreshCw className="w-4 h-4 inline mr-1" />
+                            Alterar Status
+                          </button>
                           <button
                             onClick={() => navigate(`/admin/servicos/${servico.id}`)}
                             className="text-blue-600 hover:text-blue-800 font-medium"
@@ -622,6 +695,75 @@ export default function ListaServicos() {
             </Button>
             <Button onClick={confirmarAtribuicao} disabled={!instaladorSelecionado}>
               Confirmar Atribuição
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* AlertDialog de Confirmação de Finalização */}
+      <AlertDialog open={!!servicoParaFinalizar} onOpenChange={(open) => !open && setServicoParaFinalizar(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Finalizar Serviço?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja marcar este serviço como concluído? O status será alterado para "Concluído" e ficará registrado que foi finalizado pelo administrador.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmarFinalizacao} className="bg-green-600 hover:bg-green-700">
+              Confirmar Finalização
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Modal de Alterar Status */}
+      <Dialog open={modalStatusAberto} onOpenChange={setModalStatusAberto}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Alterar Status do Serviço</DialogTitle>
+          </DialogHeader>
+          
+          {servicoParaMudarStatus && (
+            <div className="py-4 space-y-4">
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Serviço:</p>
+                <p className="font-medium">{servicoParaMudarStatus.codigo}</p>
+                <p className="text-sm text-muted-foreground mt-2">Status atual:</p>
+                <p className="font-medium">{getStatusLabel(servicoParaMudarStatus.status)}</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Novo Status</Label>
+                <Select value={novoStatus} onValueChange={setNovoStatus}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o novo status..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="aguardando_distribuicao">Aguardando Distribuição</SelectItem>
+                    <SelectItem value="disponivel">Disponível</SelectItem>
+                    <SelectItem value="solicitado">Solicitado</SelectItem>
+                    <SelectItem value="atribuido">Atribuído</SelectItem>
+                    <SelectItem value="em_andamento">Em Andamento</SelectItem>
+                    <SelectItem value="aguardando_aprovacao">Aguardando Aprovação</SelectItem>
+                    <SelectItem value="concluido">Concluído</SelectItem>
+                    <SelectItem value="cancelado">Cancelado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setModalStatusAberto(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={confirmarAlteracaoStatus} 
+              disabled={!novoStatus || novoStatus === servicoParaMudarStatus?.status}
+            >
+              Salvar Status
             </Button>
           </DialogFooter>
         </DialogContent>
