@@ -10,6 +10,17 @@ export default function Caixa() {
   const [loading, setLoading] = useState(true);
   const [filtroMes, setFiltroMes] = useState("");
   const [filtroTipo, setFiltroTipo] = useState<"todos" | "receitas" | "despesas_gerais" | "instaladores">("todos");
+  const [ordenacao, setOrdenacao] = useState<{
+    coluna: "data" | "tipo" | "categoria" | "descricao" | "forma_pagamento" | "valor";
+    direcao: "asc" | "desc";
+  }>({ coluna: "data", direcao: "desc" });
+
+  const alternarOrdenacao = (coluna: typeof ordenacao.coluna) => {
+    setOrdenacao(prev => ({
+      coluna,
+      direcao: prev.coluna === coluna && prev.direcao === "asc" ? "desc" : "asc"
+    }));
+  };
 
   useEffect(() => {
     // Setar mês atual como padrão
@@ -70,6 +81,28 @@ export default function Caixa() {
     if (filtroTipo === "despesas_gerais") return l.tipo === "despesa" && !CATEGORIAS_INSTALADORES.has(l.categoria);
     if (filtroTipo === "instaladores") return CATEGORIAS_INSTALADORES.has(l.categoria);
     return true;
+  });
+
+  // Lançamentos ordenados
+  const lancamentosOrdenados = [...lancamentosFiltrados].sort((a, b) => {
+    const direcao = ordenacao.direcao === "asc" ? 1 : -1;
+    
+    switch (ordenacao.coluna) {
+      case "data":
+        return (new Date(a.data_lancamento).getTime() - new Date(b.data_lancamento).getTime()) * direcao;
+      case "tipo":
+        return a.tipo.localeCompare(b.tipo) * direcao;
+      case "categoria":
+        return (a.categoria || "").localeCompare(b.categoria || "") * direcao;
+      case "descricao":
+        return (a.descricao || "").localeCompare(b.descricao || "") * direcao;
+      case "forma_pagamento":
+        return (a.forma_pagamento || "").localeCompare(b.forma_pagamento || "") * direcao;
+      case "valor":
+        return (Number(a.valor) - Number(b.valor)) * direcao;
+      default:
+        return 0;
+    }
   });
 
   const getTituloFiltro = () => {
@@ -167,16 +200,76 @@ export default function Caixa() {
             <table className="min-w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Forma Pgto</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Valor</th>
+                  <th 
+                    onClick={() => alternarOrdenacao("data")}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Data
+                      {ordenacao.coluna === "data" && (
+                        <span>{ordenacao.direcao === "asc" ? "↑" : "↓"}</span>
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => alternarOrdenacao("tipo")}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Tipo
+                      {ordenacao.coluna === "tipo" && (
+                        <span>{ordenacao.direcao === "asc" ? "↑" : "↓"}</span>
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => alternarOrdenacao("categoria")}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Categoria
+                      {ordenacao.coluna === "categoria" && (
+                        <span>{ordenacao.direcao === "asc" ? "↑" : "↓"}</span>
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => alternarOrdenacao("descricao")}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Descrição
+                      {ordenacao.coluna === "descricao" && (
+                        <span>{ordenacao.direcao === "asc" ? "↑" : "↓"}</span>
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => alternarOrdenacao("forma_pagamento")}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Forma Pgto
+                      {ordenacao.coluna === "forma_pagamento" && (
+                        <span>{ordenacao.direcao === "asc" ? "↑" : "↓"}</span>
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => alternarOrdenacao("valor")}
+                    className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      Valor
+                      {ordenacao.coluna === "valor" && (
+                        <span>{ordenacao.direcao === "asc" ? "↑" : "↓"}</span>
+                      )}
+                    </div>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {lancamentosFiltrados.map((lanc) => (
+                {lancamentosOrdenados.map((lanc) => (
                   <tr key={lanc.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       {new Date(lanc.data_lancamento).toLocaleDateString("pt-BR")}
