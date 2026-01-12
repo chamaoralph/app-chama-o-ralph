@@ -4,6 +4,60 @@ import { InstaladorLayout } from "@/components/layout/InstaladorLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
+// Função para comprimir imagens antes do upload
+async function comprimirImagem(file: File, qualidade = 0.7): Promise<File> {
+  return new Promise((resolve, reject) => {
+    // Se não for imagem, retorna o arquivo original
+    if (!file.type.startsWith('image/')) {
+      resolve(file);
+      return;
+    }
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+
+    img.onload = () => {
+      // Redimensionar se muito grande (máx 1920px)
+      const maxSize = 1920;
+      let { width, height } = img;
+
+      if (width > maxSize || height > maxSize) {
+        const ratio = Math.min(maxSize / width, maxSize / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      ctx?.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            const nomeArquivo = file.name.replace(/\.[^/.]+$/, '.jpg');
+            resolve(new File([blob], nomeArquivo, { type: 'image/jpeg' }));
+          } else {
+            reject(new Error('Falha ao comprimir imagem'));
+          }
+        },
+        'image/jpeg',
+        qualidade
+      );
+    };
+
+    img.onerror = () => reject(new Error('Falha ao carregar imagem'));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+// Formata tamanho em bytes para exibição legível
+function formatarTamanho(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+}
+
 export default function FinalizarServico() {
   const { id: servicoId } = useParams();
   const navigate = useNavigate();
@@ -17,6 +71,7 @@ export default function FinalizarServico() {
   const [notaFiscal, setNotaFiscal] = useState<File | null>(null);
   const [valorReembolso, setValorReembolso] = useState("");
   const [observacoes, setObservacoes] = useState("");
+  const [comprimindo, setComprimindo] = useState(false);
 
   useEffect(() => {
     console.log("servicoId da URL:", servicoId);
@@ -94,17 +149,26 @@ export default function FinalizarServico() {
     setEnviando(true);
 
     try {
-      // Armazena apenas o path do arquivo (não URL pública, pois o bucket é privado)
+      // Comprimir e fazer upload das fotos
       const fotosPaths: string[] = [];
       for (let i = 0; i < fotos.length; i++) {
         const foto = fotos[i];
+        
+        // Comprimir imagem antes do upload
+        const fotoComprimida = await comprimirImagem(foto, 0.7);
         const fileName = `${servicoId}/${Date.now()}_${i}.jpg`;
 
-        const { error: uploadError } = await supabase.storage.from("fotos-servicos").upload(fileName, foto);
+        const { error: uploadError } = await supabase.storage
+          .from("fotos-servicos")
+          .upload(fileName, fotoComprimida);
 
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          if (uploadError.message?.includes('payload too large') || uploadError.message?.includes('file size')) {
+            throw new Error(`Foto ${i + 1} muito grande. Máximo: 5MB`);
+          }
+          throw uploadError;
+        }
 
-        // Salva apenas o path, não a URL pública
         fotosPaths.push(fileName);
       }
 
@@ -196,10 +260,25 @@ export default function FinalizarServico() {
               multiple
               accept="image/*"
               required
-              onChange={(e) => setFotos(Array.from(e.target.files || []))}
+              onChange={async (e) => {
+                const arquivos = Array.from(e.target.files || []);
+                setFotos(arquivos);
+              }}
               className="w-full px-3 py-2 border rounded-md"
             />
-            <p className="text-sm text-gray-500 mt-1">{fotos.length} foto(s) selecionada(s)</p>
+            <div className="flex flex-wrap gap-2 mt-1">
+              <p className="text-sm text-muted-foreground">
+                {fotos.length} foto(s) selecionada(s)
+              </p>
+              {fotos.length > 0 && (
+                <p className="text-sm text-muted-foreground">
+                  • Total: {formatarTamanho(fotos.reduce((acc, f) => acc + f.size, 0))}
+                </p>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              💡 As fotos serão comprimidas automaticamente antes do envio (máx 5MB cada)
+            </p>
           </div>
 
           <div>
