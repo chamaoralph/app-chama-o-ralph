@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client'
 import { Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/hooks/use-toast'
+import { formatarDataBR } from '@/lib/utils'
 
 
 interface Despesa {
@@ -348,7 +349,7 @@ export default function Despesas() {
                   {despesasSalvas.map((despesa) => (
                     <tr key={despesa.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-sm">
-                        {new Date(despesa.data_lancamento).toLocaleDateString('pt-BR')}
+                        {formatarDataBR(despesa.data_lancamento)}
                       </td>
                       <td className="px-4 py-3 text-sm font-medium">{despesa.categoria}</td>
                       <td className="px-4 py-3 text-sm">{despesa.descricao}</td>
