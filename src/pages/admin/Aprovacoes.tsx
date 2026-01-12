@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { CheckCircle, XCircle, Loader2 } from 'lucide-react'
+import { CheckCircle, XCircle, Loader2, Trash2 } from 'lucide-react'
 import { formatarDataBR } from '@/lib/utils'
 
 interface Servico {
@@ -35,6 +35,7 @@ export default function Aprovacoes() {
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [filtroStatus, setFiltroStatus] = useState<'todos' | 'pendentes' | 'aprovados'>('pendentes')
   const [signedUrls, setSignedUrls] = useState<Record<string, string[]>>({})
+  const [fotoPaths, setFotoPaths] = useState<Record<string, string[]>>({})
 
   useEffect(() => {
     fetchServicos()
@@ -74,10 +75,12 @@ export default function Aprovacoes() {
 
       setServicos(servicosFormatados)
 
-      // Gerar URLs assinadas para as fotos
+      // Gerar URLs assinadas para as fotos e salvar paths originais
       const urlsMap: Record<string, string[]> = {}
+      const pathsMap: Record<string, string[]> = {}
       for (const servico of servicosFormatados) {
         if (servico.fotos_conclusao && servico.fotos_conclusao.length > 0) {
+          pathsMap[servico.id] = servico.fotos_conclusao
           const urls = await Promise.all(
             servico.fotos_conclusao.map(async (path: string) => {
               const url = await getSignedUrl(path)
@@ -88,6 +91,7 @@ export default function Aprovacoes() {
         }
       }
       setSignedUrls(urlsMap)
+      setFotoPaths(pathsMap)
     } catch (error) {
       console.error('Erro ao buscar serviços:', error)
       toast.error('Erro ao carregar serviços')
@@ -183,6 +187,53 @@ export default function Aprovacoes() {
       toast.error('Erro ao desaprovar serviço')
     } finally {
       setProcessingId(null)
+    }
+  }
+
+  async function excluirFoto(servicoId: string, fotoPath: string, fotoIndex: number) {
+    if (!confirm('Tem certeza que deseja excluir esta foto? Esta ação não pode ser desfeita.')) {
+      return
+    }
+    
+    try {
+      // Extrair o path correto se for URL
+      let path = fotoPath
+      if (fotoPath.startsWith('http://') || fotoPath.startsWith('https://')) {
+        const match = fotoPath.match(/fotos-servicos\/(.+)$/)
+        if (match) {
+          path = match[1]
+        }
+      }
+      
+      // 1. Remover arquivo do storage
+      const { error: storageError } = await supabase.storage
+        .from('fotos-servicos')
+        .remove([path])
+      
+      if (storageError) {
+        console.error('Erro ao remover do storage:', storageError)
+        // Continuar mesmo se falhar no storage (arquivo pode não existir)
+      }
+      
+      // 2. Atualizar array no banco de dados
+      const servico = servicos.find(s => s.id === servicoId)
+      if (!servico) throw new Error('Serviço não encontrado')
+      
+      const novasFotos = servico.fotos_conclusao.filter((_, idx) => idx !== fotoIndex)
+      
+      const { error: dbError } = await supabase
+        .from('servicos')
+        .update({ fotos_conclusao: novasFotos })
+        .eq('id', servicoId)
+      
+      if (dbError) throw dbError
+      
+      toast.success('Foto excluída com sucesso!')
+      fetchServicos()
+      
+    } catch (error: any) {
+      console.error('Erro ao excluir foto:', error)
+      toast.error('Erro ao excluir foto: ' + error.message)
     }
   }
 
@@ -416,13 +467,26 @@ export default function Aprovacoes() {
                     {(signedUrls[servico.id] && signedUrls[servico.id].length > 0) ? (
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {signedUrls[servico.id].map((fotoUrl, idx) => (
-                          <div key={idx} className="relative aspect-square">
+                          <div key={idx} className="relative aspect-square group">
                             <img
                               src={fotoUrl}
                               alt={`Foto ${idx + 1}`}
                               className="w-full h-full object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
                               onClick={() => window.open(fotoUrl, '_blank')}
                             />
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                const originalPath = fotoPaths[servico.id]?.[idx]
+                                if (originalPath) {
+                                  excluirFoto(servico.id, originalPath, idx)
+                                }
+                              }}
+                              className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                              title="Excluir foto"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
                         ))}
                       </div>
