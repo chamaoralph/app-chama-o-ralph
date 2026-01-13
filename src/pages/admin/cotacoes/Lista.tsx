@@ -62,6 +62,7 @@ interface EditForm {
   tipo_servico_outro: string
   valor_estimado: string
   valor_material: string
+  descricao_servico: string
   observacoes: string
 }
 
@@ -137,6 +138,7 @@ export default function ListaCotacoes() {
     tipo_servico_outro: '',
     valor_estimado: '',
     valor_material: '',
+    descricao_servico: '',
     observacoes: ''
   })
   const [editLoading, setEditLoading] = useState(false)
@@ -215,6 +217,7 @@ export default function ListaCotacoes() {
       tipo_servico_outro: ehTipoCadastrado ? '' : tipoAtual,
       valor_estimado: cotacao.valor_estimado?.toString() || '',
       valor_material: cotacao.valor_material?.toString() || '',
+      descricao_servico: cotacao.descricao_servico || '',
       observacoes: cotacao.observacoes || ''
     })
     setShowOutroInput(!ehTipoCadastrado && !!tipoAtual)
@@ -263,6 +266,7 @@ export default function ListaCotacoes() {
           valor_material: editForm.valor_material ? parseFloat(editForm.valor_material) : null,
           origem_lead: editForm.origem_lead || null,
           ocasiao: editForm.ocasiao || null,
+          descricao_servico: editForm.descricao_servico || null,
           observacoes: editForm.observacoes || null,
         })
         .eq('id', cotacaoParaEditar.id)
@@ -1057,6 +1061,15 @@ export default function ListaCotacoes() {
                     />
                   </div>
                 )}
+                <div className="col-span-2 space-y-2">
+                  <Label>Descrição do Serviço (Detalhes)</Label>
+                  <Textarea 
+                    value={editForm.descricao_servico}
+                    onChange={(e) => setEditForm({...editForm, descricao_servico: e.target.value})}
+                    placeholder="Detalhes técnicos do serviço..."
+                    rows={3}
+                  />
+                </div>
                 <div className="col-span-2 space-y-2">
                   <Label>Observações</Label>
                   <Textarea 
