@@ -97,6 +97,8 @@ export default function AdminDashboard() {
         .select(`
           instalador_id,
           valor_total,
+          valor_mao_obra_instalador,
+          valor_reembolso_despesas,
           data_servico_agendada,
           instalador:usuarios!fk_servicos_instalador(nome)
         `)
@@ -112,6 +114,8 @@ export default function AdminDashboard() {
         .select(`
           instalador_id,
           valor_total,
+          valor_mao_obra_instalador,
+          valor_reembolso_despesas,
           data_servico_agendada,
           instalador:usuarios!fk_servicos_instalador(nome)
         `)
@@ -151,18 +155,22 @@ export default function AdminDashboard() {
           }
         }
 
-        const valor = Number(s.valor_total) || 0
+        // Calcular lucro da empresa (desconta comissão do instalador + reembolso de material)
+        const valorTotal = Number(s.valor_total) || 0
+        const comissaoInstalador = Number(s.valor_mao_obra_instalador) || 0
+        const reembolsoMaterial = Number(s.valor_reembolso_despesas) || 0
+        const lucroEmpresa = valorTotal - comissaoInstalador - reembolsoMaterial
 
         if (tipo === 'atribuido') {
           instaladoresMap[s.instalador_id].dias[diaSemanaServico].atribuidos += 1
-          instaladoresMap[s.instalador_id].dias[diaSemanaServico].atribuidos_valor += valor
+          instaladoresMap[s.instalador_id].dias[diaSemanaServico].atribuidos_valor += lucroEmpresa
           instaladoresMap[s.instalador_id].total_atribuidos += 1
-          instaladoresMap[s.instalador_id].total_atribuidos_valor += valor
+          instaladoresMap[s.instalador_id].total_atribuidos_valor += lucroEmpresa
         } else {
           instaladoresMap[s.instalador_id].dias[diaSemanaServico].realizados += 1
-          instaladoresMap[s.instalador_id].dias[diaSemanaServico].realizados_valor += valor
+          instaladoresMap[s.instalador_id].dias[diaSemanaServico].realizados_valor += lucroEmpresa
           instaladoresMap[s.instalador_id].total_realizados += 1
-          instaladoresMap[s.instalador_id].total_realizados_valor += valor
+          instaladoresMap[s.instalador_id].total_realizados_valor += lucroEmpresa
         }
       }
 
