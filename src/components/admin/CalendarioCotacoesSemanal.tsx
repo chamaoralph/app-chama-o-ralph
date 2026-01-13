@@ -1,9 +1,11 @@
-import { ChevronLeft, ChevronRight, Clock, MapPin, User } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock, MapPin, User, UserX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useState } from 'react'
-import { addWeeks, subWeeks, startOfWeek, addDays, format, isSameDay } from 'date-fns'
+import { useState, useEffect } from 'react'
+import { addWeeks, subWeeks, startOfWeek, addDays, format, isSameDay, isWithinInterval, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { supabase } from '@/integrations/supabase/client'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface Cotacao {
   id: string
@@ -29,6 +31,17 @@ interface Cotacao {
     tipo_alerta: string | null
     observacao_alerta: string | null
   }
+}
+
+interface Indisponibilidade {
+  id: string
+  instalador_id: string
+  data_inicio: string
+  data_fim: string
+  hora_inicio: string | null
+  hora_fim: string | null
+  motivo: string | null
+  instalador_nome: string
 }
 
 interface CalendarioCotacoesSemanalProps {
@@ -67,12 +80,44 @@ const getStatusLabel = (status: string) => {
 export function CalendarioCotacoesSemanal({ cotacoes, onAprovar, onEditar }: CalendarioCotacoesSemanalProps) {
   const [dataReferencia, setDataReferencia] = useState(new Date())
   const [cotacaoSelecionada, setCotacaoSelecionada] = useState<Cotacao | null>(null)
+  const [indisponibilidades, setIndisponibilidades] = useState<Indisponibilidade[]>([])
   
   // Início da semana (segunda-feira)
   const inicioSemana = startOfWeek(dataReferencia, { weekStartsOn: 1 })
   
   // Dias da semana (segunda a sábado)
   const diasSemana = Array.from({ length: 6 }, (_, i) => addDays(inicioSemana, i))
+
+  // Buscar indisponibilidades
+  useEffect(() => {
+    const fetchIndisponibilidades = async () => {
+      const inicioStr = format(inicioSemana, 'yyyy-MM-dd')
+      const fimStr = format(addDays(inicioSemana, 6), 'yyyy-MM-dd')
+      
+      const { data } = await supabase
+        .from('indisponibilidades_instaladores')
+        .select(`
+          id,
+          instalador_id,
+          data_inicio,
+          data_fim,
+          hora_inicio,
+          hora_fim,
+          motivo,
+          instalador:usuarios!indisponibilidades_instaladores_instalador_id_fkey(nome)
+        `)
+        .or(`data_inicio.lte.${fimStr},data_fim.gte.${inicioStr}`)
+      
+      if (data) {
+        setIndisponibilidades(data.map(ind => ({
+          ...ind,
+          instalador_nome: (ind.instalador as any)?.nome || 'Instalador'
+        })))
+      }
+    }
+    
+    fetchIndisponibilidades()
+  }, [dataReferencia])
 
   const irParaHoje = () => setDataReferencia(new Date())
   const semanaAnterior = () => setDataReferencia(subWeeks(dataReferencia, 1))
@@ -94,177 +139,227 @@ export function CalendarioCotacoesSemanal({ cotacoes, onAprovar, onEditar }: Cal
     return { dia, cotacoes: cotacoesDoDia }
   })
 
+  // Obter indisponibilidades do dia
+  const getIndisponibilidadesDoDia = (dia: Date) => {
+    return indisponibilidades.filter(ind => {
+      const dataInicio = parseDataServico(ind.data_inicio)
+      const dataFim = parseDataServico(ind.data_fim)
+      return isWithinInterval(dia, { start: dataInicio, end: dataFim })
+    })
+  }
+
   const hoje = new Date()
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-4">
-      {/* Header com navegação */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={semanaAnterior}>
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <Button variant="outline" size="sm" onClick={irParaHoje}>
-            Hoje
-          </Button>
-          <Button variant="outline" size="sm" onClick={proximaSemana}>
-            <ChevronRight className="w-4 h-4" />
-          </Button>
+    <TooltipProvider>
+      <div className="bg-white rounded-lg shadow-md p-4">
+        {/* Header com navegação */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={semanaAnterior}>
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={irParaHoje}>
+              Hoje
+            </Button>
+            <Button variant="outline" size="sm" onClick={proximaSemana}>
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900">
+            {format(inicioSemana, "dd 'de' MMMM", { locale: ptBR })} - {format(addDays(inicioSemana, 5), "dd 'de' MMMM yyyy", { locale: ptBR })}
+          </h3>
         </div>
-        <h3 className="text-lg font-semibold text-gray-900">
-          {format(inicioSemana, "dd 'de' MMMM", { locale: ptBR })} - {format(addDays(inicioSemana, 5), "dd 'de' MMMM yyyy", { locale: ptBR })}
-        </h3>
-      </div>
 
-      {/* Grid do calendário */}
-      <div className="grid grid-cols-6 gap-2">
-        {cotacoesPorDia.map(({ dia, cotacoes: cotacoesDoDia }) => {
-          const isHoje = isSameDay(dia, hoje)
-          
-          return (
-            <div key={dia.toISOString()} className="min-h-[200px]">
-              {/* Header do dia */}
-              <div className={`text-center py-2 rounded-t-lg ${isHoje ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}>
-                <div className="text-xs font-medium uppercase">
-                  {format(dia, 'EEE', { locale: ptBR })}
-                </div>
-                <div className={`text-lg font-bold ${isHoje ? 'text-white' : 'text-gray-900'}`}>
-                  {format(dia, 'd')}
-                </div>
-              </div>
-              
-              {/* Cotações do dia */}
-              <div className="border border-t-0 rounded-b-lg p-1 space-y-1 min-h-[160px] bg-gray-50">
-                {cotacoesDoDia.length === 0 ? (
-                  <div className="text-xs text-gray-400 text-center py-4">
-                    Sem cotações
+        {/* Grid do calendário */}
+        <div className="grid grid-cols-6 gap-2">
+          {cotacoesPorDia.map(({ dia, cotacoes: cotacoesDoDia }) => {
+            const isHoje = isSameDay(dia, hoje)
+            const indisponibilidadesDoDia = getIndisponibilidadesDoDia(dia)
+            
+            return (
+              <div key={dia.toISOString()} className="min-h-[200px]">
+                {/* Header do dia */}
+                <div className={`text-center py-2 rounded-t-lg ${isHoje ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}>
+                  <div className="text-xs font-medium uppercase">
+                    {format(dia, 'EEE', { locale: ptBR })}
                   </div>
-                ) : (
-                  cotacoesDoDia.map((cotacao) => (
-                    <div
-                      key={cotacao.id}
-                      onClick={() => setCotacaoSelecionada(cotacao)}
-                      className={`p-2 rounded border cursor-pointer hover:opacity-80 transition-opacity ${getStatusColor(cotacao.status)}`}
-                    >
-                      <div className="text-xs font-medium truncate">
-                        {cotacao.clientes.nome}
-                      </div>
-                      {cotacao.horario_inicio && (
-                        <div className="text-xs opacity-75 flex items-center gap-1 mt-1">
-                          <Clock className="w-3 h-3" />
-                          {cotacao.horario_inicio.substring(0, 5)}
-                        </div>
-                      )}
-                      <div className="text-xs truncate mt-1">
-                        {cotacao.tipo_servico?.join(', ')}
-                      </div>
+                  <div className={`text-lg font-bold ${isHoje ? 'text-white' : 'text-gray-900'}`}>
+                    {format(dia, 'd')}
+                  </div>
+                </div>
+                
+                {/* Cotações e indisponibilidades do dia */}
+                <div className="border border-t-0 rounded-b-lg p-1 space-y-1 min-h-[160px] bg-gray-50">
+                  {/* Indisponibilidades */}
+                  {indisponibilidadesDoDia.length > 0 && (
+                    <div className="space-y-1 mb-2">
+                      {indisponibilidadesDoDia.map((ind) => (
+                        <Tooltip key={ind.id}>
+                          <TooltipTrigger asChild>
+                            <div className="p-1.5 rounded border bg-red-50 border-red-200 text-red-700 cursor-help">
+                              <div className="text-xs font-medium flex items-center gap-1">
+                                <UserX className="w-3 h-3" />
+                                <span className="truncate">{ind.instalador_nome.split(' ')[0]}</span>
+                              </div>
+                              {ind.hora_inicio && (
+                                <div className="text-xs opacity-75">
+                                  {ind.hora_inicio.substring(0, 5)}
+                                  {ind.hora_fim && ` - ${ind.hora_fim.substring(0, 5)}`}
+                                </div>
+                              )}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <div className="text-sm">
+                              <p className="font-medium">{ind.instalador_nome}</p>
+                              <p>Indisponível</p>
+                              {ind.motivo && <p className="text-gray-500">{ind.motivo}</p>}
+                              {ind.hora_inicio && (
+                                <p className="text-gray-500">
+                                  {ind.hora_inicio.substring(0, 5)}
+                                  {ind.hora_fim && ` - ${ind.hora_fim.substring(0, 5)}`}
+                                </p>
+                              )}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      ))}
                     </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Sheet de detalhes */}
-      <Sheet open={!!cotacaoSelecionada} onOpenChange={() => setCotacaoSelecionada(null)}>
-        <SheetContent>
-          {cotacaoSelecionada && (
-            <>
-              <SheetHeader>
-                <SheetTitle>Detalhes da Cotação</SheetTitle>
-              </SheetHeader>
-              <div className="mt-6 space-y-4">
-                <div className="flex items-center gap-2">
-                  <User className="w-5 h-5 text-gray-500" />
-                  <div>
-                    <p className="font-medium">{cotacaoSelecionada.clientes.nome}</p>
-                    <p className="text-sm text-gray-500">{cotacaoSelecionada.clientes.telefone}</p>
-                  </div>
-                </div>
-
-                {cotacaoSelecionada.clientes.bairro && (
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-5 h-5 text-gray-500" />
-                    <p className="text-sm">{cotacaoSelecionada.clientes.bairro}</p>
-                  </div>
-                )}
-
-                {cotacaoSelecionada.data_servico_desejada && (
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-5 h-5 text-gray-500" />
-                    <p className="text-sm">
-                      {format(parseDataServico(cotacaoSelecionada.data_servico_desejada), "dd/MM/yyyy", { locale: ptBR })}
-                      {cotacaoSelecionada.horario_inicio && ` às ${cotacaoSelecionada.horario_inicio.substring(0, 5)}`}
-                      {cotacaoSelecionada.horario_fim && ` - ${cotacaoSelecionada.horario_fim.substring(0, 5)}`}
-                    </p>
-                  </div>
-                )}
-
-                <div>
-                  <p className="text-sm font-medium text-gray-700">Tipo de Serviço</p>
-                  <p className="text-sm">{cotacaoSelecionada.tipo_servico?.join(', ') || '-'}</p>
-                </div>
-
-                {cotacaoSelecionada.valor_estimado && (
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Valor Estimado</p>
-                    <p className="text-sm font-bold text-green-600">
-                      R$ {cotacaoSelecionada.valor_estimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                )}
-
-                <div>
-                  <p className="text-sm font-medium text-gray-700">Status</p>
-                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(cotacaoSelecionada.status)}`}>
-                    {getStatusLabel(cotacaoSelecionada.status)}
-                  </span>
-                </div>
-
-                {cotacaoSelecionada.descricao_servico && (
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Descrição</p>
-                    <p className="text-sm text-gray-600">{cotacaoSelecionada.descricao_servico}</p>
-                  </div>
-                )}
-
-                {cotacaoSelecionada.observacoes && (
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Observações</p>
-                    <p className="text-sm text-gray-600">{cotacaoSelecionada.observacoes}</p>
-                  </div>
-                )}
-
-                <div className="flex gap-2 pt-4">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      onEditar(cotacaoSelecionada)
-                      setCotacaoSelecionada(null)
-                    }}
-                    className="flex-1"
-                  >
-                    Editar
-                  </Button>
-                  {cotacaoSelecionada.status === 'pendente' && (
-                    <Button 
-                      onClick={() => {
-                        onAprovar(cotacaoSelecionada.id)
-                        setCotacaoSelecionada(null)
-                      }}
-                      className="flex-1 bg-green-600 hover:bg-green-700"
-                    >
-                      Aprovar
-                    </Button>
+                  )}
+                  
+                  {/* Cotações */}
+                  {cotacoesDoDia.length === 0 && indisponibilidadesDoDia.length === 0 ? (
+                    <div className="text-xs text-gray-400 text-center py-4">
+                      Sem cotações
+                    </div>
+                  ) : (
+                    cotacoesDoDia.map((cotacao) => (
+                      <div
+                        key={cotacao.id}
+                        onClick={() => setCotacaoSelecionada(cotacao)}
+                        className={`p-2 rounded border cursor-pointer hover:opacity-80 transition-opacity ${getStatusColor(cotacao.status)}`}
+                      >
+                        <div className="text-xs font-medium truncate">
+                          {cotacao.clientes.nome}
+                        </div>
+                        {cotacao.horario_inicio && (
+                          <div className="text-xs opacity-75 flex items-center gap-1 mt-1">
+                            <Clock className="w-3 h-3" />
+                            {cotacao.horario_inicio.substring(0, 5)}
+                          </div>
+                        )}
+                        <div className="text-xs truncate mt-1">
+                          {cotacao.tipo_servico?.join(', ')}
+                        </div>
+                      </div>
+                    ))
                   )}
                 </div>
               </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
-    </div>
+            )
+          })}
+        </div>
+
+        {/* Sheet de detalhes */}
+        <Sheet open={!!cotacaoSelecionada} onOpenChange={() => setCotacaoSelecionada(null)}>
+          <SheetContent>
+            {cotacaoSelecionada && (
+              <>
+                <SheetHeader>
+                  <SheetTitle>Detalhes da Cotação</SheetTitle>
+                </SheetHeader>
+                <div className="mt-6 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <User className="w-5 h-5 text-gray-500" />
+                    <div>
+                      <p className="font-medium">{cotacaoSelecionada.clientes.nome}</p>
+                      <p className="text-sm text-gray-500">{cotacaoSelecionada.clientes.telefone}</p>
+                    </div>
+                  </div>
+
+                  {cotacaoSelecionada.clientes.bairro && (
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-5 h-5 text-gray-500" />
+                      <p className="text-sm">{cotacaoSelecionada.clientes.bairro}</p>
+                    </div>
+                  )}
+
+                  {cotacaoSelecionada.data_servico_desejada && (
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-5 h-5 text-gray-500" />
+                      <p className="text-sm">
+                        {format(parseDataServico(cotacaoSelecionada.data_servico_desejada), "dd/MM/yyyy", { locale: ptBR })}
+                        {cotacaoSelecionada.horario_inicio && ` às ${cotacaoSelecionada.horario_inicio.substring(0, 5)}`}
+                        {cotacaoSelecionada.horario_fim && ` - ${cotacaoSelecionada.horario_fim.substring(0, 5)}`}
+                      </p>
+                    </div>
+                  )}
+
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Tipo de Serviço</p>
+                    <p className="text-sm">{cotacaoSelecionada.tipo_servico?.join(', ') || '-'}</p>
+                  </div>
+
+                  {cotacaoSelecionada.valor_estimado && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Valor Estimado</p>
+                      <p className="text-sm font-bold text-green-600">
+                        R$ {cotacaoSelecionada.valor_estimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  )}
+
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Status</p>
+                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(cotacaoSelecionada.status)}`}>
+                      {getStatusLabel(cotacaoSelecionada.status)}
+                    </span>
+                  </div>
+
+                  {cotacaoSelecionada.descricao_servico && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Descrição</p>
+                      <p className="text-sm text-gray-600">{cotacaoSelecionada.descricao_servico}</p>
+                    </div>
+                  )}
+
+                  {cotacaoSelecionada.observacoes && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Observações</p>
+                      <p className="text-sm text-gray-600">{cotacaoSelecionada.observacoes}</p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-4">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        onEditar(cotacaoSelecionada)
+                        setCotacaoSelecionada(null)
+                      }}
+                      className="flex-1"
+                    >
+                      Editar
+                    </Button>
+                    {cotacaoSelecionada.status === 'pendente' && (
+                      <Button 
+                        onClick={() => {
+                          onAprovar(cotacaoSelecionada.id)
+                          setCotacaoSelecionada(null)
+                        }}
+                        className="flex-1 bg-green-600 hover:bg-green-700"
+                      >
+                        Aprovar
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </SheetContent>
+        </Sheet>
+      </div>
+    </TooltipProvider>
   )
 }
