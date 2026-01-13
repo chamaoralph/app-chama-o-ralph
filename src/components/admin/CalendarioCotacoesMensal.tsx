@@ -1,9 +1,11 @@
-import { ChevronLeft, ChevronRight, Clock, User, MapPin } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock, User, MapPin, UserX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useState } from 'react'
-import { addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, format, isSameMonth, isSameDay } from 'date-fns'
+import { useState, useEffect } from 'react'
+import { addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, format, isSameMonth, isSameDay, isWithinInterval } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { supabase } from '@/integrations/supabase/client'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface Cotacao {
   id: string
@@ -29,6 +31,17 @@ interface Cotacao {
     tipo_alerta: string | null
     observacao_alerta: string | null
   }
+}
+
+interface Indisponibilidade {
+  id: string
+  instalador_id: string
+  data_inicio: string
+  data_fim: string
+  hora_inicio: string | null
+  hora_fim: string | null
+  motivo: string | null
+  instalador_nome: string
 }
 
 interface CalendarioCotacoesMensalProps {
@@ -64,20 +77,11 @@ const getStatusLabel = (status: string) => {
   return labels[status] || status
 }
 
-const getStatusDot = (status: string) => {
-  const colors: Record<string, string> = {
-    pendente: 'bg-yellow-500',
-    aprovada: 'bg-green-500',
-    perdida: 'bg-red-500',
-    nao_gerou: 'bg-orange-500',
-  }
-  return colors[status] || colors.pendente
-}
-
 export function CalendarioCotacoesMensal({ cotacoes, onAprovar, onEditar }: CalendarioCotacoesMensalProps) {
   const [dataReferencia, setDataReferencia] = useState(new Date())
   const [cotacaoSelecionada, setCotacaoSelecionada] = useState<Cotacao | null>(null)
-  const [diaSelecionado, setDiaSelecionado] = useState<{ dia: Date; cotacoes: Cotacao[] } | null>(null)
+  const [diaSelecionado, setDiaSelecionado] = useState<{ dia: Date; cotacoes: Cotacao[]; indisponibilidades: Indisponibilidade[] } | null>(null)
+  const [indisponibilidades, setIndisponibilidades] = useState<Indisponibilidade[]>([])
   
   const inicioMes = startOfMonth(dataReferencia)
   const fimMes = endOfMonth(dataReferencia)
@@ -91,6 +95,37 @@ export function CalendarioCotacoesMensal({ cotacoes, onAprovar, onEditar }: Cale
     dias.push(diaAtual)
     diaAtual = addDays(diaAtual, 1)
   }
+
+  // Buscar indisponibilidades
+  useEffect(() => {
+    const fetchIndisponibilidades = async () => {
+      const inicioStr = format(inicioCalendario, 'yyyy-MM-dd')
+      const fimStr = format(fimCalendario, 'yyyy-MM-dd')
+      
+      const { data } = await supabase
+        .from('indisponibilidades_instaladores')
+        .select(`
+          id,
+          instalador_id,
+          data_inicio,
+          data_fim,
+          hora_inicio,
+          hora_fim,
+          motivo,
+          instalador:usuarios!indisponibilidades_instaladores_instalador_id_fkey(nome)
+        `)
+        .or(`data_inicio.lte.${fimStr},data_fim.gte.${inicioStr}`)
+      
+      if (data) {
+        setIndisponibilidades(data.map(ind => ({
+          ...ind,
+          instalador_nome: (ind.instalador as any)?.nome || 'Instalador'
+        })))
+      }
+    }
+    
+    fetchIndisponibilidades()
+  }, [dataReferencia])
 
   const irParaHoje = () => setDataReferencia(new Date())
   const mesAnterior = () => setDataReferencia(subMonths(dataReferencia, 1))
@@ -111,225 +146,300 @@ export function CalendarioCotacoesMensal({ cotacoes, onAprovar, onEditar }: Cale
       })
   }
 
+  // Obter indisponibilidades do dia
+  const getIndisponibilidadesDoDia = (dia: Date) => {
+    return indisponibilidades.filter(ind => {
+      const dataInicio = parseDataServico(ind.data_inicio)
+      const dataFim = parseDataServico(ind.data_fim)
+      return isWithinInterval(dia, { start: dataInicio, end: dataFim })
+    })
+  }
+
   const hoje = new Date()
   const diasSemana = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-4">
-      {/* Header com navegação */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={mesAnterior}>
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <Button variant="outline" size="sm" onClick={irParaHoje}>
-            Hoje
-          </Button>
-          <Button variant="outline" size="sm" onClick={proximoMes}>
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-        </div>
-        <h3 className="text-lg font-semibold text-gray-900 capitalize">
-          {format(dataReferencia, "MMMM 'de' yyyy", { locale: ptBR })}
-        </h3>
-      </div>
-
-      {/* Header dos dias da semana */}
-      <div className="grid grid-cols-7 gap-1 mb-1">
-        {diasSemana.map(dia => (
-          <div key={dia} className="text-center text-xs font-medium text-gray-500 py-2">
-            {dia}
+    <TooltipProvider>
+      <div className="bg-white rounded-lg shadow-md p-4">
+        {/* Header com navegação */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={mesAnterior}>
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={irParaHoje}>
+              Hoje
+            </Button>
+            <Button variant="outline" size="sm" onClick={proximoMes}>
+              <ChevronRight className="w-4 h-4" />
+            </Button>
           </div>
-        ))}
-      </div>
+          <h3 className="text-lg font-semibold text-gray-900 capitalize">
+            {format(dataReferencia, "MMMM 'de' yyyy", { locale: ptBR })}
+          </h3>
+        </div>
 
-      {/* Grid do calendário */}
-      <div className="grid grid-cols-7 gap-1">
-        {dias.map((dia) => {
-          const cotacoesDoDia = getCotacoesDoDia(dia)
-          const isHoje = isSameDay(dia, hoje)
-          const isMesAtual = isSameMonth(dia, dataReferencia)
-          
-          return (
-            <div 
-              key={dia.toISOString()} 
-              className={`min-h-[80px] p-1 border rounded cursor-pointer hover:bg-gray-50 transition-colors ${
-                isHoje ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-              } ${!isMesAtual ? 'opacity-40' : ''}`}
-              onClick={() => cotacoesDoDia.length > 0 && setDiaSelecionado({ dia, cotacoes: cotacoesDoDia })}
-            >
-              <div className={`text-sm font-medium mb-1 ${isHoje ? 'text-blue-600' : 'text-gray-700'}`}>
-                {format(dia, 'd')}
-              </div>
-              
-              {/* Indicadores de cotações */}
-              <div className="space-y-0.5">
-                {cotacoesDoDia.slice(0, 3).map((cotacao) => (
-                  <div
-                    key={cotacao.id}
-                    className={`text-xs px-1 py-0.5 rounded truncate ${getStatusColor(cotacao.status)}`}
-                    title={cotacao.clientes.nome}
-                  >
-                    {cotacao.clientes.nome.split(' ')[0]}
-                  </div>
-                ))}
-                {cotacoesDoDia.length > 3 && (
-                  <div className="text-xs text-gray-500 text-center">
-                    +{cotacoesDoDia.length - 3} mais
-                  </div>
-                )}
-              </div>
+        {/* Header dos dias da semana */}
+        <div className="grid grid-cols-7 gap-1 mb-1">
+          {diasSemana.map(dia => (
+            <div key={dia} className="text-center text-xs font-medium text-gray-500 py-2">
+              {dia}
             </div>
-          )
-        })}
-      </div>
+          ))}
+        </div>
 
-      {/* Sheet de cotações do dia */}
-      <Sheet open={!!diaSelecionado} onOpenChange={() => setDiaSelecionado(null)}>
-        <SheetContent>
-          {diaSelecionado && (
-            <>
-              <SheetHeader>
-                <SheetTitle>
-                  Cotações - {format(diaSelecionado.dia, "dd 'de' MMMM", { locale: ptBR })}
-                </SheetTitle>
-              </SheetHeader>
-              <div className="mt-6 space-y-3">
-                {diaSelecionado.cotacoes.map((cotacao) => (
-                  <div 
-                    key={cotacao.id}
-                    onClick={() => {
-                      setDiaSelecionado(null)
-                      setCotacaoSelecionada(cotacao)
-                    }}
-                    className={`p-3 rounded-lg border cursor-pointer hover:opacity-80 ${getStatusColor(cotacao.status)}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">{cotacao.clientes.nome}</span>
-                      <span className="text-xs">{getStatusLabel(cotacao.status)}</span>
-                    </div>
-                    <div className="text-sm mt-1">
-                      {cotacao.tipo_servico?.join(', ')}
-                    </div>
-                    {cotacao.horario_inicio && (
-                      <div className="text-xs flex items-center gap-1 mt-1 opacity-75">
-                        <Clock className="w-3 h-3" />
-                        {cotacao.horario_inicio.substring(0, 5)}
-                        {cotacao.horario_fim && ` - ${cotacao.horario_fim.substring(0, 5)}`}
+        {/* Grid do calendário */}
+        <div className="grid grid-cols-7 gap-1">
+          {dias.map((dia) => {
+            const cotacoesDoDia = getCotacoesDoDia(dia)
+            const indisponibilidadesDoDia = getIndisponibilidadesDoDia(dia)
+            const isHoje = isSameDay(dia, hoje)
+            const isMesAtual = isSameMonth(dia, dataReferencia)
+            const temConteudo = cotacoesDoDia.length > 0 || indisponibilidadesDoDia.length > 0
+            
+            return (
+              <div 
+                key={dia.toISOString()} 
+                className={`min-h-[80px] p-1 border rounded cursor-pointer hover:bg-gray-50 transition-colors ${
+                  isHoje ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                } ${!isMesAtual ? 'opacity-40' : ''}`}
+                onClick={() => temConteudo && setDiaSelecionado({ dia, cotacoes: cotacoesDoDia, indisponibilidades: indisponibilidadesDoDia })}
+              >
+                <div className={`text-sm font-medium mb-1 ${isHoje ? 'text-blue-600' : 'text-gray-700'}`}>
+                  {format(dia, 'd')}
+                </div>
+                
+                {/* Indicadores de indisponibilidades */}
+                {indisponibilidadesDoDia.length > 0 && (
+                  <div className="mb-0.5">
+                    {indisponibilidadesDoDia.slice(0, 1).map((ind) => (
+                      <Tooltip key={ind.id}>
+                        <TooltipTrigger asChild>
+                          <div className="text-xs px-1 py-0.5 rounded bg-red-100 text-red-700 truncate flex items-center gap-1">
+                            <UserX className="w-3 h-3 flex-shrink-0" />
+                            <span className="truncate">{ind.instalador_nome.split(' ')[0]}</span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <div className="text-sm">
+                            <p className="font-medium">{ind.instalador_nome}</p>
+                            <p>Indisponível</p>
+                            {ind.motivo && <p className="text-gray-500">{ind.motivo}</p>}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    ))}
+                    {indisponibilidadesDoDia.length > 1 && (
+                      <div className="text-xs text-red-500 text-center">
+                        +{indisponibilidadesDoDia.length - 1} indisp.
                       </div>
                     )}
-                    {cotacao.clientes.bairro && (
-                      <div className="text-xs flex items-center gap-1 mt-1 opacity-75">
-                        <MapPin className="w-3 h-3" />
-                        {cotacao.clientes.bairro}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
-
-      {/* Sheet de detalhes da cotação */}
-      <Sheet open={!!cotacaoSelecionada} onOpenChange={() => setCotacaoSelecionada(null)}>
-        <SheetContent>
-          {cotacaoSelecionada && (
-            <>
-              <SheetHeader>
-                <SheetTitle>Detalhes da Cotação</SheetTitle>
-              </SheetHeader>
-              <div className="mt-6 space-y-4">
-                <div className="flex items-center gap-2">
-                  <User className="w-5 h-5 text-gray-500" />
-                  <div>
-                    <p className="font-medium">{cotacaoSelecionada.clientes.nome}</p>
-                    <p className="text-sm text-gray-500">{cotacaoSelecionada.clientes.telefone}</p>
-                  </div>
-                </div>
-
-                {cotacaoSelecionada.clientes.bairro && (
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-5 h-5 text-gray-500" />
-                    <p className="text-sm">{cotacaoSelecionada.clientes.bairro}</p>
                   </div>
                 )}
-
-                {cotacaoSelecionada.data_servico_desejada && (
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-5 h-5 text-gray-500" />
-                    <p className="text-sm">
-                      {format(parseDataServico(cotacaoSelecionada.data_servico_desejada), "dd/MM/yyyy", { locale: ptBR })}
-                      {cotacaoSelecionada.horario_inicio && ` às ${cotacaoSelecionada.horario_inicio.substring(0, 5)}`}
-                      {cotacaoSelecionada.horario_fim && ` - ${cotacaoSelecionada.horario_fim.substring(0, 5)}`}
-                    </p>
-                  </div>
-                )}
-
-                <div>
-                  <p className="text-sm font-medium text-gray-700">Tipo de Serviço</p>
-                  <p className="text-sm">{cotacaoSelecionada.tipo_servico?.join(', ') || '-'}</p>
-                </div>
-
-                {cotacaoSelecionada.valor_estimado && (
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Valor Estimado</p>
-                    <p className="text-sm font-bold text-green-600">
-                      R$ {cotacaoSelecionada.valor_estimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                )}
-
-                <div>
-                  <p className="text-sm font-medium text-gray-700">Status</p>
-                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(cotacaoSelecionada.status)}`}>
-                    {getStatusLabel(cotacaoSelecionada.status)}
-                  </span>
-                </div>
-
-                {cotacaoSelecionada.descricao_servico && (
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Descrição</p>
-                    <p className="text-sm text-gray-600">{cotacaoSelecionada.descricao_servico}</p>
-                  </div>
-                )}
-
-                {cotacaoSelecionada.observacoes && (
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Observações</p>
-                    <p className="text-sm text-gray-600">{cotacaoSelecionada.observacoes}</p>
-                  </div>
-                )}
-
-                <div className="flex gap-2 pt-4">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      onEditar(cotacaoSelecionada)
-                      setCotacaoSelecionada(null)
-                    }}
-                    className="flex-1"
-                  >
-                    Editar
-                  </Button>
-                  {cotacaoSelecionada.status === 'pendente' && (
-                    <Button 
-                      onClick={() => {
-                        onAprovar(cotacaoSelecionada.id)
-                        setCotacaoSelecionada(null)
-                      }}
-                      className="flex-1 bg-green-600 hover:bg-green-700"
+                
+                {/* Indicadores de cotações */}
+                <div className="space-y-0.5">
+                  {cotacoesDoDia.slice(0, 2).map((cotacao) => (
+                    <div
+                      key={cotacao.id}
+                      className={`text-xs px-1 py-0.5 rounded truncate ${getStatusColor(cotacao.status)}`}
+                      title={cotacao.clientes.nome}
                     >
-                      Aprovar
-                    </Button>
+                      {cotacao.clientes.nome.split(' ')[0]}
+                    </div>
+                  ))}
+                  {cotacoesDoDia.length > 2 && (
+                    <div className="text-xs text-gray-500 text-center">
+                      +{cotacoesDoDia.length - 2} mais
+                    </div>
                   )}
                 </div>
               </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
-    </div>
+            )
+          })}
+        </div>
+
+        {/* Sheet de cotações e indisponibilidades do dia */}
+        <Sheet open={!!diaSelecionado} onOpenChange={() => setDiaSelecionado(null)}>
+          <SheetContent>
+            {diaSelecionado && (
+              <>
+                <SheetHeader>
+                  <SheetTitle>
+                    {format(diaSelecionado.dia, "dd 'de' MMMM", { locale: ptBR })}
+                  </SheetTitle>
+                </SheetHeader>
+                <div className="mt-6 space-y-4">
+                  {/* Indisponibilidades */}
+                  {diaSelecionado.indisponibilidades.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                        <UserX className="w-4 h-4 text-red-500" />
+                        Indisponibilidades
+                      </h4>
+                      <div className="space-y-2">
+                        {diaSelecionado.indisponibilidades.map((ind) => (
+                          <div key={ind.id} className="p-3 rounded-lg border bg-red-50 border-red-200 text-red-800">
+                            <p className="font-medium">{ind.instalador_nome}</p>
+                            {ind.hora_inicio && (
+                              <p className="text-sm">
+                                {ind.hora_inicio.substring(0, 5)}
+                                {ind.hora_fim && ` - ${ind.hora_fim.substring(0, 5)}`}
+                              </p>
+                            )}
+                            {ind.motivo && (
+                              <p className="text-sm opacity-75">{ind.motivo}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Cotações */}
+                  {diaSelecionado.cotacoes.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">Cotações</h4>
+                      <div className="space-y-2">
+                        {diaSelecionado.cotacoes.map((cotacao) => (
+                          <div 
+                            key={cotacao.id}
+                            onClick={() => {
+                              setDiaSelecionado(null)
+                              setCotacaoSelecionada(cotacao)
+                            }}
+                            className={`p-3 rounded-lg border cursor-pointer hover:opacity-80 ${getStatusColor(cotacao.status)}`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium">{cotacao.clientes.nome}</span>
+                              <span className="text-xs">{getStatusLabel(cotacao.status)}</span>
+                            </div>
+                            <div className="text-sm mt-1">
+                              {cotacao.tipo_servico?.join(', ')}
+                            </div>
+                            {cotacao.horario_inicio && (
+                              <div className="text-xs flex items-center gap-1 mt-1 opacity-75">
+                                <Clock className="w-3 h-3" />
+                                {cotacao.horario_inicio.substring(0, 5)}
+                                {cotacao.horario_fim && ` - ${cotacao.horario_fim.substring(0, 5)}`}
+                              </div>
+                            )}
+                            {cotacao.clientes.bairro && (
+                              <div className="text-xs flex items-center gap-1 mt-1 opacity-75">
+                                <MapPin className="w-3 h-3" />
+                                {cotacao.clientes.bairro}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </SheetContent>
+        </Sheet>
+
+        {/* Sheet de detalhes da cotação */}
+        <Sheet open={!!cotacaoSelecionada} onOpenChange={() => setCotacaoSelecionada(null)}>
+          <SheetContent>
+            {cotacaoSelecionada && (
+              <>
+                <SheetHeader>
+                  <SheetTitle>Detalhes da Cotação</SheetTitle>
+                </SheetHeader>
+                <div className="mt-6 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <User className="w-5 h-5 text-gray-500" />
+                    <div>
+                      <p className="font-medium">{cotacaoSelecionada.clientes.nome}</p>
+                      <p className="text-sm text-gray-500">{cotacaoSelecionada.clientes.telefone}</p>
+                    </div>
+                  </div>
+
+                  {cotacaoSelecionada.clientes.bairro && (
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-5 h-5 text-gray-500" />
+                      <p className="text-sm">{cotacaoSelecionada.clientes.bairro}</p>
+                    </div>
+                  )}
+
+                  {cotacaoSelecionada.data_servico_desejada && (
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-5 h-5 text-gray-500" />
+                      <p className="text-sm">
+                        {format(parseDataServico(cotacaoSelecionada.data_servico_desejada), "dd/MM/yyyy", { locale: ptBR })}
+                        {cotacaoSelecionada.horario_inicio && ` às ${cotacaoSelecionada.horario_inicio.substring(0, 5)}`}
+                        {cotacaoSelecionada.horario_fim && ` - ${cotacaoSelecionada.horario_fim.substring(0, 5)}`}
+                      </p>
+                    </div>
+                  )}
+
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Tipo de Serviço</p>
+                    <p className="text-sm">{cotacaoSelecionada.tipo_servico?.join(', ') || '-'}</p>
+                  </div>
+
+                  {cotacaoSelecionada.valor_estimado && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Valor Estimado</p>
+                      <p className="text-sm font-bold text-green-600">
+                        R$ {cotacaoSelecionada.valor_estimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  )}
+
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Status</p>
+                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(cotacaoSelecionada.status)}`}>
+                      {getStatusLabel(cotacaoSelecionada.status)}
+                    </span>
+                  </div>
+
+                  {cotacaoSelecionada.descricao_servico && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Descrição</p>
+                      <p className="text-sm text-gray-600">{cotacaoSelecionada.descricao_servico}</p>
+                    </div>
+                  )}
+
+                  {cotacaoSelecionada.observacoes && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Observações</p>
+                      <p className="text-sm text-gray-600">{cotacaoSelecionada.observacoes}</p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-4">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        onEditar(cotacaoSelecionada)
+                        setCotacaoSelecionada(null)
+                      }}
+                      className="flex-1"
+                    >
+                      Editar
+                    </Button>
+                    {cotacaoSelecionada.status === 'pendente' && (
+                      <Button 
+                        onClick={() => {
+                          onAprovar(cotacaoSelecionada.id)
+                          setCotacaoSelecionada(null)
+                        }}
+                        className="flex-1 bg-green-600 hover:bg-green-700"
+                      >
+                        Aprovar
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </SheetContent>
+        </Sheet>
+      </div>
+    </TooltipProvider>
   )
 }
