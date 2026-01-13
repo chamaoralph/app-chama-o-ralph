@@ -475,6 +475,35 @@ export default function AdminDashboard() {
                         </tr>
                       ))}
                     </tbody>
+                    <tfoot className="bg-gray-200 font-bold">
+                      <tr>
+                        <td className="px-2 py-2 font-bold text-gray-900 sticky left-0 bg-gray-200">TOTAL</td>
+                        {diasSemana.map(dia => {
+                          const totalDiaAtribuidos = dadosSemana.instaladores.reduce((sum, inst) => sum + (inst.dias[dia.key]?.atribuidos || 0), 0);
+                          const totalDiaAtribuidosValor = dadosSemana.instaladores.reduce((sum, inst) => sum + (inst.dias[dia.key]?.atribuidos_valor || 0), 0);
+                          const totalDiaRealizados = dadosSemana.instaladores.reduce((sum, inst) => sum + (inst.dias[dia.key]?.realizados || 0), 0);
+                          const totalDiaRealizadosValor = dadosSemana.instaladores.reduce((sum, inst) => sum + (inst.dias[dia.key]?.realizados_valor || 0), 0);
+                          return (
+                            <td key={dia.key} className="px-2 py-2">
+                              <div className="text-center">
+                                <div className="text-blue-700 text-xs">📋 {totalDiaAtribuidos} - {formatarValorCurto(totalDiaAtribuidosValor)}</div>
+                                <div className="text-green-700 text-xs">✅ {totalDiaRealizados} - {formatarValorCurto(totalDiaRealizadosValor)}</div>
+                              </div>
+                            </td>
+                          );
+                        })}
+                        <td className="px-2 py-2 bg-gray-300">
+                          <div className="text-center">
+                            <div className="text-blue-700 text-xs">
+                              📋 {dadosSemana.instaladores.reduce((sum, inst) => sum + inst.total_atribuidos, 0)} - {formatarValorCurto(dadosSemana.instaladores.reduce((sum, inst) => sum + inst.total_atribuidos_valor, 0))}
+                            </div>
+                            <div className="text-green-700 text-xs">
+                              ✅ {dadosSemana.instaladores.reduce((sum, inst) => sum + inst.total_realizados, 0)} - {formatarValorCurto(dadosSemana.instaladores.reduce((sum, inst) => sum + inst.total_realizados_valor, 0))}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               </div>
@@ -674,6 +703,35 @@ export default function AdminDashboard() {
                     </tr>
                   ))}
                 </tbody>
+                <tfoot className="bg-gray-200 font-bold">
+                  <tr>
+                    <td className="px-4 py-3 font-bold text-gray-900">TOTAL</td>
+                    {diasSemana.map(dia => {
+                      const totalDiaAtribuidos = dadosSemana.instaladores.reduce((sum, inst) => sum + (inst.dias[dia.key]?.atribuidos || 0), 0);
+                      const totalDiaAtribuidosValor = dadosSemana.instaladores.reduce((sum, inst) => sum + (inst.dias[dia.key]?.atribuidos_valor || 0), 0);
+                      const totalDiaRealizados = dadosSemana.instaladores.reduce((sum, inst) => sum + (inst.dias[dia.key]?.realizados || 0), 0);
+                      const totalDiaRealizadosValor = dadosSemana.instaladores.reduce((sum, inst) => sum + (inst.dias[dia.key]?.realizados_valor || 0), 0);
+                      return (
+                        <td key={dia.key} className="px-4 py-3">
+                          <div className="text-center">
+                            <div className="text-blue-700 text-sm">📋 {totalDiaAtribuidos} - {formatarValorCurto(totalDiaAtribuidosValor)}</div>
+                            <div className="text-green-700 text-sm">✅ {totalDiaRealizados} - {formatarValorCurto(totalDiaRealizadosValor)}</div>
+                          </div>
+                        </td>
+                      );
+                    })}
+                    <td className="px-4 py-3 bg-gray-300">
+                      <div className="text-center">
+                        <div className="text-blue-700 text-sm">
+                          📋 {dadosSemana.instaladores.reduce((sum, inst) => sum + inst.total_atribuidos, 0)} - {formatarValorCurto(dadosSemana.instaladores.reduce((sum, inst) => sum + inst.total_atribuidos_valor, 0))}
+                        </div>
+                        <div className="text-green-700 text-sm">
+                          ✅ {dadosSemana.instaladores.reduce((sum, inst) => sum + inst.total_realizados, 0)} - {formatarValorCurto(dadosSemana.instaladores.reduce((sum, inst) => sum + inst.total_realizados_valor, 0))}
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           ) : (
