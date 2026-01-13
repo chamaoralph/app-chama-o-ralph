@@ -48,14 +48,37 @@ export function IndisponibilidadeCard({
   if (compact) {
     return (
       <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-2 text-sm">
-        <div className="flex items-center gap-2">
-          <Ban className="h-4 w-4 text-destructive" />
-          <span className="font-medium text-destructive">Indisponível</span>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <Ban className="h-4 w-4 text-destructive flex-shrink-0" />
+            <div className="min-w-0">
+              <span className="font-medium text-destructive">Indisponível</span>
+              <p className="text-xs text-muted-foreground truncate">
+                {periodoTexto}
+                {indisponibilidade.motivo && ` • ${indisponibilidade.motivo}`}
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex gap-1 flex-shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => onEditar(indisponibilidade)}
+            >
+              <Pencil className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-destructive hover:text-destructive"
+              onClick={() => onExcluir(indisponibilidade.id)}
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </div>
         </div>
-        <p className="text-xs text-muted-foreground mt-1">
-          {periodoTexto}
-          {indisponibilidade.motivo && ` • ${indisponibilidade.motivo}`}
-        </p>
       </div>
     );
   }
