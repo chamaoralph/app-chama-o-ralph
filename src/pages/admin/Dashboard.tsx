@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { AdminLayout } from '@/components/layout/AdminLayout'
 import { supabase } from '@/integrations/supabase/client'
 import { Link } from 'react-router-dom'
-import { DollarSign, Package, Users, FileText, TrendingUp, ChevronRight, Plus, CheckCircle, BarChart3 } from 'lucide-react'
+import { DollarSign, Package, Users, FileText, TrendingUp, ChevronRight, ChevronLeft, Plus, CheckCircle, BarChart3 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -24,16 +24,20 @@ interface UltimoServico {
 }
 
 interface DadoInstaladorDia {
-  quantidade: number
-  valor: number
+  atribuidos: number
+  atribuidos_valor: number
+  realizados: number
+  realizados_valor: number
 }
 
 interface DadosInstaladorSemana {
   instalador_id: string
   instalador_nome: string
   dias: Record<number, DadoInstaladorDia> // 1=seg, 2=ter, ..., 6=sab
-  total_quantidade: number
-  total_valor: number
+  total_atribuidos: number
+  total_atribuidos_valor: number
+  total_realizados: number
+  total_realizados_valor: number
 }
 
 interface DadosSemana {
@@ -52,13 +56,143 @@ export default function AdminDashboard() {
   })
   const [ultimosServicos, setUltimosServicos] = useState<UltimoServico[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingSemana, setLoadingSemana] = useState(false)
   const [servicosDisponiveis, setServicosDisponiveis] = useState(0)
   const [dadosSemana, setDadosSemana] = useState<DadosSemana | null>(null)
+  const [semanaOffset, setSemanaOffset] = useState(0)
+  const [empresaId, setEmpresaId] = useState<string | null>(null)
   const isMobile = useIsMobile()
+
+  const diasSemana = [
+    { key: 1, label: 'segunda' },
+    { key: 2, label: 'terça' },
+    { key: 3, label: 'quarta' },
+    { key: 4, label: 'quinta' },
+    { key: 5, label: 'sexta' },
+    { key: 6, label: 'sábado' }
+  ]
+
+  const carregarDadosSemana = useCallback(async (empId: string, offset: number) => {
+    try {
+      setLoadingSemana(true)
+      
+      const hoje = new Date()
+      hoje.setDate(hoje.getDate() + (offset * 7))
+      
+      const diaSemana = hoje.getDay()
+      const inicioSemana = new Date(hoje)
+      inicioSemana.setDate(hoje.getDate() - (diaSemana === 0 ? 6 : diaSemana - 1))
+      inicioSemana.setHours(0, 0, 0, 0)
+
+      const fimSemana = new Date(inicioSemana)
+      fimSemana.setDate(inicioSemana.getDate() + 5)
+      fimSemana.setHours(23, 59, 59, 999)
+
+      const startOfYear = new Date(inicioSemana.getFullYear(), 0, 1)
+      const weekNumber = Math.ceil(((inicioSemana.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7)
+
+      // Buscar serviços ATRIBUÍDOS + EM_ANDAMENTO
+      const { data: servicosAtribuidos } = await supabase
+        .from('servicos')
+        .select(`
+          instalador_id,
+          valor_total,
+          data_servico_agendada,
+          instalador:usuarios!fk_servicos_instalador(nome)
+        `)
+        .eq('empresa_id', empId)
+        .in('status', ['atribuido', 'em_andamento'])
+        .gte('data_servico_agendada', inicioSemana.toISOString())
+        .lte('data_servico_agendada', fimSemana.toISOString())
+        .not('instalador_id', 'is', null)
+
+      // Buscar serviços CONCLUÍDOS
+      const { data: servicosConcluidos } = await supabase
+        .from('servicos')
+        .select(`
+          instalador_id,
+          valor_total,
+          data_servico_agendada,
+          instalador:usuarios!fk_servicos_instalador(nome)
+        `)
+        .eq('empresa_id', empId)
+        .eq('status', 'concluido')
+        .gte('data_servico_agendada', inicioSemana.toISOString())
+        .lte('data_servico_agendada', fimSemana.toISOString())
+        .not('instalador_id', 'is', null)
+
+      // Agrupar por instalador e dia
+      const instaladoresMap: Record<string, DadosInstaladorSemana> = {}
+
+      const processarServico = (s: any, tipo: 'atribuido' | 'realizado') => {
+        if (!s.instalador_id) return
+        
+        const dataServico = new Date(s.data_servico_agendada)
+        const diaSemanaServico = dataServico.getDay()
+
+        if (!instaladoresMap[s.instalador_id]) {
+          instaladoresMap[s.instalador_id] = {
+            instalador_id: s.instalador_id,
+            instalador_nome: s.instalador?.nome || 'Sem nome',
+            dias: {},
+            total_atribuidos: 0,
+            total_atribuidos_valor: 0,
+            total_realizados: 0,
+            total_realizados_valor: 0
+          }
+        }
+
+        if (!instaladoresMap[s.instalador_id].dias[diaSemanaServico]) {
+          instaladoresMap[s.instalador_id].dias[diaSemanaServico] = {
+            atribuidos: 0,
+            atribuidos_valor: 0,
+            realizados: 0,
+            realizados_valor: 0
+          }
+        }
+
+        const valor = Number(s.valor_total) || 0
+
+        if (tipo === 'atribuido') {
+          instaladoresMap[s.instalador_id].dias[diaSemanaServico].atribuidos += 1
+          instaladoresMap[s.instalador_id].dias[diaSemanaServico].atribuidos_valor += valor
+          instaladoresMap[s.instalador_id].total_atribuidos += 1
+          instaladoresMap[s.instalador_id].total_atribuidos_valor += valor
+        } else {
+          instaladoresMap[s.instalador_id].dias[diaSemanaServico].realizados += 1
+          instaladoresMap[s.instalador_id].dias[diaSemanaServico].realizados_valor += valor
+          instaladoresMap[s.instalador_id].total_realizados += 1
+          instaladoresMap[s.instalador_id].total_realizados_valor += valor
+        }
+      }
+
+      servicosAtribuidos?.forEach(s => processarServico(s, 'atribuido'))
+      servicosConcluidos?.forEach(s => processarServico(s, 'realizado'))
+
+      setDadosSemana({
+        numero_semana: weekNumber,
+        inicio: inicioSemana,
+        fim: fimSemana,
+        instaladores: Object.values(instaladoresMap).sort((a, b) => 
+          (b.total_realizados_valor + b.total_atribuidos_valor) - (a.total_realizados_valor + a.total_atribuidos_valor)
+        )
+      })
+    } catch (error) {
+      console.error('Erro ao carregar dados da semana:', error)
+    } finally {
+      setLoadingSemana(false)
+    }
+  }, [])
 
   useEffect(() => {
     carregarDados()
   }, [])
+
+  useEffect(() => {
+    if (empresaId) {
+      carregarDadosSemana(empresaId, semanaOffset)
+    }
+  }, [empresaId, semanaOffset, carregarDadosSemana])
 
   async function carregarDados() {
     try {
@@ -73,6 +207,8 @@ export default function AdminDashboard() {
         .single()
 
       if (!userData) return
+
+      setEmpresaId(userData.empresa_id)
 
       const now = new Date()
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -147,74 +283,6 @@ export default function AdminDashboard() {
 
       setUltimosServicos(servicosFormatados)
 
-      // Calcular semana atual (segunda a sábado)
-      const hoje = new Date()
-      const diaSemana = hoje.getDay()
-      const inicioSemana = new Date(hoje)
-      // Se for domingo (0), volta 6 dias para segunda anterior
-      // Se for outro dia, volta (dia-1) para segunda
-      inicioSemana.setDate(hoje.getDate() - (diaSemana === 0 ? 6 : diaSemana - 1))
-      inicioSemana.setHours(0, 0, 0, 0)
-
-      const fimSemana = new Date(inicioSemana)
-      fimSemana.setDate(inicioSemana.getDate() + 5) // Sábado
-      fimSemana.setHours(23, 59, 59, 999)
-
-      // Calcular número da semana
-      const startOfYear = new Date(hoje.getFullYear(), 0, 1)
-      const weekNumber = Math.ceil(((hoje.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7)
-
-      // Buscar serviços concluídos da semana
-      const { data: servicosSemana } = await supabase
-        .from('servicos')
-        .select(`
-          instalador_id,
-          valor_total,
-          data_servico_agendada,
-          instalador:usuarios!fk_servicos_instalador(nome)
-        `)
-        .eq('empresa_id', userData.empresa_id)
-        .eq('status', 'concluido')
-        .gte('data_servico_agendada', inicioSemana.toISOString())
-        .lte('data_servico_agendada', fimSemana.toISOString())
-        .not('instalador_id', 'is', null)
-
-      // Agrupar por instalador e dia
-      const instaladoresMap: Record<string, DadosInstaladorSemana> = {}
-
-      servicosSemana?.forEach((s: any) => {
-        if (!s.instalador_id) return
-        
-        const dataServico = new Date(s.data_servico_agendada)
-        const diaSemanaServico = dataServico.getDay() // 0=dom, 1=seg, ..., 6=sab
-
-        if (!instaladoresMap[s.instalador_id]) {
-          instaladoresMap[s.instalador_id] = {
-            instalador_id: s.instalador_id,
-            instalador_nome: s.instalador?.nome || 'Sem nome',
-            dias: {},
-            total_quantidade: 0,
-            total_valor: 0
-          }
-        }
-
-        if (!instaladoresMap[s.instalador_id].dias[diaSemanaServico]) {
-          instaladoresMap[s.instalador_id].dias[diaSemanaServico] = { quantidade: 0, valor: 0 }
-        }
-
-        instaladoresMap[s.instalador_id].dias[diaSemanaServico].quantidade += 1
-        instaladoresMap[s.instalador_id].dias[diaSemanaServico].valor += Number(s.valor_total) || 0
-        instaladoresMap[s.instalador_id].total_quantidade += 1
-        instaladoresMap[s.instalador_id].total_valor += Number(s.valor_total) || 0
-      })
-
-      setDadosSemana({
-        numero_semana: weekNumber,
-        inicio: inicioSemana,
-        fim: fimSemana,
-        instaladores: Object.values(instaladoresMap).sort((a, b) => b.total_valor - a.total_valor)
-      })
-
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
     } finally {
@@ -222,14 +290,13 @@ export default function AdminDashboard() {
     }
   }
 
-  const diasSemana = [
-    { key: 1, label: 'segunda' },
-    { key: 2, label: 'terça' },
-    { key: 3, label: 'quarta' },
-    { key: 4, label: 'quinta' },
-    { key: 5, label: 'sexta' },
-    { key: 6, label: 'sábado' }
-  ]
+  const irSemanaAnterior = () => {
+    setSemanaOffset(prev => prev - 1)
+  }
+
+  const irProximaSemana = () => {
+    setSemanaOffset(prev => Math.min(prev + 1, 0))
+  }
 
   const formatarValorCurto = (valor: number) => {
     if (valor >= 1000) {
@@ -245,6 +312,13 @@ export default function AdminDashboard() {
     return `${data.getDate().toString().padStart(2, '0')}/${(data.getMonth() + 1).toString().padStart(2, '0')}`
   }
 
+  const formatarPeriodoSemana = () => {
+    if (!dadosSemana) return ''
+    const inicio = dadosSemana.inicio
+    const fim = dadosSemana.fim
+    return `${inicio.getDate().toString().padStart(2, '0')}/${(inicio.getMonth() + 1).toString().padStart(2, '0')} - ${fim.getDate().toString().padStart(2, '0')}/${(fim.getMonth() + 1).toString().padStart(2, '0')}`
+  }
+
   function getStatusBadge(status: string) {
     const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
       'aguardando_distribuicao': { label: 'Aguardando', variant: 'secondary' },
@@ -256,6 +330,28 @@ export default function AdminDashboard() {
     }
     const config = statusMap[status] || { label: status, variant: 'outline' }
     return <Badge variant={config.variant}>{config.label}</Badge>
+  }
+
+  // Componente de célula da tabela semanal
+  const CelulaSemanal = ({ dados }: { dados?: DadoInstaladorDia }) => {
+    if (!dados || (dados.atribuidos === 0 && dados.realizados === 0)) {
+      return (
+        <div className="text-center text-gray-300">
+          <div className="text-xs">📋 0</div>
+          <div className="text-xs">✅ 0</div>
+        </div>
+      )
+    }
+    return (
+      <div className="text-center">
+        <div className="text-blue-600 text-xs">
+          📋 {dados.atribuidos} - {formatarValorCurto(dados.atribuidos_valor)}
+        </div>
+        <div className="text-green-600 text-xs font-medium">
+          ✅ {dados.realizados} - {formatarValorCurto(dados.realizados_valor)}
+        </div>
+      </div>
+    )
   }
 
   if (loading) {
@@ -322,9 +418,25 @@ export default function AdminDashboard() {
           </div>
 
           {/* Tabela Semanal de Serviços - Mobile */}
-          {dadosSemana && dadosSemana.instaladores.length > 0 && (
-            <div>
-              <h2 className="text-lg font-bold mb-3">📊 Semana {dadosSemana.numero_semana}</h2>
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <Button variant="outline" size="sm" onClick={irSemanaAnterior} disabled={loadingSemana}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <h2 className="text-base font-bold text-center">
+                📊 Semana {dadosSemana?.numero_semana || '-'}
+                <span className="block text-xs font-normal text-gray-500">{formatarPeriodoSemana()}</span>
+              </h2>
+              <Button variant="outline" size="sm" onClick={irProximaSemana} disabled={semanaOffset >= 0 || loadingSemana}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            {loadingSemana ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+              </div>
+            ) : dadosSemana && dadosSemana.instaladores.length > 0 ? (
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
@@ -332,11 +444,11 @@ export default function AdminDashboard() {
                       <tr>
                         <th className="px-2 py-2 text-left font-medium text-gray-600 sticky left-0 bg-gray-50">Instalador</th>
                         {diasSemana.map(dia => (
-                          <th key={dia.key} className="px-2 py-2 text-center font-medium text-gray-600 min-w-[60px]">
+                          <th key={dia.key} className="px-2 py-2 text-center font-medium text-gray-600 min-w-[70px]">
                             {dia.label.slice(0, 3)}
                           </th>
                         ))}
-                        <th className="px-2 py-2 text-center font-medium text-gray-600 bg-gray-100">Total</th>
+                        <th className="px-2 py-2 text-center font-medium text-gray-600 bg-gray-100 min-w-[80px]">Total</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -345,24 +457,20 @@ export default function AdminDashboard() {
                           <td className="px-2 py-2 font-medium text-gray-900 sticky left-0 bg-inherit whitespace-nowrap">
                             {instalador.instalador_nome.split(' ')[0]}
                           </td>
-                          {diasSemana.map(dia => {
-                            const dados = instalador.dias[dia.key]
-                            return (
-                              <td key={dia.key} className="px-2 py-2 text-center">
-                                {dados ? (
-                                  <div>
-                                    <div className="font-bold text-gray-900">{dados.quantidade}</div>
-                                    <div className="text-gray-500 text-[10px]">{formatarValorCurto(dados.valor)}</div>
-                                  </div>
-                                ) : (
-                                  <span className="text-gray-300">-</span>
-                                )}
-                              </td>
-                            )
-                          })}
-                          <td className="px-2 py-2 text-center bg-gray-100">
-                            <div className="font-bold text-gray-900">{instalador.total_quantidade}</div>
-                            <div className="text-green-600 text-[10px] font-medium">{formatarValorCurto(instalador.total_valor)}</div>
+                          {diasSemana.map(dia => (
+                            <td key={dia.key} className="px-2 py-2">
+                              <CelulaSemanal dados={instalador.dias[dia.key]} />
+                            </td>
+                          ))}
+                          <td className="px-2 py-2 bg-gray-100">
+                            <div className="text-center">
+                              <div className="text-blue-600 text-xs">
+                                📋 {instalador.total_atribuidos} - {formatarValorCurto(instalador.total_atribuidos_valor)}
+                              </div>
+                              <div className="text-green-600 text-xs font-bold">
+                                ✅ {instalador.total_realizados} - {formatarValorCurto(instalador.total_realizados_valor)}
+                              </div>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -370,8 +478,12 @@ export default function AdminDashboard() {
                   </table>
                 </div>
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center text-gray-500">
+                Nenhum serviço nesta semana
+              </div>
+            )}
+          </div>
 
           {/* Links Rápidos */}
           <div className="space-y-2">
@@ -507,54 +619,75 @@ export default function AdminDashboard() {
         </div>
 
         {/* Tabela Semanal de Serviços por Instalador - Desktop */}
-        {dadosSemana && dadosSemana.instaladores.length > 0 && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold mb-4">📊 Semana {dadosSemana.numero_semana} - Serviços por Instalador</h2>
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-4">
+            <Button variant="outline" onClick={irSemanaAnterior} disabled={loadingSemana}>
+              <ChevronLeft className="h-4 w-4 mr-2" /> Anterior
+            </Button>
+            <h2 className="text-xl font-bold text-center">
+              📊 Semana {dadosSemana?.numero_semana || '-'} - Serviços por Instalador
+              <span className="block text-sm font-normal text-gray-500">{formatarPeriodoSemana()}</span>
+            </h2>
+            <Button variant="outline" onClick={irProximaSemana} disabled={semanaOffset >= 0 || loadingSemana}>
+              Próxima <ChevronRight className="h-4 w-4 ml-2" />
+            </Button>
+          </div>
+          
+          {loadingSemana ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+            </div>
+          ) : dadosSemana && dadosSemana.instaladores.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Instalador</th>
                     {diasSemana.map(dia => (
-                      <th key={dia.key} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                      <th key={dia.key} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase min-w-[120px]">
                         {dia.label}<br />
                         <span className="text-[10px] text-gray-400 font-normal">{getDataDia(dia.key)}</span>
                       </th>
                     ))}
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase bg-gray-100">Total</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase bg-gray-100 min-w-[130px]">Total</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {dadosSemana.instaladores.map((instalador, idx) => (
                     <tr key={instalador.instalador_id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">{instalador.instalador_nome}</td>
-                      {diasSemana.map(dia => {
-                        const dados = instalador.dias[dia.key]
-                        return (
-                          <td key={dia.key} className="px-4 py-3 text-center">
-                            {dados ? (
-                              <div>
-                                <span className="font-bold text-gray-900">{dados.quantidade}</span>
-                                <span className="text-gray-500 mx-1">-</span>
-                                <span className="text-green-600 font-medium">R${dados.valor.toFixed(0)}</span>
-                              </div>
-                            ) : (
-                              <span className="text-gray-300">0 - R$0</span>
-                            )}
-                          </td>
-                        )
-                      })}
-                      <td className="px-4 py-3 text-center bg-gray-100">
-                        <div className="font-bold text-gray-900">{instalador.total_quantidade} serviços</div>
-                        <div className="text-green-600 font-medium">R${instalador.total_valor.toFixed(2)}</div>
+                      {diasSemana.map(dia => (
+                        <td key={dia.key} className="px-4 py-3">
+                          <CelulaSemanal dados={instalador.dias[dia.key]} />
+                        </td>
+                      ))}
+                      <td className="px-4 py-3 bg-gray-100">
+                        <div className="text-center">
+                          <div className="text-blue-600 text-sm">
+                            📋 {instalador.total_atribuidos} - {formatarValorCurto(instalador.total_atribuidos_valor)}
+                          </div>
+                          <div className="text-green-600 text-sm font-bold">
+                            ✅ {instalador.total_realizados} - {formatarValorCurto(instalador.total_realizados_valor)}
+                          </div>
+                        </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              Nenhum serviço nesta semana
+            </div>
+          )}
+
+          {/* Legenda */}
+          <div className="mt-4 flex items-center justify-center gap-6 text-sm text-gray-600">
+            <span>📋 = Atribuídos (agendados)</span>
+            <span>✅ = Realizados (concluídos)</span>
           </div>
-        )}
+        </div>
 
         {/* Últimos Serviços */}
         <div className="bg-white rounded-lg shadow p-6">
