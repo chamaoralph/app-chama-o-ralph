@@ -29,10 +29,10 @@ export default function MeuExtrato() {
   const [modalReciboOpen, setModalReciboOpen] = useState(false)
   const [instaladorNome, setInstaladorNome] = useState('')
 
-  // Serviços finalizados de hoje (para o recibo)
+  // Serviços APROVADOS de hoje (para o recibo) - apenas 'concluido' pode entrar no recibo
   const servicosHoje = servicos.filter(s => {
     const dataServico = new Date(s.data_servico_agendada)
-    return isToday(dataServico) && (s.status === 'aguardando_aprovacao' || s.status === 'concluido')
+    return isToday(dataServico) && s.status === 'concluido'
   })
 
   // Cálculos dos cards
@@ -202,7 +202,7 @@ export default function MeuExtrato() {
               <span className="text-3xl opacity-30">💰</span>
             </div>
             <div className="text-2xl font-bold">R$ {aReceber.toFixed(2)}</div>
-            <div className="text-sm opacity-90">Aguardando Aprovação</div>
+            <div className="text-sm opacity-90">Pendente de Aprovação</div>
           </div>
 
           <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
