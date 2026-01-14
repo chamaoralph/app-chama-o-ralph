@@ -1260,10 +1260,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      calculate_rfm: {
-        Args: { p_empresa_id: string; p_periodo_dias?: number }
-        Returns: Json
-      }
+      calculate_rfm:
+        | {
+            Args: { p_empresa_id: string; p_periodo_dias?: number }
+            Returns: Json
+          }
+        | { Args: { p_periodo_dias?: number }; Returns: Json }
       create_user_invitation: {
         Args: {
           p_email: string

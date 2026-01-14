@@ -7,6 +7,16 @@ import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { CheckCircle, XCircle, Loader2, Trash2 } from 'lucide-react'
 import { formatarDataBR } from '@/lib/utils'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
 
 interface Servico {
   id: string
@@ -29,6 +39,12 @@ interface Servico {
   instalador_nome: string | null
 }
 
+interface CorrecaoModal {
+  open: boolean
+  servicoId: string | null
+  observacao: string
+}
+
 export default function Aprovacoes() {
   const [servicos, setServicos] = useState<Servico[]>([])
   const [loading, setLoading] = useState(true)
@@ -36,6 +52,11 @@ export default function Aprovacoes() {
   const [filtroStatus, setFiltroStatus] = useState<'todos' | 'pendentes' | 'aprovados'>('pendentes')
   const [signedUrls, setSignedUrls] = useState<Record<string, string[]>>({})
   const [fotoPaths, setFotoPaths] = useState<Record<string, string[]>>({})
+  const [correcaoModal, setCorrecaoModal] = useState<CorrecaoModal>({
+    open: false,
+    servicoId: null,
+    observacao: ''
+  })
 
   useEffect(() => {
     fetchServicos()
@@ -108,15 +129,11 @@ export default function Aprovacoes() {
       // Otimista: atualiza UI imediatamente
       setServicos((list) => list.map((s) => (s.id === servicoId ? { ...s, status: 'concluido' } : s)))
 
-      console.log('Tentando aprovar serviço:', servicoId)
-
       const { data, error } = await supabase
         .from('servicos')
         .update({ status: 'concluido' })
         .eq('id', servicoId)
         .select()
-
-      console.log('Resultado da aprovação:', { data, error })
 
       if (error) {
         console.error('Erro detalhado:', error)
@@ -139,26 +156,44 @@ export default function Aprovacoes() {
     }
   }
 
-  async function solicitarCorrecao(servicoId: string) {
+  function abrirModalCorrecao(servicoId: string) {
+    setCorrecaoModal({
+      open: true,
+      servicoId,
+      observacao: ''
+    })
+  }
+
+  async function handleSubmitCorrecao() {
+    const { servicoId, observacao } = correcaoModal
+    
+    if (!servicoId) return
+
+    // Validate input
+    const trimmed = observacao.trim()
+    if (trimmed.length === 0) {
+      toast.error('Observação não pode estar vazia')
+      return
+    }
+    if (trimmed.length > 500) {
+      toast.error('Observação muito longa (máximo 500 caracteres)')
+      return
+    }
+
     try {
       setProcessingId(servicoId)
-
-      const observacao = prompt('Digite o motivo da solicitação de correção:')
-      if (!observacao) {
-        setProcessingId(null)
-        return
-      }
 
       const { error } = await supabase
         .from('servicos')
         .update({ 
           status: 'correcao_solicitada',
-          observacoes_instalador: observacao
+          observacoes_instalador: trimmed
         })
         .eq('id', servicoId)
 
       if (error) throw error
 
+      setCorrecaoModal({ open: false, servicoId: null, observacao: '' })
       toast.success('Correção solicitada com sucesso!')
       fetchServicos()
     } catch (error) {
@@ -485,13 +520,13 @@ export default function Aprovacoes() {
                               className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
                               title="Excluir foto"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-gray-500 text-sm">Nenhuma foto disponível</p>
+                      <p className="text-gray-500 text-sm">Nenhuma foto anexada</p>
                     )}
                   </div>
 
@@ -501,6 +536,7 @@ export default function Aprovacoes() {
                       <h3 className="font-semibold text-gray-900 mb-2">Nota Fiscal</h3>
                       <Button
                         variant="outline"
+                        size="sm"
                         onClick={async () => {
                           const url = await getNotaFiscalUrl(servico.nota_fiscal_url!)
                           if (url) window.open(url, '_blank')
@@ -513,16 +549,12 @@ export default function Aprovacoes() {
 
                   {/* Botões de Ação */}
                   <div className="border-t pt-4 flex gap-3">
-                    {servico.status === 'aguardando_aprovacao' ? (
+                    {servico.status === 'aguardando_aprovacao' && (
                       <>
                         <Button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            console.log('Botão Aprovar clicado para serviço:', servico.id);
-                            aprovarServico(servico.id);
-                          }}
+                          onClick={() => aprovarServico(servico.id)}
                           disabled={processingId === servico.id}
-                          className="flex-1 bg-green-600 hover:bg-green-700"
+                          className="bg-green-600 hover:bg-green-700"
                         >
                           {processingId === servico.id ? (
                             <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -531,33 +563,23 @@ export default function Aprovacoes() {
                           )}
                           Aprovar
                         </Button>
-
                         <Button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            solicitarCorrecao(servico.id);
-                          }}
+                          variant="outline"
+                          onClick={() => abrirModalCorrecao(servico.id)}
                           disabled={processingId === servico.id}
-                          variant="destructive"
-                          className="flex-1"
+                          className="text-orange-600 border-orange-300 hover:bg-orange-50"
                         >
-                          {processingId === servico.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          ) : (
-                            <XCircle className="h-4 w-4 mr-2" />
-                          )}
+                          <XCircle className="h-4 w-4 mr-2" />
                           Solicitar Correção
                         </Button>
                       </>
-                    ) : servico.status === 'concluido' ? (
+                    )}
+                    {servico.status === 'concluido' && (
                       <Button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          desaprovarServico(servico.id);
-                        }}
-                        disabled={processingId === servico.id}
                         variant="outline"
-                        className="flex-1"
+                        onClick={() => desaprovarServico(servico.id)}
+                        disabled={processingId === servico.id}
+                        className="text-red-600 border-red-300 hover:bg-red-50"
                       >
                         {processingId === servico.id ? (
                           <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -566,7 +588,7 @@ export default function Aprovacoes() {
                         )}
                         Desaprovar
                       </Button>
-                    ) : null}
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -574,6 +596,59 @@ export default function Aprovacoes() {
           </div>
         )}
       </div>
+
+      {/* Modal de Correção */}
+      <Dialog 
+        open={correcaoModal.open} 
+        onOpenChange={(open) => {
+          if (!open) {
+            setCorrecaoModal({ open: false, servicoId: null, observacao: '' })
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Solicitar Correção</DialogTitle>
+            <DialogDescription>
+              Descreva o motivo da solicitação de correção. O instalador receberá esta mensagem.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="observacao">Motivo da Correção</Label>
+              <Textarea
+                id="observacao"
+                placeholder="Descreva o que precisa ser corrigido..."
+                value={correcaoModal.observacao}
+                onChange={(e) => setCorrecaoModal(prev => ({ ...prev, observacao: e.target.value }))}
+                className="min-h-[100px]"
+                maxLength={500}
+              />
+              <p className="text-xs text-muted-foreground text-right">
+                {correcaoModal.observacao.length}/500 caracteres
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCorrecaoModal({ open: false, servicoId: null, observacao: '' })}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSubmitCorrecao}
+              disabled={processingId !== null || correcaoModal.observacao.trim().length === 0}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              {processingId ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              Solicitar Correção
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   )
 }
