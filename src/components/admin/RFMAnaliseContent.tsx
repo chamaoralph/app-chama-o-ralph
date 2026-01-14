@@ -152,7 +152,6 @@ export function RFMAnaliseContent() {
   const recalcularMutation = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.rpc("calculate_rfm", {
-        p_empresa_id: empresaId,
         p_periodo_dias: periodoSelecionado,
       });
 
