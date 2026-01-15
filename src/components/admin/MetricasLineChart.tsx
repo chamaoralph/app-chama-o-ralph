@@ -2,9 +2,9 @@ import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { TrendingUp, Users, Target } from "lucide-react";
+import { TrendingUp, Users, Target, Receipt } from "lucide-react";
 
-type MetricaType = 'roas' | 'cpl' | 'cpc';
+type MetricaType = 'roas' | 'cpl' | 'cpc' | 'ticketMedio';
 
 interface DailyData {
   data: string;
@@ -42,6 +42,13 @@ const metricas: { key: MetricaType; label: string; icon: React.ReactNode; color:
     color: 'hsl(var(--chart-3))',
     format: (v) => `R$ ${v.toFixed(2)}`
   },
+  { 
+    key: 'ticketMedio', 
+    label: 'Ticket Médio', 
+    icon: <Receipt className="h-4 w-4" />, 
+    color: 'hsl(var(--chart-4))',
+    format: (v) => `R$ ${v.toFixed(2)}`
+  },
 ];
 
 export function MetricasLineChart({ dailyData, loading }: MetricasLineChartProps) {
@@ -65,12 +72,14 @@ export function MetricasLineChart({ dailyData, loading }: MetricasLineChartProps
       const roas = acumInvestimento > 0 ? acumReceita / acumInvestimento : 0;
       const cpl = acumLeads > 0 ? acumInvestimento / acumLeads : 0;
       const cpc = acumConversoes > 0 ? acumInvestimento / acumConversoes : 0;
+      const ticketMedio = acumConversoes > 0 ? acumReceita / acumConversoes : 0;
       
       return {
         dataLabel: d.dataLabel,
         roas,
         cpl,
         cpc,
+        ticketMedio,
         // Guardar acumulados para tooltip
         acumInvestimento,
         acumLeads,
@@ -154,7 +163,7 @@ export function MetricasLineChart({ dailyData, loading }: MetricasLineChartProps
                 className="text-muted-foreground"
                 tickFormatter={(value) => {
                   if (metricaSelecionada === 'roas') return `${value.toFixed(1)}x`;
-                  return `R$${value.toFixed(0)}`;
+                  return `R$ ${value.toFixed(0)}`;
                 }}
               />
               <Tooltip
