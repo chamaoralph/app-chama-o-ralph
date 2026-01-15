@@ -3,11 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
+import { format, eachDayOfInterval, parseISO } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { TrendingUp, Users, Target, DollarSign, ArrowDown, Percent, CalendarIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { MetricasLineChart } from "./MetricasLineChart";
 
 interface FunnelData {
   investimento: number;
@@ -18,6 +20,15 @@ interface FunnelData {
   cpc: number;
   roas: number;
   taxaConversao: number;
+}
+
+interface DailyData {
+  data: string;
+  dataLabel: string;
+  investimento: number;
+  leads: number;
+  conversoes: number;
+  receita: number;
 }
 
 export function FunilConversaoContent() {
@@ -37,6 +48,7 @@ export function FunilConversaoContent() {
     roas: 0,
     taxaConversao: 0,
   });
+  const [dailyData, setDailyData] = useState<DailyData[]>([]);
 
   async function carregarDados() {
     setLoading(true);
@@ -62,7 +74,7 @@ export function FunilConversaoContent() {
 
       const { data: cotacoes, error: erroCotacoes } = await supabase
         .from("cotacoes")
-        .select("id, status")
+        .select("id, status, created_at")
         .ilike("origem_lead", "%google%")
         .gte("created_at", dataInicioStr)
         .lte("created_at", dataFimStr + "T23:59:59");
@@ -75,17 +87,19 @@ export function FunilConversaoContent() {
       
       let agendados = 0;
       let receita = 0;
+      let servicos: { id: string; valor_total: number; status: string | null; cotacao_id: string | null; created_at: string | null }[] = [];
 
       if (cotacaoIds.length > 0) {
-        const { data: servicos, error: erroServicos } = await supabase
+        const { data: servicosData, error: erroServicos } = await supabase
           .from("servicos")
-          .select("id, valor_total, status")
+          .select("id, valor_total, status, cotacao_id, created_at")
           .in("cotacao_id", cotacaoIds);
 
         if (erroServicos) throw erroServicos;
 
-        agendados = servicos?.length || 0;
-        receita = servicos?.reduce((sum, s) => sum + Number(s.valor_total), 0) || 0;
+        servicos = servicosData || [];
+        agendados = servicos.length;
+        receita = servicos.reduce((sum, s) => sum + Number(s.valor_total), 0);
       }
 
       const cpl = leads > 0 ? investimento / leads : 0;
@@ -103,6 +117,45 @@ export function FunilConversaoContent() {
         roas,
         taxaConversao,
       });
+
+      // Build daily data for line chart
+      const days = eachDayOfInterval({ start: dataInicio, end: dataFim });
+      const dailyMetrics: DailyData[] = days.map(day => {
+        const dayStr = format(day, "yyyy-MM-dd");
+        const dayLabel = format(day, "dd/MM", { locale: ptBR });
+
+        // Daily investment
+        const dayInvestimento = despesasGoogle
+          .filter(d => d.data_lancamento === dayStr)
+          .reduce((sum, d) => sum + Number(d.valor), 0);
+
+        // Daily leads
+        const dayLeads = cotacoes?.filter(c => 
+          c.created_at && c.created_at.startsWith(dayStr)
+        ).length || 0;
+
+        // Daily conversions and revenue
+        const dayCotacaoIds = cotacoes?.filter(c => 
+          c.created_at && c.created_at.startsWith(dayStr)
+        ).map(c => c.id) || [];
+        
+        const dayServicos = servicos.filter(s => 
+          s.cotacao_id && dayCotacaoIds.includes(s.cotacao_id)
+        );
+        const dayConversoes = dayServicos.length;
+        const dayReceita = dayServicos.reduce((sum, s) => sum + Number(s.valor_total), 0);
+
+        return {
+          data: dayStr,
+          dataLabel: dayLabel,
+          investimento: dayInvestimento,
+          leads: dayLeads,
+          conversoes: dayConversoes,
+          receita: dayReceita,
+        };
+      });
+
+      setDailyData(dailyMetrics);
     } catch (error: any) {
       toast({
         title: "Erro ao carregar dados",
@@ -243,6 +296,9 @@ export function FunilConversaoContent() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Gráfico de Linha - Evolução de Métricas */}
+      <MetricasLineChart dailyData={dailyData} loading={loading} />
 
       {/* Funil Visual */}
       <Card>
