@@ -47,17 +47,35 @@ const metricas: { key: MetricaType; label: string; icon: React.ReactNode; color:
 export function MetricasLineChart({ dailyData, loading }: MetricasLineChartProps) {
   const [metricaSelecionada, setMetricaSelecionada] = useState<MetricaType>('roas');
 
+  // Calcular métricas ACUMULATIVAS para mostrar evolução real
   const chartData = useMemo(() => {
+    let acumInvestimento = 0;
+    let acumLeads = 0;
+    let acumConversoes = 0;
+    let acumReceita = 0;
+
     return dailyData.map(d => {
-      const roas = d.investimento > 0 ? d.receita / d.investimento : 0;
-      const cpl = d.leads > 0 ? d.investimento / d.leads : 0;
-      const cpc = d.conversoes > 0 ? d.investimento / d.conversoes : 0;
+      // Acumular valores
+      acumInvestimento += d.investimento;
+      acumLeads += d.leads;
+      acumConversoes += d.conversoes;
+      acumReceita += d.receita;
+
+      // Calcular métricas acumuladas
+      const roas = acumInvestimento > 0 ? acumReceita / acumInvestimento : 0;
+      const cpl = acumLeads > 0 ? acumInvestimento / acumLeads : 0;
+      const cpc = acumConversoes > 0 ? acumInvestimento / acumConversoes : 0;
       
       return {
         dataLabel: d.dataLabel,
         roas,
         cpl,
         cpc,
+        // Guardar acumulados para tooltip
+        acumInvestimento,
+        acumLeads,
+        acumConversoes,
+        acumReceita,
       };
     });
   }, [dailyData]);
@@ -94,7 +112,10 @@ export function MetricasLineChart({ dailyData, loading }: MetricasLineChartProps
     <Card>
       <CardHeader className="pb-2">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <CardTitle className="text-lg">Evolução de Métricas</CardTitle>
+          <div>
+            <CardTitle className="text-lg">Evolução de Métricas (Acumulado)</CardTitle>
+            <p className="text-sm text-muted-foreground">Valores acumulados desde o início do período</p>
+          </div>
           <div className="flex flex-wrap gap-2">
             {metricas.map((m) => (
               <Button
@@ -140,12 +161,19 @@ export function MetricasLineChart({ dailyData, loading }: MetricasLineChartProps
                 content={({ active, payload, label }) => {
                   if (active && payload && payload.length) {
                     const value = payload[0].value as number;
+                    const data = payload[0].payload;
                     return (
                       <div className="bg-background border rounded-lg shadow-lg p-3">
-                        <p className="text-sm text-muted-foreground">{label}</p>
+                        <p className="text-sm font-medium text-foreground mb-2">{label}</p>
                         <p className="text-lg font-semibold" style={{ color: metricaAtual.color }}>
                           {metricaAtual.format(value)}
                         </p>
+                        <div className="mt-2 pt-2 border-t text-xs text-muted-foreground space-y-1">
+                          <p>Investimento: R$ {data.acumInvestimento?.toFixed(2)}</p>
+                          <p>Leads: {data.acumLeads}</p>
+                          <p>Conversões: {data.acumConversoes}</p>
+                          <p>Receita: R$ {data.acumReceita?.toFixed(2)}</p>
+                        </div>
                       </div>
                     );
                   }
