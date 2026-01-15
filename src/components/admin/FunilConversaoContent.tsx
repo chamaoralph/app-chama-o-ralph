@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, eachDayOfInterval, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { TrendingUp, Users, Target, DollarSign, ArrowDown, Percent, CalendarIcon } from "lucide-react";
+import { TrendingUp, Users, Target, DollarSign, ArrowDown, Percent, CalendarIcon, Receipt } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -20,6 +20,7 @@ interface FunnelData {
   cpc: number;
   roas: number;
   taxaConversao: number;
+  ticketMedio: number;
 }
 
 interface DailyData {
@@ -47,6 +48,7 @@ export function FunilConversaoContent() {
     cpc: 0,
     roas: 0,
     taxaConversao: 0,
+    ticketMedio: 0,
   });
   const [dailyData, setDailyData] = useState<DailyData[]>([]);
 
@@ -106,6 +108,7 @@ export function FunilConversaoContent() {
       const cpc = agendados > 0 ? investimento / agendados : 0;
       const roas = investimento > 0 ? receita / investimento : 0;
       const taxaConversao = leads > 0 ? (agendados / leads) * 100 : 0;
+      const ticketMedio = agendados > 0 ? receita / agendados : 0;
 
       setFunnelData({
         investimento,
@@ -116,6 +119,7 @@ export function FunilConversaoContent() {
         cpc,
         roas,
         taxaConversao,
+        ticketMedio,
       });
 
       // Build daily data for line chart
@@ -247,7 +251,7 @@ export function FunilConversaoContent() {
       </Card>
 
       {/* Métricas Principais */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -292,6 +296,18 @@ export function FunilConversaoContent() {
                 <p className="text-2xl font-bold">{funnelData.roas.toFixed(2)}x</p>
               </div>
               <TrendingUp className="h-10 w-10 opacity-80" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-cyan-500 to-cyan-600 text-white">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-cyan-100 text-sm">Ticket Médio</p>
+                <p className="text-2xl font-bold">{formatCurrency(funnelData.ticketMedio)}</p>
+              </div>
+              <Receipt className="h-10 w-10 opacity-80" />
             </div>
           </CardContent>
         </Card>
