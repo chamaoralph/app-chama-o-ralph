@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Search, X, Loader2 } from 'lucide-react'
+import { normalizarTelefone } from '@/lib/utils'
 
 interface TipoServico {
   id: string
@@ -286,7 +287,9 @@ export default function NovaCotacao() {
                   required 
                   value={formData.cliente_telefone} 
                   onChange={(e) => {
-                    setFormData({...formData, cliente_telefone: e.target.value})
+                    // Normaliza o telefone removendo caracteres especiais (incluindo Unicode do WhatsApp)
+                    const telefoneNormalizado = normalizarTelefone(e.target.value)
+                    setFormData({...formData, cliente_telefone: telefoneNormalizado})
                     if (clienteBuscado) {
                       setClienteBuscado(false)
                       setClienteEncontrado(false)
