@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { formatarDataBR } from "@/lib/utils"
+import { formatarDataBR, normalizarTelefone } from "@/lib/utils"
 import { 
   Search, 
   Users, 
@@ -185,9 +185,10 @@ export default function AdminClientes() {
     // Busca
     if (busca) {
       const termoBusca = busca.toLowerCase()
+      const telefoneBuscaNormalizado = normalizarTelefone(busca)
       resultado = resultado.filter(c => 
         c.nome.toLowerCase().includes(termoBusca) ||
-        c.telefone.includes(termoBusca)
+        c.telefone.includes(telefoneBuscaNormalizado.length >= 4 ? telefoneBuscaNormalizado : busca)
       )
     }
 
@@ -322,7 +323,7 @@ export default function AdminClientes() {
     atualizarClienteCompleto.mutate({
       id: clienteSelecionado.id,
       nome: formEdicao.nome,
-      telefone: formEdicao.telefone,
+      telefone: normalizarTelefone(formEdicao.telefone),
       bairro: formEdicao.bairro || null,
       endereco_completo: formEdicao.endereco_completo || null,
       idade: formEdicao.idade ? parseInt(formEdicao.idade) : null,

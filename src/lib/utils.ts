@@ -5,6 +5,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// Remove TODOS os caracteres não-numéricos de um telefone
+// Isso inclui espaços, hífens, parênteses, e caracteres Unicode invisíveis do WhatsApp
+export function normalizarTelefone(telefone: string | null | undefined): string {
+  if (!telefone) return ''
+  return telefone.replace(/[^\d]/g, '')
+}
+
 // Formata data ISO para DD/MM/YYYY (sem conversão de timezone)
 export function formatarDataBR(dataString: string | null): string {
   if (!dataString) return '-'
