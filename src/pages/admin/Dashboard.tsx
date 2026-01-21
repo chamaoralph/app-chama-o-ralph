@@ -85,7 +85,10 @@ export default function AdminDashboard() {
     try {
       setLoadingSemana(true)
       
-      const hoje = new Date()
+      // Forçar timezone de Brasília (UTC-3) para "hoje"
+      const agoraBrasil = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+      const [diaHoje, mesHoje, anoHoje] = agoraBrasil.split('/').map(Number)
+      const hoje = new Date(anoHoje, mesHoje - 1, diaHoje)
       hoje.setDate(hoje.getDate() + (offset * 7))
       
       const diaSemana = hoje.getDay()
@@ -123,7 +126,7 @@ export default function AdminDashboard() {
         .lte('data_servico_agendada', fimQuery)
         .not('instalador_id', 'is', null)
 
-      // Buscar serviços CONCLUÍDOS
+      // Buscar serviços CONCLUÍDOS + AGUARDANDO APROVAÇÃO (instalador já fez)
       const { data: servicosConcluidos } = await supabase
         .from('servicos')
         .select(`
@@ -135,7 +138,7 @@ export default function AdminDashboard() {
           instalador:usuarios!fk_servicos_instalador(nome)
         `)
         .eq('empresa_id', empId)
-        .eq('status', 'concluido')
+        .in('status', ['concluido', 'aguardando_aprovacao'])
         .gte('data_servico_agendada', inicioQuery)
         .lte('data_servico_agendada', fimQuery)
         .not('instalador_id', 'is', null)
