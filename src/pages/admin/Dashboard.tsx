@@ -69,8 +69,17 @@ export default function AdminDashboard() {
     { key: 3, label: 'quarta' },
     { key: 4, label: 'quinta' },
     { key: 5, label: 'sexta' },
-    { key: 6, label: 'sábado' }
+    { key: 6, label: 'sábado' },
+    { key: 7, label: 'domingo' }
   ]
+
+  // Formata data local para query no Supabase (YYYY-MM-DD)
+  const formatarDataParaQuery = (data: Date) => {
+    const ano = data.getFullYear()
+    const mes = String(data.getMonth() + 1).padStart(2, '0')
+    const dia = String(data.getDate()).padStart(2, '0')
+    return `${ano}-${mes}-${dia}`
+  }
 
   const carregarDadosSemana = useCallback(async (empId: string, offset: number) => {
     try {
@@ -81,15 +90,21 @@ export default function AdminDashboard() {
       
       const diaSemana = hoje.getDay()
       const inicioSemana = new Date(hoje)
+      // Segunda-feira da semana
       inicioSemana.setDate(hoje.getDate() - (diaSemana === 0 ? 6 : diaSemana - 1))
       inicioSemana.setHours(0, 0, 0, 0)
 
       const fimSemana = new Date(inicioSemana)
-      fimSemana.setDate(inicioSemana.getDate() + 5)
+      // Domingo da semana (6 dias depois da segunda)
+      fimSemana.setDate(inicioSemana.getDate() + 6)
       fimSemana.setHours(23, 59, 59, 999)
 
       const startOfYear = new Date(inicioSemana.getFullYear(), 0, 1)
       const weekNumber = Math.ceil(((inicioSemana.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7)
+
+      // Usar datas locais formatadas para evitar problemas de timezone
+      const inicioQuery = `${formatarDataParaQuery(inicioSemana)}T00:00:00`
+      const fimQuery = `${formatarDataParaQuery(fimSemana)}T23:59:59`
 
       // Buscar serviços ATRIBUÍDOS + EM_ANDAMENTO
       const { data: servicosAtribuidos } = await supabase
@@ -104,8 +119,8 @@ export default function AdminDashboard() {
         `)
         .eq('empresa_id', empId)
         .in('status', ['atribuido', 'em_andamento'])
-        .gte('data_servico_agendada', inicioSemana.toISOString())
-        .lte('data_servico_agendada', fimSemana.toISOString())
+        .gte('data_servico_agendada', inicioQuery)
+        .lte('data_servico_agendada', fimQuery)
         .not('instalador_id', 'is', null)
 
       // Buscar serviços CONCLUÍDOS
@@ -121,8 +136,8 @@ export default function AdminDashboard() {
         `)
         .eq('empresa_id', empId)
         .eq('status', 'concluido')
-        .gte('data_servico_agendada', inicioSemana.toISOString())
-        .lte('data_servico_agendada', fimSemana.toISOString())
+        .gte('data_servico_agendada', inicioQuery)
+        .lte('data_servico_agendada', fimQuery)
         .not('instalador_id', 'is', null)
 
       // Agrupar por instalador e dia
@@ -131,8 +146,15 @@ export default function AdminDashboard() {
       const processarServico = (s: any, tipo: 'atribuido' | 'realizado') => {
         if (!s.instalador_id) return
         
-        const dataServico = new Date(s.data_servico_agendada)
-        const diaSemanaServico = dataServico.getDay()
+        // Extrair apenas a parte da data (YYYY-MM-DD) para evitar problemas de timezone
+        const dataStr = s.data_servico_agendada.split('T')[0] // "2026-01-19"
+        const [ano, mes, dia] = dataStr.split('-').map(Number)
+        const dataServico = new Date(ano, mes - 1, dia) // Cria data local sem timezone
+        
+        // getDay(): 0=dom, 1=seg, ..., 6=sab
+        // Queremos: 1=seg, 2=ter, ..., 6=sab, 7=dom
+        let diaSemanaServico = dataServico.getDay()
+        diaSemanaServico = diaSemanaServico === 0 ? 7 : diaSemanaServico
 
         if (!instaladoresMap[s.instalador_id]) {
           instaladoresMap[s.instalador_id] = {
@@ -316,6 +338,7 @@ export default function AdminDashboard() {
   const getDataDia = (diaKey: number) => {
     if (!dadosSemana) return ''
     const data = new Date(dadosSemana.inicio)
+    // diaKey: 1=seg (offset 0), 2=ter (offset 1), ..., 7=dom (offset 6)
     data.setDate(data.getDate() + (diaKey - 1))
     return `${data.getDate().toString().padStart(2, '0')}/${(data.getMonth() + 1).toString().padStart(2, '0')}`
   }
@@ -324,6 +347,7 @@ export default function AdminDashboard() {
     if (!dadosSemana) return ''
     const inicio = dadosSemana.inicio
     const fim = dadosSemana.fim
+    // Mostra de segunda a domingo
     return `${inicio.getDate().toString().padStart(2, '0')}/${(inicio.getMonth() + 1).toString().padStart(2, '0')} - ${fim.getDate().toString().padStart(2, '0')}/${(fim.getMonth() + 1).toString().padStart(2, '0')}`
   }
 
