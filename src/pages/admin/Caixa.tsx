@@ -23,6 +23,9 @@ export default function Caixa() {
     coluna: "data" | "tipo" | "categoria" | "descricao" | "forma_pagamento" | "valor";
     direcao: "asc" | "desc";
   }>({ coluna: "data", direcao: "desc" });
+  
+  // Total de instaladores baseado em recibos pagos (fonte única de verdade)
+  const [totalInstaladoresRecibos, setTotalInstaladoresRecibos] = useState(0);
 
   const alternarOrdenacao = (coluna: typeof ordenacao.coluna) => {
     setOrdenacao(prev => ({
@@ -41,8 +44,31 @@ export default function Caixa() {
   useEffect(() => {
     if (filtroMes) {
       carregarLancamentos();
+      carregarTotalRecibos();
     }
   }, [filtroMes]);
+
+  async function carregarTotalRecibos() {
+    try {
+      const [ano, mes] = filtroMes.split("-");
+      const primeiroDia = `${ano}-${mes}-01`;
+      const lastDay = new Date(Number(ano), Number(mes), 0).getDate();
+      const ultimoDia = `${ano}-${mes}-${String(lastDay).padStart(2, "0")}`;
+
+      const { data, error } = await supabase
+        .from("recibos_diarios")
+        .select("valor_total")
+        .eq("status_pagamento", "pago")
+        .gte("data_referencia", primeiroDia)
+        .lte("data_referencia", ultimoDia);
+
+      if (error) throw error;
+      const total = (data || []).reduce((sum, r) => sum + Number(r.valor_total), 0);
+      setTotalInstaladoresRecibos(total);
+    } catch (error) {
+      console.error("Erro ao carregar total de recibos:", error);
+    }
+  }
 
   async function carregarLancamentos() {
     setLoading(true);
@@ -78,9 +104,8 @@ export default function Caixa() {
     .filter((l) => l.tipo === "despesa" && !CATEGORIAS_INSTALADORES.has(l.categoria))
     .reduce((acc, l) => acc + Number(l.valor), 0);
 
-  const totalInstaladores = lancamentos
-    .filter((l) => CATEGORIAS_INSTALADORES.has(l.categoria))
-    .reduce((acc, l) => acc + Number(l.valor), 0);
+  // Usar o total de recibos pagos como fonte única de verdade
+  const totalInstaladores = totalInstaladoresRecibos;
 
   const saldo = totalReceitas - totalDespesasGerais - totalInstaladores;
 
