@@ -31,6 +31,7 @@ interface Movimentacao {
   observacoes: string | null
   created_at: string
   servico_id: string | null
+  valor_unitario: number | null
   usuarios?: { nome: string }
   servicos?: { codigo: string } | null
 }
@@ -47,6 +48,7 @@ export default function Suportes() {
   const [formEntrega, setFormEntrega] = useState({
     instalador_id: '',
     quantidade: '1',
+    valor_unitario: '',
     observacoes: ''
   })
   const [enviando, setEnviando] = useState(false)
@@ -76,7 +78,7 @@ export default function Suportes() {
         .order('created_at', { ascending: false })
         .limit(100)
       
-      setMovimentacoes(movData || [])
+      setMovimentacoes((movData || []) as Movimentacao[])
       
       // Calcular saldos por instalador
       if (movData) {
@@ -120,6 +122,7 @@ export default function Suportes() {
           instalador_id: formEntrega.instalador_id,
           quantidade: parseInt(formEntrega.quantidade),
           tipo_movimento: 'entrega',
+          valor_unitario: formEntrega.valor_unitario ? parseFloat(formEntrega.valor_unitario) : 0,
           observacoes: formEntrega.observacoes || null,
           data_movimento: new Date().toISOString().split('T')[0]
         })
@@ -131,7 +134,7 @@ export default function Suportes() {
         description: `${formEntrega.quantidade} suporte(s) registrado(s) com sucesso.`
       })
       
-      setFormEntrega({ instalador_id: '', quantidade: '1', observacoes: '' })
+      setFormEntrega({ instalador_id: '', quantidade: '1', valor_unitario: '', observacoes: '' })
       fetchData()
       
     } catch (error: any) {
@@ -271,13 +274,25 @@ export default function Suportes() {
                     </div>
                     
                     <div className="space-y-2">
-                      <Label>Observações</Label>
+                      <Label>Valor Unitário (R$) *</Label>
                       <Input 
-                        value={formEntrega.observacoes}
-                        onChange={(e) => setFormEntrega({...formEntrega, observacoes: e.target.value})}
-                        placeholder="Ex: Suportes articulados 32-55"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formEntrega.valor_unitario}
+                        onChange={(e) => setFormEntrega({...formEntrega, valor_unitario: e.target.value})}
+                        placeholder="0,00"
                       />
                     </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Observações</Label>
+                    <Input 
+                      value={formEntrega.observacoes}
+                      onChange={(e) => setFormEntrega({...formEntrega, observacoes: e.target.value})}
+                      placeholder="Ex: Suportes articulados 32-55"
+                    />
                   </div>
                   
                   <Button type="submit" disabled={enviando || !formEntrega.instalador_id}>
@@ -361,6 +376,7 @@ export default function Suportes() {
                       <TableHead>Instalador</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead className="text-center">Qtd</TableHead>
+                      <TableHead className="text-right">Valor Unit.</TableHead>
                       <TableHead>Serviço</TableHead>
                       <TableHead>Observações</TableHead>
                     </TableRow>
@@ -380,6 +396,11 @@ export default function Suportes() {
                         <TableCell className="text-center font-medium">
                           {mov.tipo_movimento === 'entrega' ? '+' : '-'}{mov.quantidade}
                         </TableCell>
+                        <TableCell className="text-right">
+                          {mov.valor_unitario && mov.valor_unitario > 0 
+                            ? `R$ ${mov.valor_unitario.toFixed(2)}` 
+                            : '-'}
+                        </TableCell>
                         <TableCell>
                           {mov.servicos?.codigo || '-'}
                         </TableCell>
@@ -390,7 +411,7 @@ export default function Suportes() {
                     ))}
                     {movimentacoes.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                        <TableCell colSpan={7} className="text-center text-gray-500 py-8">
                           Nenhuma movimentação registrada
                         </TableCell>
                       </TableRow>

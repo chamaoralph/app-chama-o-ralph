@@ -663,6 +663,7 @@ export type Database = {
           quantidade: number
           servico_id: string | null
           tipo_movimento: string
+          valor_unitario: number | null
         }
         Insert: {
           created_at?: string | null
@@ -674,6 +675,7 @@ export type Database = {
           quantidade?: number
           servico_id?: string | null
           tipo_movimento: string
+          valor_unitario?: number | null
         }
         Update: {
           created_at?: string | null
@@ -685,6 +687,7 @@ export type Database = {
           quantidade?: number
           servico_id?: string | null
           tipo_movimento?: string
+          valor_unitario?: number | null
         }
         Relationships: [
           {
