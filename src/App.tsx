@@ -32,6 +32,7 @@ import InstaladorFinalizarServico from "@/pages/instalador/FinalizarServico";
 import InstaladorMeuExtrato from "@/pages/instalador/MeuExtrato";
 import InstaladorBaseConhecimento from "@/pages/instalador/BaseConhecimento";
 import AdminGerenciarConteudo from "@/pages/admin/GerenciarConteudo";
+import AdminSuportes from "@/pages/admin/Suportes";
 
 const AdminQuestionarios = lazy(() => import('./pages/admin/Questionarios'));
 const AdminGerenciarPerguntas = lazy(() => import('./pages/admin/GerenciarPerguntas'));
@@ -77,6 +78,7 @@ function App() {
               <Route path="relatorios" element={<AdminRelatorios />} />
               <Route path="marketing" element={<AdminMarketing />} />
               <Route path="conteudo" element={<AdminGerenciarConteudo />} />
+              <Route path="suportes" element={<AdminSuportes />} />
               <Route path="questionarios" element={<Suspense><AdminQuestionarios /></Suspense>} />
               <Route path="questionarios/:id/perguntas" element={<Suspense><AdminGerenciarPerguntas /></Suspense>} />
               <Route path="certificacoes" element={<Suspense><AdminCertificacoes /></Suspense>} />

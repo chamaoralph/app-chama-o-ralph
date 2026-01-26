@@ -99,6 +99,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           <Link to="/admin/despesas" className="block px-4 py-2 rounded hover:bg-gray-800 transition-colors">
             💸 Despesas
           </Link>
+          <Link to="/admin/suportes" className="block px-4 py-2 rounded hover:bg-gray-800 transition-colors">
+            📦 Suportes
+          </Link>
           <Collapsible open={capacitacaoOpen} onOpenChange={setCapacitacaoOpen}>
             <CollapsibleTrigger className="flex items-center justify-between w-full px-4 py-2 rounded hover:bg-gray-800 transition-colors text-left">
               <span>🎓 Capacitação</span>

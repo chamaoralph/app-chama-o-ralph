@@ -352,6 +352,7 @@ export type Database = {
         Row: {
           cliente_id: string
           created_at: string | null
+          custo_suporte: number | null
           data_servico_desejada: string | null
           descricao_servico: string | null
           empresa_id: string
@@ -361,6 +362,7 @@ export type Database = {
           observacoes: string | null
           ocasiao: string | null
           origem_lead: string | null
+          origem_suporte: string | null
           status: string
           tipo_servico: string[] | null
           updated_at: string | null
@@ -370,6 +372,7 @@ export type Database = {
         Insert: {
           cliente_id: string
           created_at?: string | null
+          custo_suporte?: number | null
           data_servico_desejada?: string | null
           descricao_servico?: string | null
           empresa_id: string
@@ -379,6 +382,7 @@ export type Database = {
           observacoes?: string | null
           ocasiao?: string | null
           origem_lead?: string | null
+          origem_suporte?: string | null
           status?: string
           tipo_servico?: string[] | null
           updated_at?: string | null
@@ -388,6 +392,7 @@ export type Database = {
         Update: {
           cliente_id?: string
           created_at?: string | null
+          custo_suporte?: number | null
           data_servico_desejada?: string | null
           descricao_servico?: string | null
           empresa_id?: string
@@ -397,6 +402,7 @@ export type Database = {
           observacoes?: string | null
           ocasiao?: string | null
           origem_lead?: string | null
+          origem_suporte?: string | null
           status?: string
           tipo_servico?: string[] | null
           updated_at?: string | null
@@ -639,6 +645,64 @@ export type Database = {
           },
           {
             foreignKeyName: "lancamentos_caixa_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: false
+            referencedRelation: "servicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      movimentacoes_suportes: {
+        Row: {
+          created_at: string | null
+          data_movimento: string
+          empresa_id: string
+          id: string
+          instalador_id: string
+          observacoes: string | null
+          quantidade: number
+          servico_id: string | null
+          tipo_movimento: string
+        }
+        Insert: {
+          created_at?: string | null
+          data_movimento?: string
+          empresa_id: string
+          id?: string
+          instalador_id: string
+          observacoes?: string | null
+          quantidade?: number
+          servico_id?: string | null
+          tipo_movimento: string
+        }
+        Update: {
+          created_at?: string | null
+          data_movimento?: string
+          empresa_id?: string
+          id?: string
+          instalador_id?: string
+          observacoes?: string | null
+          quantidade?: number
+          servico_id?: string | null
+          tipo_movimento?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "movimentacoes_suportes_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentacoes_suportes_instalador_id_fkey"
+            columns: ["instalador_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentacoes_suportes_servico_id_fkey"
             columns: ["servico_id"]
             isOneToOne: false
             referencedRelation: "servicos"
@@ -899,6 +963,7 @@ export type Database = {
           codigo: string
           cotacao_id: string | null
           created_at: string | null
+          custo_suporte: number | null
           data_servico_agendada: string
           descricao: string | null
           empresa_id: string
@@ -908,6 +973,7 @@ export type Database = {
           instalador_id: string | null
           nota_fiscal_url: string | null
           observacoes_instalador: string | null
+          origem_suporte: string | null
           status: string | null
           tipo_servico: string[]
           updated_at: string | null
@@ -920,6 +986,7 @@ export type Database = {
           codigo: string
           cotacao_id?: string | null
           created_at?: string | null
+          custo_suporte?: number | null
           data_servico_agendada: string
           descricao?: string | null
           empresa_id: string
@@ -929,6 +996,7 @@ export type Database = {
           instalador_id?: string | null
           nota_fiscal_url?: string | null
           observacoes_instalador?: string | null
+          origem_suporte?: string | null
           status?: string | null
           tipo_servico: string[]
           updated_at?: string | null
@@ -941,6 +1009,7 @@ export type Database = {
           codigo?: string
           cotacao_id?: string | null
           created_at?: string | null
+          custo_suporte?: number | null
           data_servico_agendada?: string
           descricao?: string | null
           empresa_id?: string
@@ -950,6 +1019,7 @@ export type Database = {
           instalador_id?: string | null
           nota_fiscal_url?: string | null
           observacoes_instalador?: string | null
+          origem_suporte?: string | null
           status?: string | null
           tipo_servico?: string[]
           updated_at?: string | null

@@ -64,6 +64,8 @@ interface EditForm {
   valor_material: string
   descricao_servico: string
   observacoes: string
+  origem_suporte: string
+  custo_suporte: string
 }
 
 interface TipoServico {
@@ -139,7 +141,9 @@ export default function ListaCotacoes() {
     valor_estimado: '',
     valor_material: '',
     descricao_servico: '',
-    observacoes: ''
+    observacoes: '',
+    origem_suporte: '',
+    custo_suporte: ''
   })
   const [editLoading, setEditLoading] = useState(false)
   const [motivoNaoGerou, setMotivoNaoGerou] = useState<string>('')
@@ -218,7 +222,9 @@ export default function ListaCotacoes() {
       valor_estimado: cotacao.valor_estimado?.toString() || '',
       valor_material: cotacao.valor_material?.toString() || '',
       descricao_servico: cotacao.descricao_servico || '',
-      observacoes: cotacao.observacoes || ''
+      observacoes: cotacao.observacoes || '',
+      origem_suporte: (cotacao as any).origem_suporte || '',
+      custo_suporte: (cotacao as any).custo_suporte?.toString() || ''
     })
     setShowOutroInput(!ehTipoCadastrado && !!tipoAtual)
     setCotacaoParaEditar(cotacao)
@@ -268,6 +274,8 @@ export default function ListaCotacoes() {
           ocasiao: editForm.ocasiao || null,
           descricao_servico: editForm.descricao_servico || null,
           observacoes: editForm.observacoes || null,
+          origem_suporte: editForm.origem_suporte || null,
+          custo_suporte: editForm.custo_suporte ? parseFloat(editForm.custo_suporte) : 0,
         })
         .eq('id', cotacaoParaEditar.id)
 
@@ -1077,6 +1085,42 @@ export default function ListaCotacoes() {
                     onChange={(e) => setEditForm({...editForm, observacoes: e.target.value})}
                     rows={3}
                   />
+                </div>
+                
+                {/* Seção Suporte */}
+                <div className="col-span-2 border-t pt-4 mt-2">
+                  <h4 className="font-medium mb-3">Suporte de TV</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Origem do Suporte</Label>
+                      <Select 
+                        value={editForm.origem_suporte} 
+                        onValueChange={(v) => setEditForm({...editForm, origem_suporte: v})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Não aplicável" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Não aplicável</SelectItem>
+                          <SelectItem value="empresa">Empresa fornece</SelectItem>
+                          <SelectItem value="instalador">Instalador compra (reembolso)</SelectItem>
+                          <SelectItem value="cliente">Cliente já tem</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {editForm.origem_suporte && editForm.origem_suporte !== 'cliente' && (
+                      <div className="space-y-2">
+                        <Label>Custo do Suporte (R$)</Label>
+                        <Input 
+                          type="number"
+                          step="0.01"
+                          value={editForm.custo_suporte}
+                          onChange={(e) => setEditForm({...editForm, custo_suporte: e.target.value})}
+                          placeholder="0,00"
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
