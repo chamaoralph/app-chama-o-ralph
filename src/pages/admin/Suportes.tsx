@@ -8,11 +8,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
-import { Package, Plus, History, Users } from 'lucide-react'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Package, Plus, History, Users, Pencil } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -52,6 +52,15 @@ export default function Suportes() {
     observacoes: ''
   })
   const [enviando, setEnviando] = useState(false)
+  
+  // Estado do modal de edição
+  const [editando, setEditando] = useState<Movimentacao | null>(null)
+  const [formEdit, setFormEdit] = useState({
+    quantidade: '',
+    valor_unitario: '',
+    observacoes: ''
+  })
+  const [salvandoEdicao, setSalvandoEdicao] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -186,13 +195,58 @@ export default function Suportes() {
   const getTipoMovimentoBadge = (tipo: string) => {
     switch (tipo) {
       case 'entrega':
-        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Entrega</Badge>
+        return <Badge className="bg-green-500/20 text-green-700 hover:bg-green-500/20 border-green-500/30">Entrega</Badge>
       case 'devolucao':
-        return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Devolução</Badge>
+        return <Badge className="bg-blue-500/20 text-blue-700 hover:bg-blue-500/20 border-blue-500/30">Devolução</Badge>
       case 'uso':
-        return <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">Uso</Badge>
+        return <Badge className="bg-orange-500/20 text-orange-700 hover:bg-orange-500/20 border-orange-500/30">Uso</Badge>
       default:
         return <Badge variant="outline">{tipo}</Badge>
+    }
+  }
+
+  function abrirModalEdicao(mov: Movimentacao) {
+    setFormEdit({
+      quantidade: mov.quantidade.toString(),
+      valor_unitario: mov.valor_unitario?.toString() || '',
+      observacoes: mov.observacoes || ''
+    })
+    setEditando(mov)
+  }
+
+  async function salvarEdicao() {
+    if (!editando) return
+    
+    setSalvandoEdicao(true)
+    try {
+      const { error } = await supabase
+        .from('movimentacoes_suportes')
+        .update({
+          quantidade: parseInt(formEdit.quantidade) || 1,
+          valor_unitario: parseFloat(formEdit.valor_unitario) || 0,
+          observacoes: formEdit.observacoes?.trim() || null
+        })
+        .eq('id', editando.id)
+      
+      if (error) throw error
+      
+      toast({
+        title: '✅ Movimentação atualizada!',
+        description: 'Os dados foram salvos com sucesso.'
+      })
+      
+      setEditando(null)
+      fetchData()
+      
+    } catch (error: any) {
+      console.error('Erro ao atualizar:', error)
+      toast({
+        title: '❌ Erro ao atualizar',
+        description: error.message,
+        variant: 'destructive'
+      })
+    } finally {
+      setSalvandoEdicao(false)
     }
   }
 
@@ -379,6 +433,7 @@ export default function Suportes() {
                       <TableHead className="text-right">Valor Unit.</TableHead>
                       <TableHead>Serviço</TableHead>
                       <TableHead>Observações</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -404,14 +459,23 @@ export default function Suportes() {
                         <TableCell>
                           {mov.servicos?.codigo || '-'}
                         </TableCell>
-                        <TableCell className="text-gray-500 max-w-[200px] truncate">
+                        <TableCell className="text-muted-foreground max-w-[200px] truncate">
                           {mov.observacoes || '-'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => abrirModalEdicao(mov)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
                     {movimentacoes.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center text-gray-500 py-8">
+                        <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                           Nenhuma movimentação registrada
                         </TableCell>
                       </TableRow>
@@ -422,6 +486,83 @@ export default function Suportes() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Modal de Edição */}
+        <Dialog open={!!editando} onOpenChange={(open) => !open && setEditando(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar Movimentação</DialogTitle>
+              <DialogDescription>
+                Altere os dados da movimentação de suportes
+              </DialogDescription>
+            </DialogHeader>
+            
+            {editando && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Instalador:</span>
+                    <p className="font-medium">{editando.usuarios?.nome || '-'}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Tipo:</span>
+                    <p className="font-medium capitalize">{editando.tipo_movimento}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Data:</span>
+                    <p className="font-medium">
+                      {format(new Date(editando.data_movimento), 'dd/MM/yyyy', { locale: ptBR })}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-quantidade">Quantidade *</Label>
+                  <Input
+                    id="edit-quantidade"
+                    type="number"
+                    min="1"
+                    value={formEdit.quantidade}
+                    onChange={(e) => setFormEdit({ ...formEdit, quantidade: e.target.value })}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-valor">Valor Unitário (R$)</Label>
+                  <Input
+                    id="edit-valor"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formEdit.valor_unitario}
+                    onChange={(e) => setFormEdit({ ...formEdit, valor_unitario: e.target.value })}
+                    placeholder="0,00"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-obs">Observações</Label>
+                  <Input
+                    id="edit-obs"
+                    value={formEdit.observacoes}
+                    onChange={(e) => setFormEdit({ ...formEdit, observacoes: e.target.value })}
+                    placeholder="Ex: Suportes articulados"
+                    maxLength={200}
+                  />
+                </div>
+              </div>
+            )}
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditando(null)}>
+                Cancelar
+              </Button>
+              <Button onClick={salvarEdicao} disabled={salvandoEdicao}>
+                {salvandoEdicao ? 'Salvando...' : 'Salvar'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AdminLayout>
   )
