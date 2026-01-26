@@ -43,7 +43,9 @@ export default function NovaCotacao() {
     descricao: '',
     valor_mao_obra: '',
     valor_material: '',
-    observacoes: ''
+    observacoes: '',
+    origem_suporte: '',
+    custo_suporte: ''
   })
 
   useEffect(() => {
@@ -232,6 +234,8 @@ export default function NovaCotacao() {
           origem_lead: formData.origem_lead,
           ocasiao: formData.ocasiao,
           observacoes: formData.observacoes,
+          origem_suporte: formData.origem_suporte || null,
+          custo_suporte: formData.custo_suporte ? parseFloat(formData.custo_suporte) : 0,
           status: 'pendente'
         })
 
@@ -445,6 +449,39 @@ export default function NovaCotacao() {
                   rows={4}
                   placeholder="Descreva detalhes adicionais sobre o serviço (modelo da TV, tipo de parede, acesso, etc.)"
                 />
+              </div>
+              
+              {/* Seção Suporte */}
+              <div className="col-span-2 border-t pt-4">
+                <h3 className="text-lg font-semibold mb-3">Suporte de TV</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Origem do Suporte</label>
+                    <select 
+                      value={formData.origem_suporte} 
+                      onChange={(e) => setFormData({...formData, origem_suporte: e.target.value})} 
+                      className="w-full px-3 py-2 border rounded-md bg-background"
+                    >
+                      <option value="">Não aplicável</option>
+                      <option value="empresa">Empresa fornece</option>
+                      <option value="instalador">Instalador compra (reembolso)</option>
+                      <option value="cliente">Cliente já tem</option>
+                    </select>
+                  </div>
+                  {formData.origem_suporte && formData.origem_suporte !== 'cliente' && (
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Custo do Suporte (R$)</label>
+                      <input 
+                        type="number" 
+                        step="0.01" 
+                        value={formData.custo_suporte} 
+                        onChange={(e) => setFormData({...formData, custo_suporte: e.target.value})} 
+                        className="w-full px-3 py-2 border rounded-md" 
+                        placeholder="0,00" 
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
