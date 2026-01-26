@@ -459,7 +459,34 @@ export default function NovaCotacao() {
                     <label className="block text-sm font-medium mb-2">Origem do Suporte</label>
                     <select 
                       value={formData.origem_suporte} 
-                      onChange={(e) => setFormData({...formData, origem_suporte: e.target.value})} 
+                      onChange={async (e) => {
+                        const novaOrigem = e.target.value
+                        setFormData({...formData, origem_suporte: novaOrigem, custo_suporte: ''})
+                        
+                        // Se selecionou "Empresa fornece", buscar último valor unitário
+                        if (novaOrigem === 'empresa') {
+                          try {
+                            const { data } = await supabase
+                              .from('movimentacoes_suportes')
+                              .select('valor_unitario')
+                              .eq('tipo_movimento', 'entrega')
+                              .gt('valor_unitario', 0)
+                              .order('created_at', { ascending: false })
+                              .limit(1)
+                              .maybeSingle()
+                            
+                            if (data?.valor_unitario) {
+                              setFormData(prev => ({
+                                ...prev, 
+                                origem_suporte: novaOrigem,
+                                custo_suporte: data.valor_unitario.toString()
+                              }))
+                            }
+                          } catch (err) {
+                            console.error('Erro ao buscar valor do suporte:', err)
+                          }
+                        }
+                      }} 
                       className="w-full px-3 py-2 border rounded-md bg-background"
                     >
                       <option value="">Não aplicável</option>
@@ -479,6 +506,11 @@ export default function NovaCotacao() {
                         className="w-full px-3 py-2 border rounded-md" 
                         placeholder="0,00" 
                       />
+                      {formData.origem_suporte === 'empresa' && formData.custo_suporte && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          💡 Valor sugerido da última entrega
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
