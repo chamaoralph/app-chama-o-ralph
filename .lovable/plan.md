@@ -1,108 +1,120 @@
 
-## Adicionar Edição de Movimentações de Suportes
 
-### Situacao Atual
-Voce tem 1 entrega registrada para o Joao:
-- 6 suportes fixo universal
-- Valor unitario: R$ 0,00 (vazio porque foi lancado antes do campo existir)
+## Correção: Recibo Baseado na Data de Conclusão
 
-Atualmente a pagina de Suportes nao tem funcionalidade de edicao.
+### Problema Identificado
+
+O instalador finaliza um serviço agendado para **03/02** no dia **05/02**, mas o recibo:
+- Agrupa por `data_servico_agendada` (03/02)
+- O serviço **não aparece** no recibo do dia 05/02
+
+Isso está errado porque o instalador precisa enviar o recibo do dia em que **finalizou** o trabalho no sistema, não do dia em que estava agendado.
 
 ---
 
-### Solucao
+### Solução
 
-Adicionar um botao "Editar" na tabela de historico que abre um modal para alterar os dados da movimentacao.
+Adicionar um campo `data_conclusao` na tabela `servicos` que registra **quando o instalador finalizou o serviço no sistema**. O recibo passa a usar essa data.
 
 ---
 
 ### Mudancas Tecnicas
 
-**Arquivo: `src/pages/admin/Suportes.tsx`**
+#### 1. Banco de Dados
 
-1. **Adicionar estado para modal de edicao**
-   - Estado para controlar abertura do modal
-   - Estado para armazenar a movimentacao sendo editada
-   - Estado para o formulario de edicao
+Adicionar coluna na tabela `servicos`:
 
-2. **Criar funcao de atualizacao**
-   - Funcao `atualizarMovimentacao` que faz UPDATE na tabela `movimentacoes_suportes`
-   - Campos editaveis: quantidade, valor_unitario, observacoes
+```sql
+ALTER TABLE public.servicos
+ADD COLUMN data_conclusao TIMESTAMPTZ;
 
-3. **Adicionar botao Editar na tabela**
-   - Nova coluna "Acoes" no historico
-   - Botao com icone de lapis para abrir o modal
-
-4. **Criar componente Dialog de edicao**
-   - Modal com os campos:
-     - Quantidade (input number)
-     - Valor Unitario (input number)
-     - Observacoes (input text)
-   - Botoes Salvar e Cancelar
-
----
-
-### Interface do Modal
-
-```
-+------------------------------------------+
-|  Editar Movimentacao                  X  |
-+------------------------------------------+
-|                                          |
-|  Instalador: Joao Victor (somente leitura)
-|  Tipo: Entrega (somente leitura)         |
-|  Data: 26/01/2026 (somente leitura)      |
-|                                          |
-|  Quantidade *                            |
-|  [    6    ]                             |
-|                                          |
-|  Valor Unitario (R$) *                   |
-|  [   35.00  ]                            |
-|                                          |
-|  Observacoes                             |
-|  [ 6 suportes fixo universal ]           |
-|                                          |
-|        [Cancelar]  [Salvar]              |
-+------------------------------------------+
+COMMENT ON COLUMN public.servicos.data_conclusao 
+IS 'Data/hora em que o instalador finalizou o servico no sistema';
 ```
 
----
+#### 2. Finalizacao do Servico (`FinalizarServico.tsx`)
 
-### Codigo Resumido
+Ao atualizar o servico para `aguardando_aprovacao`, registrar a data atual:
 
 ```tsx
-// Estado do modal
-const [editando, setEditando] = useState<Movimentacao | null>(null)
-const [formEdit, setFormEdit] = useState({
-  quantidade: '',
-  valor_unitario: '',
-  observacoes: ''
+.update({
+  status: "aguardando_aprovacao",
+  fotos_conclusao: fotosPaths,
+  data_conclusao: new Date().toISOString(),  // NOVO
+  ...
 })
+```
 
-// Funcao de salvar
-async function salvarEdicao() {
-  await supabase
-    .from('movimentacoes_suportes')
-    .update({
-      quantidade: parseInt(formEdit.quantidade),
-      valor_unitario: parseFloat(formEdit.valor_unitario) || 0,
-      observacoes: formEdit.observacoes || null
-    })
-    .eq('id', editando.id)
-  
-  fetchData()
-  setEditando(null)
+#### 3. Extrato do Instalador (`MeuExtrato.tsx`)
+
+Alterar a logica de filtragem dos servicos do dia:
+
+**Antes:**
+```tsx
+const servicosHoje = servicos.filter(s => {
+  const dataServico = new Date(s.data_servico_agendada)
+  return isToday(dataServico) && s.status === 'concluido'
+})
+```
+
+**Depois:**
+```tsx
+const servicosHoje = servicos.filter(s => {
+  if (!s.data_conclusao) return false
+  const dataConclusao = new Date(s.data_conclusao)
+  return isToday(dataConclusao) && s.status === 'concluido'
+})
+```
+
+#### 4. Consulta de Servicos
+
+Adicionar `data_conclusao` na interface e na query:
+
+```tsx
+interface Servico {
+  // ... campos existentes
+  data_conclusao: string | null  // NOVO
 }
 ```
 
 ---
 
-### Resultado
+### Fluxo Corrigido
 
-Apos a implementacao, voce podera:
-1. Ir na aba "Historico"
-2. Clicar no botao "Editar" na linha do Joao
-3. Alterar o valor unitario para o valor correto (ex: R$ 35,00)
-4. Salvar
+```
+Dia 03/02 - Servico agendado
+            Instalador vai ao local
+            Faz o trabalho
 
-O valor sera atualizado e estara disponivel para uso automatico nas cotacoes.
+Dia 05/02 - Instalador abre o app
+            Sobe as fotos
+            Clica "Finalizar"
+            → Sistema registra data_conclusao = 05/02 19:30:00
+
+Dia 05/02 - Instalador abre "Meu Extrato"
+            Clica "Gerar Recibo do Dia"
+            → Servico aparece no recibo do dia 05/02 ✓
+```
+
+---
+
+### Campos de Data na Tabela Servicos
+
+Apos a mudanca, a tabela tera:
+
+| Campo | Significado |
+|-------|-------------|
+| `created_at` | Quando o servico foi criado no sistema |
+| `data_servico_agendada` | Dia/hora combinado com cliente (03/02) |
+| `data_conclusao` | Quando o instalador finalizou no app (05/02) |
+| `updated_at` | Ultima alteracao (qualquer campo) |
+
+---
+
+### Vantagens
+
+- Recibo reflete a data real de trabalho concluido no sistema
+- Historico preciso para controle financeiro
+- Instalador pode finalizar servicos atrasados sem problemas
+- Admin ve quando realmente foi concluido vs quando estava agendado
+
