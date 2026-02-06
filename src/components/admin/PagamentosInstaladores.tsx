@@ -23,7 +23,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { toast } from '@/hooks/use-toast'
-import { Check, Upload, Eye, Clock, DollarSign, FileText } from 'lucide-react'
+import { Check, Upload, Eye, Clock, DollarSign, FileText, Pencil } from 'lucide-react'
 
 interface ReciboComInstalador {
   id: string
@@ -60,6 +60,10 @@ export function PagamentosInstaladores() {
   const [modalDetalhes, setModalDetalhes] = useState(false)
   const [servicosDetalhes, setServicosDetalhes] = useState<any[]>([])
   const [carregandoDetalhes, setCarregandoDetalhes] = useState(false)
+
+  // Modal de edição de pagamento
+  const [modalEdicao, setModalEdicao] = useState(false)
+  const [editandoPagamento, setEditandoPagamento] = useState(false)
 
   // Cálculos
   const totalPendente = recibos
@@ -251,6 +255,72 @@ export function PagamentosInstaladores() {
     setModalComprovante(true)
   }
 
+  function abrirModalEdicao(recibo: ReciboComInstalador) {
+    setReciboSelecionado(recibo)
+    setDataPagamento(recibo.data_pagamento || '')
+    setComprovante(null)
+    setModalEdicao(true)
+  }
+
+  async function salvarEdicaoPagamento() {
+    if (!reciboSelecionado || !dataPagamento) {
+      toast({
+        title: 'Atenção',
+        description: 'Informe a data do pagamento',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    try {
+      setEditandoPagamento(true)
+
+      let comprovanteUrl = reciboSelecionado.comprovante_pix_url
+
+      if (comprovante) {
+        const fileName = `${reciboSelecionado.instalador_id}/${Date.now()}_${comprovante.name}`
+        const { error: uploadError } = await supabase.storage
+          .from('comprovantes')
+          .upload(fileName, comprovante)
+
+        if (uploadError) throw uploadError
+
+        const { data: urlData } = supabase.storage
+          .from('comprovantes')
+          .getPublicUrl(fileName)
+        
+        comprovanteUrl = urlData.publicUrl
+      }
+
+      const { error } = await supabase
+        .from('recibos_diarios')
+        .update({
+          data_pagamento: dataPagamento,
+          comprovante_pix_url: comprovanteUrl
+        })
+        .eq('id', reciboSelecionado.id)
+
+      if (error) throw error
+
+      toast({
+        title: 'Sucesso',
+        description: 'Pagamento atualizado!'
+      })
+
+      setModalEdicao(false)
+      carregarRecibos()
+    } catch (error) {
+      console.error('Erro ao editar pagamento:', error)
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível atualizar o pagamento',
+        variant: 'destructive'
+      })
+    } finally {
+      setEditandoPagamento(false)
+    }
+  }
+
   async function verDetalhes(recibo: ReciboComInstalador) {
     setReciboSelecionado(recibo)
     setCarregandoDetalhes(true)
@@ -416,6 +486,14 @@ export function PagamentosInstaladores() {
                         </Button>
                       ) : (
                         <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => abrirModalEdicao(recibo)}
+                          >
+                            <Pencil className="h-4 w-4 mr-1" />
+                            Editar
+                          </Button>
                           {recibo.comprovante_pix_url && (
                             <Button
                               size="sm"
@@ -526,6 +604,63 @@ export function PagamentosInstaladores() {
               )
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Edição de Pagamento */}
+      <Dialog open={modalEdicao} onOpenChange={setModalEdicao}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Pagamento</DialogTitle>
+          </DialogHeader>
+          
+          {reciboSelecionado && (
+            <div className="space-y-4">
+              <div className="bg-muted p-4 rounded-lg space-y-2">
+                <p><strong>Instalador:</strong> {reciboSelecionado.instalador_nome}</p>
+                <p><strong>Data do Recibo:</strong> {formatarDataBR(reciboSelecionado.data_referencia)}</p>
+                <p className="text-lg font-bold text-primary">
+                  Total: R$ {reciboSelecionado.valor_total.toFixed(2)}
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="dataPagamentoEdit">Data do Pagamento *</Label>
+                <Input
+                  id="dataPagamentoEdit"
+                  type="date"
+                  value={dataPagamento}
+                  onChange={(e) => setDataPagamento(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="comprovanteEdit">Novo Comprovante (opcional)</Label>
+                <Input
+                  id="comprovanteEdit"
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={(e) => setComprovante(e.target.files?.[0] || null)}
+                  className="mt-1"
+                />
+                {reciboSelecionado.comprovante_pix_url && !comprovante && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Já possui comprovante anexado. Selecione outro arquivo para substituir.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setModalEdicao(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={salvarEdicaoPagamento} disabled={editandoPagamento}>
+              {editandoPagamento ? 'Salvando...' : 'Salvar Alterações'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
