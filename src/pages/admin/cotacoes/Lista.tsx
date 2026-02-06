@@ -1066,7 +1066,7 @@ export default function ListaCotacoes() {
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {tiposServico.map((tipo) => (
+                      {tiposServico.filter(tipo => tipo.nome && tipo.nome.trim() !== '').map((tipo) => (
                         <SelectItem key={tipo.id} value={tipo.nome}>{tipo.nome}</SelectItem>
                       ))}
                       <SelectItem value="Outros">Outros</SelectItem>
