@@ -36,8 +36,12 @@ export default function MeuExtrato() {
     // Usa data_conclusao se existir, senão usa updated_at como fallback
     const dataReferencia = s.data_conclusao || s.updated_at
     if (!dataReferencia) return false
-    const dataConclusao = new Date(dataReferencia)
-    return isToday(dataConclusao) && s.status === 'concluido'
+    
+    // Comparar apenas a parte da data (YYYY-MM-DD) para evitar problemas de fuso horário
+    const dataConclusaoStr = dataReferencia.split('T')[0]
+    const hojeStr = new Date().toISOString().split('T')[0]
+    
+    return dataConclusaoStr === hojeStr && s.status === 'concluido'
   })
 
   // Cálculos dos cards
