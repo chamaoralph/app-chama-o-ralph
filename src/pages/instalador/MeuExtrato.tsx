@@ -13,6 +13,7 @@ interface Servico {
   id: string
   codigo: string
   data_servico_agendada: string
+  data_conclusao: string | null
   status: string
   tipo_servico: string[]
   valor_mao_obra_instalador: number
@@ -29,10 +30,11 @@ export default function MeuExtrato() {
   const [modalReciboOpen, setModalReciboOpen] = useState(false)
   const [instaladorNome, setInstaladorNome] = useState('')
 
-  // Serviços APROVADOS de hoje (para o recibo) - apenas 'concluido' pode entrar no recibo
+  // Serviços APROVADOS de hoje (para o recibo) - usa data_conclusao (quando finalizou no sistema)
   const servicosHoje = servicos.filter(s => {
-    const dataServico = new Date(s.data_servico_agendada)
-    return isToday(dataServico) && s.status === 'concluido'
+    if (!s.data_conclusao) return false
+    const dataConclusao = new Date(s.data_conclusao)
+    return isToday(dataConclusao) && s.status === 'concluido'
   })
 
   // Cálculos dos cards
@@ -130,6 +132,7 @@ export default function MeuExtrato() {
         id: s.id,
         codigo: s.codigo,
         data_servico_agendada: s.data_servico_agendada,
+        data_conclusao: s.data_conclusao,
         status: s.status,
         tipo_servico: s.tipo_servico,
         valor_mao_obra_instalador: s.valor_mao_obra_instalador || 0,

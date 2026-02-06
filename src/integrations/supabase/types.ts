@@ -967,6 +967,7 @@ export type Database = {
           cotacao_id: string | null
           created_at: string | null
           custo_suporte: number | null
+          data_conclusao: string | null
           data_servico_agendada: string
           descricao: string | null
           empresa_id: string
@@ -990,6 +991,7 @@ export type Database = {
           cotacao_id?: string | null
           created_at?: string | null
           custo_suporte?: number | null
+          data_conclusao?: string | null
           data_servico_agendada: string
           descricao?: string | null
           empresa_id: string
@@ -1013,6 +1015,7 @@ export type Database = {
           cotacao_id?: string | null
           created_at?: string | null
           custo_suporte?: number | null
+          data_conclusao?: string | null
           data_servico_agendada?: string
           descricao?: string | null
           empresa_id?: string
