@@ -196,6 +196,7 @@ export default function FinalizarServico() {
           nota_fiscal_url: notaFiscalPath,
           valor_reembolso_despesas: temReembolso ? parseFloat(valorReembolso) : servico.valor_reembolso_despesas,
           observacoes_instalador: observacoes,
+          data_conclusao: new Date().toISOString(), // Registra quando o instalador finalizou no sistema
         })
         .eq("id", servicoId)
         .eq("instalador_id", user.id)
