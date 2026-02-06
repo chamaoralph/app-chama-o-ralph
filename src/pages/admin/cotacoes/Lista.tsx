@@ -1115,14 +1115,14 @@ export default function ListaCotacoes() {
                           <SelectValue placeholder="Não aplicável" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Não aplicável</SelectItem>
+                          <SelectItem value="nao_aplicavel">Não aplicável</SelectItem>
                           <SelectItem value="empresa">Empresa fornece</SelectItem>
                           <SelectItem value="instalador">Instalador compra (reembolso)</SelectItem>
                           <SelectItem value="cliente">Cliente já tem</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-                    {editForm.origem_suporte && editForm.origem_suporte !== 'cliente' && (
+                    {editForm.origem_suporte && editForm.origem_suporte !== 'cliente' && editForm.origem_suporte !== 'nao_aplicavel' && (
                       <div className="space-y-2">
                         <Label>Custo do Suporte (R$)</Label>
                         <Input 
