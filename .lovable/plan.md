@@ -1,99 +1,196 @@
 
+## Adicionar Botao Editar Pagamento
 
-## Correcao: Recibo Nao Gera para Servicos Sem Data de Conclusao
+### Contexto do Problema
 
-### Problema Identificado
-
-O instalador Joao nao consegue gerar recibo porque:
-
-1. A coluna `data_conclusao` foi adicionada recentemente
-2. Todos os servicos existentes (finalizados antes da migracao) tem `data_conclusao = NULL`
-3. O filtro atual exige que `data_conclusao` exista para incluir no recibo
-
-**Dados do banco:**
-```
-SRV-2026-080 | data_conclusao: NULL | updated_at: 2026-02-06 02:47 | status: concluido
-```
-
-O servico foi finalizado hoje mas nao aparece no recibo porque `data_conclusao` esta vazio.
-
----
+Voce lancou o pagamento do recibo de 30/01/2026 com a data errada (05/02 ao inves da data correta). Atualmente nao existe forma de corrigir isso apos confirmar o pagamento.
 
 ### Solucao
 
-Usar `updated_at` como fallback quando `data_conclusao` nao existir. Isso garante compatibilidade com servicos antigos.
+Adicionar um botao "Editar" para pagamentos ja confirmados, permitindo alterar:
+- Data do pagamento
+- Comprovante PIX (opcional - substituir ou adicionar)
 
 ---
 
 ### Mudancas Tecnicas
 
-**Arquivo: `src/pages/instalador/MeuExtrato.tsx`**
+**Arquivo: `src/components/admin/PagamentosInstaladores.tsx`**
 
-**1. Atualizar o filtro `servicosHoje` para usar fallback**
+**1. Adicionar novo estado para modal de edicao**
 
 ```tsx
-// ANTES (linha 34-38)
-const servicosHoje = servicos.filter(s => {
-  if (!s.data_conclusao) return false
-  const dataConclusao = new Date(s.data_conclusao)
-  return isToday(dataConclusao) && s.status === 'concluido'
-})
-
-// DEPOIS
-const servicosHoje = servicos.filter(s => {
-  // Usa data_conclusao se existir, senao usa updated_at como fallback
-  const dataReferencia = s.data_conclusao || s.updated_at
-  if (!dataReferencia) return false
-  const dataConclusao = new Date(dataReferencia)
-  return isToday(dataConclusao) && s.status === 'concluido'
-})
+// Modal de edição de pagamento
+const [modalEdicao, setModalEdicao] = useState(false)
+const [editandoPagamento, setEditandoPagamento] = useState(false)
 ```
 
-**2. Adicionar `updated_at` a interface e ao select**
+**2. Adicionar funcao para abrir modal de edicao**
 
-Na interface `Servico`:
 ```tsx
-interface Servico {
-  id: string
-  codigo: string
-  data_servico_agendada: string
-  data_conclusao: string | null
-  updated_at: string  // ADICIONAR
-  status: string
-  // ...resto
+function abrirModalEdicao(recibo: ReciboComInstalador) {
+  setReciboSelecionado(recibo)
+  // Preencher com a data atual do pagamento
+  setDataPagamento(recibo.data_pagamento || '')
+  setComprovante(null)
+  setModalEdicao(true)
 }
 ```
 
-No mapeamento dos servicos (linha 131-142):
+**3. Adicionar funcao para salvar edicao**
+
 ```tsx
-const servicosFormatados = data?.map((s: any) => ({
-  // ...campos existentes
-  data_conclusao: s.data_conclusao,
-  updated_at: s.updated_at,  // ADICIONAR
-  // ...resto
-})) || []
+async function salvarEdicaoPagamento() {
+  if (!reciboSelecionado || !dataPagamento) {
+    toast({ title: 'Atencao', description: 'Informe a data', variant: 'destructive' })
+    return
+  }
+
+  try {
+    setEditandoPagamento(true)
+
+    let comprovanteUrl = reciboSelecionado.comprovante_pix_url
+
+    // Upload do novo comprovante se houver
+    if (comprovante) {
+      const fileName = `${reciboSelecionado.instalador_id}/${Date.now()}_${comprovante.name}`
+      const { error: uploadError } = await supabase.storage
+        .from('comprovantes')
+        .upload(fileName, comprovante)
+
+      if (uploadError) throw uploadError
+
+      const { data: urlData } = supabase.storage
+        .from('comprovantes')
+        .getPublicUrl(fileName)
+      
+      comprovanteUrl = urlData.publicUrl
+    }
+
+    const { error } = await supabase
+      .from('recibos_diarios')
+      .update({
+        data_pagamento: dataPagamento,
+        comprovante_pix_url: comprovanteUrl
+      })
+      .eq('id', reciboSelecionado.id)
+
+    if (error) throw error
+
+    toast({ title: 'Sucesso', description: 'Pagamento atualizado!' })
+    setModalEdicao(false)
+    carregarRecibos()
+  } catch (error) {
+    console.error('Erro ao editar pagamento:', error)
+    toast({ title: 'Erro', description: 'Nao foi possivel atualizar', variant: 'destructive' })
+  } finally {
+    setEditandoPagamento(false)
+  }
+}
 ```
 
----
+**4. Adicionar botao Editar na coluna de Acoes (para pagamentos ja confirmados)**
 
-### Alternativa: Preencher dados historicos
+Na linha ~417-434, onde mostra os botoes para status "pago":
 
-Apos a correcao, podemos executar uma query SQL para preencher `data_conclusao` nos servicos antigos usando o `updated_at`:
-
-```sql
-UPDATE servicos 
-SET data_conclusao = updated_at 
-WHERE data_conclusao IS NULL 
-  AND status IN ('concluido', 'aguardando_aprovacao');
+```tsx
+{recibo.status_pagamento === 'pago' && (
+  <>
+    <Button
+      size="sm"
+      variant="outline"
+      onClick={() => abrirModalEdicao(recibo)}
+    >
+      <Pencil className="h-4 w-4 mr-1" />
+      Editar
+    </Button>
+    {recibo.comprovante_pix_url && (
+      <Button size="sm" variant="outline" onClick={() => verComprovante(recibo.comprovante_pix_url!)}>
+        <Eye className="h-4 w-4 mr-1" />
+        Comprovante
+      </Button>
+    )}
+    {recibo.data_pagamento && (
+      <span className="text-xs text-muted-foreground self-center">
+        Pago em {format(new Date(recibo.data_pagamento), 'dd/MM')}
+      </span>
+    )}
+  </>
+)}
 ```
 
-Isso garante consistencia dos dados a longo prazo.
+**5. Adicionar import do icone Pencil**
+
+```tsx
+import { Check, Upload, Eye, Clock, DollarSign, FileText, Pencil } from 'lucide-react'
+```
+
+**6. Adicionar novo modal de edicao**
+
+```tsx
+{/* Modal de Edição de Pagamento */}
+<Dialog open={modalEdicao} onOpenChange={setModalEdicao}>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Editar Pagamento</DialogTitle>
+    </DialogHeader>
+    
+    {reciboSelecionado && (
+      <div className="space-y-4">
+        <div className="bg-muted p-4 rounded-lg space-y-2">
+          <p><strong>Instalador:</strong> {reciboSelecionado.instalador_nome}</p>
+          <p><strong>Data do Recibo:</strong> {formatarDataBR(reciboSelecionado.data_referencia)}</p>
+          <p className="text-lg font-bold text-primary">
+            Total: R$ {reciboSelecionado.valor_total.toFixed(2)}
+          </p>
+        </div>
+
+        <div>
+          <Label htmlFor="dataPagamentoEdit">Data do Pagamento *</Label>
+          <Input
+            id="dataPagamentoEdit"
+            type="date"
+            value={dataPagamento}
+            onChange={(e) => setDataPagamento(e.target.value)}
+            className="mt-1"
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="comprovanteEdit">Novo Comprovante (opcional)</Label>
+          <Input
+            id="comprovanteEdit"
+            type="file"
+            accept="image/*,.pdf"
+            onChange={(e) => setComprovante(e.target.files?.[0] || null)}
+            className="mt-1"
+          />
+          {reciboSelecionado.comprovante_pix_url && !comprovante && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Ja possui comprovante anexado. Selecione outro arquivo para substituir.
+            </p>
+          )}
+        </div>
+      </div>
+    )}
+
+    <DialogFooter>
+      <Button variant="outline" onClick={() => setModalEdicao(false)}>
+        Cancelar
+      </Button>
+      <Button onClick={salvarEdicaoPagamento} disabled={editandoPagamento}>
+        {editandoPagamento ? 'Salvando...' : 'Salvar Alteracoes'}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+```
 
 ---
 
 ### Resultado
 
-- Servicos finalizados hoje aparecerao no recibo mesmo sem `data_conclusao`
-- Compatibilidade com servicos historicos mantida
-- Comportamento correto para novos servicos que terao `data_conclusao` preenchida
-
+- Botao "Editar" aparecera ao lado de "Detalhes" e "Comprovante" para pagamentos ja confirmados
+- Ao clicar, abre modal com a data atual preenchida para correcao
+- Possibilidade de substituir o comprovante se necessario
+- A atualizacao reflete imediatamente na listagem
