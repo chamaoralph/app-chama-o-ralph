@@ -1,103 +1,81 @@
 
 
-## Bloquear Recibo Apos Geracao
+## Correção: Lançamento no Caixa na Data Agendada
 
-### Problema
+### Problema Identificado
 
-O instalador pode gerar o mesmo recibo varias vezes, o que pode causar confusao e pagamentos duplicados.
+Quando um instalador finaliza um serviço, o lançamento de receita no caixa está entrando com a **data de hoje** (quando foi finalizado), ao invés da **data em que o serviço estava agendado**.
 
-### Solucao
+Exemplo encontrado:
+- **SRV-2026-067**: agendado para 27/01/2026, mas entrou no caixa em 06/02/2026
 
-Uma vez que o recibo e gerado/salvo no banco, bloquear a geracao de novos recibos para aquela data. Simples e direto.
+Isso acontece porque o trigger `registrar_no_caixa_ao_aprovar` usa `CURRENT_DATE` para definir a data do lançamento.
 
----
+### Dados Afetados
 
-### Mudancas Tecnicas
-
-**Arquivo: `src/pages/instalador/MeuExtrato.tsx`**
-
-1. **Adicionar estado para controlar recibos ja gerados**
-
-```tsx
-const [recibosGerados, setRecibosGerados] = useState<string[]>([]) // datas no formato 'yyyy-MM-dd'
-```
-
-2. **Carregar recibos ja gerados ao montar componente**
-
-```tsx
-async function carregarRecibosGerados() {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return
-
-  const { data } = await supabase
-    .from('recibos_diarios')
-    .select('data_referencia')
-    .eq('instalador_id', user.id)
-
-  if (data) {
-    setRecibosGerados(data.map(r => r.data_referencia))
-  }
-}
-```
-
-3. **Adicionar seletor de data com validacao**
-
-```tsx
-const [dataRecibo, setDataRecibo] = useState<Date>(new Date())
-
-// Verificar se recibo ja foi gerado para data selecionada
-const hojeStr = format(dataRecibo, 'yyyy-MM-dd')
-const reciboJaGerado = recibosGerados.includes(hojeStr)
-```
-
-4. **Atualizar botao com bloqueio e feedback visual**
-
-```tsx
-<div className="flex items-center gap-2">
-  <Input
-    type="date"
-    value={format(dataRecibo, 'yyyy-MM-dd')}
-    onChange={(e) => setDataRecibo(new Date(e.target.value + 'T12:00:00'))}
-    max={format(new Date(), 'yyyy-MM-dd')}
-    min={format(subDays(new Date(), 7), 'yyyy-MM-dd')}
-    className="w-[150px]"
-  />
-  <Button 
-    onClick={() => setModalReciboOpen(true)}
-    disabled={servicosDataSelecionada.length === 0 || reciboJaGerado}
-  >
-    <FileText className="h-4 w-4" />
-    Gerar Recibo ({servicosDataSelecionada.length})
-  </Button>
-  {reciboJaGerado && (
-    <span className="text-sm text-orange-600 font-medium">
-      Recibo ja enviado
-    </span>
-  )}
-</div>
-```
-
-5. **Atualizar lista apos gerar recibo no modal**
-
-No `GerarReciboModal`, adicionar callback `onReciboGerado` que atualiza a lista de recibos gerados.
+Encontrei 10 lançamentos com datas incorretas nos últimos registros:
+- SRV-2026-067: agendado 27/01, lançado 06/02
+- SRV-2026-077: agendado 29/01, lançado 06/02
+- SRV-2026-065: agendado 28/01, lançado 06/02
+- SRV-2026-074: agendado 31/01, lançado 06/02
+- E outros...
 
 ---
 
-### Fluxo do Usuario
+### Solução em 2 Partes
 
-1. Instalador acessa "Meu Extrato"
-2. Sistema carrega lista de datas que ja tem recibo
-3. Por padrao, data vem com "hoje"
-4. Se hoje ja tem recibo: botao desabilitado + "Recibo ja enviado"
-5. Instalador pode mudar data para outro dia (ate 7 dias atras)
-6. Se data selecionada ja tem recibo: bloqueado
-7. Se data selecionada NAO tem recibo: pode gerar
-8. Apos gerar, data entra na lista e fica bloqueada
+**Parte 1: Corrigir o trigger para usar a data agendada**
 
-### Beneficios
+Alterar o trigger para usar `NEW.data_servico_agendada::date` no lugar de `CURRENT_DATE`:
 
-- Joao pode gerar recibo do dia 5 no dia 6 (se ainda nao gerou)
-- Uma vez gerado, nao pode mais regerar
-- Voce nao recebe recibos duplicados
-- Simples de entender para o instalador
+```sql
+CREATE OR REPLACE FUNCTION public.registrar_no_caixa_ao_aprovar()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+BEGIN
+  IF NEW.status = 'concluido' AND (OLD.status IS NULL OR OLD.status <> 'concluido') THEN
+
+    -- Receita do servico - agora usa data_servico_agendada
+    INSERT INTO public.lancamentos_caixa (
+      empresa_id, servico_id, tipo, categoria, descricao, valor, data_lancamento, forma_pagamento
+    ) VALUES (
+      NEW.empresa_id, 
+      NEW.id, 
+      'receita', 
+      'Receita de Servico',
+      'Receita do servico ' || NEW.codigo, 
+      NEW.valor_total, 
+      NEW.data_servico_agendada::date,  -- CORRIGIDO: usa data agendada
+      'Pix'
+    )
+    ON CONFLICT (servico_id, tipo, categoria) DO NOTHING;
+
+  END IF;
+
+  RETURN NEW;
+END;
+$function$;
+```
+
+**Parte 2: Corrigir lançamentos existentes com datas erradas**
+
+```sql
+UPDATE lancamentos_caixa l
+SET data_lancamento = s.data_servico_agendada::date
+FROM servicos s
+WHERE l.servico_id = s.id
+  AND l.categoria = 'Receita de Servico'
+  AND l.data_lancamento != s.data_servico_agendada::date;
+```
+
+---
+
+### Resultado Esperado
+
+- O serviço SRV-2026-067 passará a aparecer no caixa do dia 27/01/2026
+- Todos os serviços futuros entrarão no caixa na data correta (data agendada)
+- O relatório de caixa refletirá a receita no dia em que o serviço estava programado
 
