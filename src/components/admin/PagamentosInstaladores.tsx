@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/integrations/supabase/client'
-import { format } from 'date-fns'
+import { format, endOfMonth } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { formatarDataBR } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -102,7 +102,8 @@ export function PagamentosInstaladores() {
       // Filtrar por mês
       const [ano, mes] = filtroMes.split('-')
       const dataInicio = `${ano}-${mes}-01`
-      const dataFim = `${ano}-${mes}-31`
+      const ultimoDia = endOfMonth(new Date(parseInt(ano), parseInt(mes) - 1, 1))
+      const dataFim = format(ultimoDia, 'yyyy-MM-dd')
 
       const { data, error } = await supabase
         .from('recibos_diarios')
