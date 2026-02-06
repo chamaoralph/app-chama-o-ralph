@@ -23,6 +23,7 @@ interface GerarReciboModalProps {
   servicos: ServicoRecibo[]
   dataReferencia: Date
   instaladorNome: string
+  onReciboGerado?: () => void
 }
 
 export function GerarReciboModal({
@@ -30,7 +31,8 @@ export function GerarReciboModal({
   onOpenChange,
   servicos,
   dataReferencia,
-  instaladorNome
+  instaladorNome,
+  onReciboGerado
 }: GerarReciboModalProps) {
   const [gerando, setGerando] = useState(false)
   const hiddenContainerRef = useRef<HTMLDivElement>(null)
@@ -149,6 +151,7 @@ export function GerarReciboModal({
       URL.revokeObjectURL(url)
 
       toast.success('Recibo gerado com sucesso!')
+      onReciboGerado?.()
       onOpenChange(false)
     } catch (error) {
       console.error('Erro:', error)
@@ -181,6 +184,7 @@ export function GerarReciboModal({
           text: `Recibo dos serviços do dia ${format(dataReferencia, 'dd/MM/yyyy')} - Total: R$ ${totalGeral.toFixed(2)}`
         })
         toast.success('Recibo compartilhado!')
+        onReciboGerado?.()
         onOpenChange(false)
       } else {
         // Fallback: download
