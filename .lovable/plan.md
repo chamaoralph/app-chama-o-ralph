@@ -1,120 +1,102 @@
 
 
-## Correção: Recibo Baseado na Data de Conclusão
+## Correcao: Modal de Edicao Nao Carrega ao Alterar Data
 
 ### Problema Identificado
 
-O instalador finaliza um serviço agendado para **03/02** no dia **05/02**, mas o recibo:
-- Agrupa por `data_servico_agendada` (03/02)
-- O serviço **não aparece** no recibo do dia 05/02
+Ao abrir o modal de edicao de cotacao, a pagina pode travar porque o campo `data_servico_desejada` nao esta sendo tratado corretamente.
 
-Isso está errado porque o instalador precisa enviar o recibo do dia em que **finalizou** o trabalho no sistema, não do dia em que estava agendado.
+**Causa raiz**: O codigo trata a data de forma inconsistente:
+
+```tsx
+// Linha 216 - NAO faz split (pode vir com timezone)
+data_servico_desejada: cotacao.data_servico_desejada || '',
+
+// Linha 219 - FAZ split corretamente
+data_criacao: cotacao.created_at ? cotacao.created_at.split('T')[0] : '',
+```
+
+O campo `input type="date"` espera o formato `YYYY-MM-DD`, mas se a data vier com timezone (ex: `2026-01-06T00:00:00+00:00`), o input pode ter comportamento imprevisivel ou causar loops de re-renderizacao.
 
 ---
 
-### Solução
+### Solucao
 
-Adicionar um campo `data_conclusao` na tabela `servicos` que registra **quando o instalador finalizou o serviço no sistema**. O recibo passa a usar essa data.
+Normalizar o tratamento de datas no modal de edicao para garantir que sempre use o formato correto.
 
 ---
 
 ### Mudancas Tecnicas
 
-#### 1. Banco de Dados
+**Arquivo: `src/pages/admin/cotacoes/Lista.tsx`**
 
-Adicionar coluna na tabela `servicos`:
-
-```sql
-ALTER TABLE public.servicos
-ADD COLUMN data_conclusao TIMESTAMPTZ;
-
-COMMENT ON COLUMN public.servicos.data_conclusao 
-IS 'Data/hora em que o instalador finalizou o servico no sistema';
-```
-
-#### 2. Finalizacao do Servico (`FinalizarServico.tsx`)
-
-Ao atualizar o servico para `aguardando_aprovacao`, registrar a data atual:
+**1. Criar funcao auxiliar para extrair data (antes da funcao abrirEdicao)**
 
 ```tsx
-.update({
-  status: "aguardando_aprovacao",
-  fotos_conclusao: fotosPaths,
-  data_conclusao: new Date().toISOString(),  // NOVO
-  ...
-})
-```
-
-#### 3. Extrato do Instalador (`MeuExtrato.tsx`)
-
-Alterar a logica de filtragem dos servicos do dia:
-
-**Antes:**
-```tsx
-const servicosHoje = servicos.filter(s => {
-  const dataServico = new Date(s.data_servico_agendada)
-  return isToday(dataServico) && s.status === 'concluido'
-})
-```
-
-**Depois:**
-```tsx
-const servicosHoje = servicos.filter(s => {
-  if (!s.data_conclusao) return false
-  const dataConclusao = new Date(s.data_conclusao)
-  return isToday(dataConclusao) && s.status === 'concluido'
-})
-```
-
-#### 4. Consulta de Servicos
-
-Adicionar `data_conclusao` na interface e na query:
-
-```tsx
-interface Servico {
-  // ... campos existentes
-  data_conclusao: string | null  // NOVO
+// Funcao para extrair apenas a parte da data (YYYY-MM-DD)
+function extrairDataParaInput(dataStr: string | null): string {
+  if (!dataStr) return ''
+  // Se contem T, pegar so a parte antes
+  const [dataPart] = dataStr.split('T')
+  return dataPart
 }
 ```
 
----
+**2. Usar a funcao na abertura do modal**
 
-### Fluxo Corrigido
+Alterar a linha 216:
 
-```
-Dia 03/02 - Servico agendado
-            Instalador vai ao local
-            Faz o trabalho
+```tsx
+// ANTES
+data_servico_desejada: cotacao.data_servico_desejada || '',
 
-Dia 05/02 - Instalador abre o app
-            Sobe as fotos
-            Clica "Finalizar"
-            → Sistema registra data_conclusao = 05/02 19:30:00
-
-Dia 05/02 - Instalador abre "Meu Extrato"
-            Clica "Gerar Recibo do Dia"
-            → Servico aparece no recibo do dia 05/02 ✓
+// DEPOIS  
+data_servico_desejada: extrairDataParaInput(cotacao.data_servico_desejada),
 ```
 
----
+E simplificar a linha 219:
 
-### Campos de Data na Tabela Servicos
+```tsx
+// ANTES
+data_criacao: cotacao.created_at ? cotacao.created_at.split('T')[0] : '',
 
-Apos a mudanca, a tabela tera:
-
-| Campo | Significado |
-|-------|-------------|
-| `created_at` | Quando o servico foi criado no sistema |
-| `data_servico_agendada` | Dia/hora combinado com cliente (03/02) |
-| `data_conclusao` | Quando o instalador finalizou no app (05/02) |
-| `updated_at` | Ultima alteracao (qualquer campo) |
+// DEPOIS
+data_criacao: extrairDataParaInput(cotacao.created_at),
+```
 
 ---
 
-### Vantagens
+### Codigo Completo da Correcao
 
-- Recibo reflete a data real de trabalho concluido no sistema
-- Historico preciso para controle financeiro
-- Instalador pode finalizar servicos atrasados sem problemas
-- Admin ve quando realmente foi concluido vs quando estava agendado
+Adicionar antes da funcao `abrirEdicao` (linha ~193):
+
+```tsx
+// Extrai apenas YYYY-MM-DD de uma string de data (com ou sem timezone)
+function extrairDataParaInput(dataStr: string | null): string {
+  if (!dataStr) return ''
+  const [dataPart] = dataStr.split('T')
+  return dataPart
+}
+```
+
+Alterar a funcao `abrirEdicao`:
+
+```tsx
+setEditForm({
+  // ... outros campos
+  data_servico_desejada: extrairDataParaInput(cotacao.data_servico_desejada),
+  // ... outros campos
+  data_criacao: extrairDataParaInput(cotacao.created_at),
+  // ... resto
+})
+```
+
+---
+
+### Resultado
+
+Apos a correcao:
+- O modal de edicao abrira normalmente mesmo com datas em diferentes formatos
+- O campo de data funcionara corretamente no formato esperado pelo navegador
+- Nao havera mais travamentos ao alterar a data
 
