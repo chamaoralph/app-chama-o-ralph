@@ -192,9 +192,16 @@ export default function ListaCotacoes() {
   }
 
   // Extrai apenas YYYY-MM-DD de uma string de data (com ou sem timezone)
-  function extrairDataParaInput(dataStr: string | null): string {
+  function extrairDataParaInput(dataStr: string | null | undefined): string {
     if (!dataStr) return ''
-    const [dataPart] = dataStr.split('T')
+    // Remove espaços extras e pega apenas a parte da data
+    const trimmed = dataStr.trim()
+    // Pode vir como "YYYY-MM-DD", "YYYY-MM-DDTHH:MM" ou "YYYY-MM-DD HH:MM"
+    const dataPart = trimmed.includes('T') 
+      ? trimmed.split('T')[0] 
+      : trimmed.split(' ')[0]
+    // Validação básica: deve ter formato YYYY-MM-DD
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dataPart)) return ''
     return dataPart
   }
 
