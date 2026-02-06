@@ -292,6 +292,7 @@ export function PagamentosInstaladores() {
         comprovanteUrl = urlData.publicUrl
       }
 
+      // Atualizar recibo
       const { error } = await supabase
         .from('recibos_diarios')
         .update({
@@ -301,6 +302,27 @@ export function PagamentosInstaladores() {
         .eq('id', reciboSelecionado.id)
 
       if (error) throw error
+
+      // Atualizar lançamentos no caixa com a nova data de pagamento
+      const dataReferenciaFormatada = format(new Date(reciboSelecionado.data_referencia + 'T12:00:00'), 'dd/MM/yyyy')
+      
+      // Atualizar despesa de mão de obra
+      await supabase
+        .from('lancamentos_caixa')
+        .update({ data_lancamento: dataPagamento })
+        .eq('categoria', 'Pagamento Instalador')
+        .ilike('descricao', `%${dataReferenciaFormatada}%`)
+        .ilike('descricao', `%${reciboSelecionado.instalador_nome}%`)
+      
+      // Atualizar despesa de reembolso (se houver)
+      if (reciboSelecionado.valor_reembolso > 0) {
+        await supabase
+          .from('lancamentos_caixa')
+          .update({ data_lancamento: dataPagamento })
+          .eq('categoria', 'Reembolso Materiais')
+          .ilike('descricao', `%${dataReferenciaFormatada}%`)
+          .ilike('descricao', `%${reciboSelecionado.instalador_nome}%`)
+      }
 
       toast({
         title: 'Sucesso',
