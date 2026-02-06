@@ -1,102 +1,99 @@
 
 
-## Correcao: Modal de Edicao Nao Carrega ao Alterar Data
+## Correcao: Recibo Nao Gera para Servicos Sem Data de Conclusao
 
 ### Problema Identificado
 
-Ao abrir o modal de edicao de cotacao, a pagina pode travar porque o campo `data_servico_desejada` nao esta sendo tratado corretamente.
+O instalador Joao nao consegue gerar recibo porque:
 
-**Causa raiz**: O codigo trata a data de forma inconsistente:
+1. A coluna `data_conclusao` foi adicionada recentemente
+2. Todos os servicos existentes (finalizados antes da migracao) tem `data_conclusao = NULL`
+3. O filtro atual exige que `data_conclusao` exista para incluir no recibo
 
-```tsx
-// Linha 216 - NAO faz split (pode vir com timezone)
-data_servico_desejada: cotacao.data_servico_desejada || '',
-
-// Linha 219 - FAZ split corretamente
-data_criacao: cotacao.created_at ? cotacao.created_at.split('T')[0] : '',
+**Dados do banco:**
+```
+SRV-2026-080 | data_conclusao: NULL | updated_at: 2026-02-06 02:47 | status: concluido
 ```
 
-O campo `input type="date"` espera o formato `YYYY-MM-DD`, mas se a data vier com timezone (ex: `2026-01-06T00:00:00+00:00`), o input pode ter comportamento imprevisivel ou causar loops de re-renderizacao.
+O servico foi finalizado hoje mas nao aparece no recibo porque `data_conclusao` esta vazio.
 
 ---
 
 ### Solucao
 
-Normalizar o tratamento de datas no modal de edicao para garantir que sempre use o formato correto.
+Usar `updated_at` como fallback quando `data_conclusao` nao existir. Isso garante compatibilidade com servicos antigos.
 
 ---
 
 ### Mudancas Tecnicas
 
-**Arquivo: `src/pages/admin/cotacoes/Lista.tsx`**
+**Arquivo: `src/pages/instalador/MeuExtrato.tsx`**
 
-**1. Criar funcao auxiliar para extrair data (antes da funcao abrirEdicao)**
+**1. Atualizar o filtro `servicosHoje` para usar fallback**
 
 ```tsx
-// Funcao para extrair apenas a parte da data (YYYY-MM-DD)
-function extrairDataParaInput(dataStr: string | null): string {
-  if (!dataStr) return ''
-  // Se contem T, pegar so a parte antes
-  const [dataPart] = dataStr.split('T')
-  return dataPart
+// ANTES (linha 34-38)
+const servicosHoje = servicos.filter(s => {
+  if (!s.data_conclusao) return false
+  const dataConclusao = new Date(s.data_conclusao)
+  return isToday(dataConclusao) && s.status === 'concluido'
+})
+
+// DEPOIS
+const servicosHoje = servicos.filter(s => {
+  // Usa data_conclusao se existir, senao usa updated_at como fallback
+  const dataReferencia = s.data_conclusao || s.updated_at
+  if (!dataReferencia) return false
+  const dataConclusao = new Date(dataReferencia)
+  return isToday(dataConclusao) && s.status === 'concluido'
+})
+```
+
+**2. Adicionar `updated_at` a interface e ao select**
+
+Na interface `Servico`:
+```tsx
+interface Servico {
+  id: string
+  codigo: string
+  data_servico_agendada: string
+  data_conclusao: string | null
+  updated_at: string  // ADICIONAR
+  status: string
+  // ...resto
 }
 ```
 
-**2. Usar a funcao na abertura do modal**
-
-Alterar a linha 216:
-
+No mapeamento dos servicos (linha 131-142):
 ```tsx
-// ANTES
-data_servico_desejada: cotacao.data_servico_desejada || '',
-
-// DEPOIS  
-data_servico_desejada: extrairDataParaInput(cotacao.data_servico_desejada),
-```
-
-E simplificar a linha 219:
-
-```tsx
-// ANTES
-data_criacao: cotacao.created_at ? cotacao.created_at.split('T')[0] : '',
-
-// DEPOIS
-data_criacao: extrairDataParaInput(cotacao.created_at),
+const servicosFormatados = data?.map((s: any) => ({
+  // ...campos existentes
+  data_conclusao: s.data_conclusao,
+  updated_at: s.updated_at,  // ADICIONAR
+  // ...resto
+})) || []
 ```
 
 ---
 
-### Codigo Completo da Correcao
+### Alternativa: Preencher dados historicos
 
-Adicionar antes da funcao `abrirEdicao` (linha ~193):
+Apos a correcao, podemos executar uma query SQL para preencher `data_conclusao` nos servicos antigos usando o `updated_at`:
 
-```tsx
-// Extrai apenas YYYY-MM-DD de uma string de data (com ou sem timezone)
-function extrairDataParaInput(dataStr: string | null): string {
-  if (!dataStr) return ''
-  const [dataPart] = dataStr.split('T')
-  return dataPart
-}
+```sql
+UPDATE servicos 
+SET data_conclusao = updated_at 
+WHERE data_conclusao IS NULL 
+  AND status IN ('concluido', 'aguardando_aprovacao');
 ```
 
-Alterar a funcao `abrirEdicao`:
-
-```tsx
-setEditForm({
-  // ... outros campos
-  data_servico_desejada: extrairDataParaInput(cotacao.data_servico_desejada),
-  // ... outros campos
-  data_criacao: extrairDataParaInput(cotacao.created_at),
-  // ... resto
-})
-```
+Isso garante consistencia dos dados a longo prazo.
 
 ---
 
 ### Resultado
 
-Apos a correcao:
-- O modal de edicao abrira normalmente mesmo com datas em diferentes formatos
-- O campo de data funcionara corretamente no formato esperado pelo navegador
-- Nao havera mais travamentos ao alterar a data
+- Servicos finalizados hoje aparecerao no recibo mesmo sem `data_conclusao`
+- Compatibilidade com servicos historicos mantida
+- Comportamento correto para novos servicos que terao `data_conclusao` preenchida
 
