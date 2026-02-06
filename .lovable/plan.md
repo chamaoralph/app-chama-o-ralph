@@ -1,54 +1,45 @@
 
-## Correção: Reembolso de Material com Suporte Fornecido pela Empresa
+## Correção Completa: Reembolso Indevido no Caixa
 
-### Problema Identificado
+### Problema Restante
 
-Quando o suporte é fornecido pela empresa, o instalador João está recebendo reembolso de material no valor do suporte (R$ 10,00), mesmo que esse custo seja da empresa e não dele.
+A correção anterior atualizou os campos nas tabelas `servicos` e `cotacoes`, mas os registros derivados ainda estão incorretos:
 
-**Exemplo concreto:**
-- SRV-2026-079: origem_suporte = empresa, custo_suporte = R$ 10, valor_material = R$ 10
-- O instalador recebe R$ 10 de reembolso quando não deveria
+1. **Lançamento no Caixa** (lancamentos_caixa)
+   - ID: `fafc2053-4995-44e7-ae24-48fc954eda70`
+   - Valor: R$ 10,00 de "Reembolso Materiais" para João em 03/02/2026
+   - **Ação**: Deletar este lançamento
 
-### Causa Raiz
+2. **Recibo Diário** (recibos_diarios)
+   - ID: `c1008c3e-0e36-4173-a8e1-054287d594af`
+   - Valores atuais: valor_reembolso = 10, valor_total = 224.50
+   - Valores corretos: valor_reembolso = 0, valor_total = 214.50
+   - **Ação**: Atualizar os totais
 
-O campo `valor_material` na cotação está sendo preenchido com o mesmo valor do suporte quando a empresa fornece. Como o trigger calcula reembolso = valor_material (quando empresa fornece), o instalador acaba recebendo esse valor indevidamente.
+### Serviços Envolvidos (já corrigidos)
 
-**Comportamento esperado:**
-- Empresa fornece suporte → custo fica com empresa → instalador não recebe reembolso do suporte
-- Instalador compra suporte → valor vai para reembolso de despesas
+| Código | Origem Suporte | Mão de Obra | Reembolso |
+|--------|----------------|-------------|-----------|
+| SRV-2026-078 | cliente | R$ 129,50 | R$ 0,00 |
+| SRV-2026-079 | empresa | R$ 85,00 | R$ 0,00 |
+| **Total** | | **R$ 214,50** | **R$ 0,00** |
 
-### Solucao Proposta
-
-**1. Corrigir dados atuais:**
+### SQL para Correção
 
 ```sql
--- Zerar o valor_reembolso_despesas nos servicos onde empresa forneceu o suporte
--- e o valor_material igual ao custo_suporte (indicando que nao havia outro material)
-UPDATE servicos
-SET valor_reembolso_despesas = 0
-WHERE origem_suporte = 'empresa'
-  AND custo_suporte > 0
-  AND valor_reembolso_despesas = custo_suporte;
+-- 1. Deletar lançamento indevido do caixa
+DELETE FROM lancamentos_caixa 
+WHERE id = 'fafc2053-4995-44e7-ae24-48fc954eda70';
 
--- Tambem corrigir as cotacoes para evitar inconsistencia futura
-UPDATE cotacoes
-SET valor_material = 0
-WHERE origem_suporte = 'empresa'
-  AND custo_suporte > 0
-  AND valor_material = custo_suporte;
+-- 2. Corrigir totais do recibo
+UPDATE recibos_diarios
+SET valor_reembolso = 0,
+    valor_total = 214.50
+WHERE id = 'c1008c3e-0e36-4173-a8e1-054287d594af';
 ```
-
-**2. Melhorar a interface (Nova Cotacao):**
-
-Quando o usuario selecionar "Empresa fornece" e preencher o custo do suporte, limpar automaticamente o campo valor_material se ele contiver o mesmo valor, evitando confusao.
-
-### Arquivos a Modificar
-
-- Nenhum arquivo de codigo precisa ser alterado para a correcao dos dados atuais
-- Opcional: `src/pages/admin/cotacoes/Nova.tsx` - adicionar validacao/aviso na UI
 
 ### Resultado Esperado
 
-- Os servicos SRV-2026-079 e SRV-2026-072 terao valor_reembolso_despesas = 0
-- O instalador Joao nao recebera reembolso indevido do suporte fornecido pela empresa
-- Os relatorios financeiros refletirao o lucro correto para a empresa
+- O lançamento de R$ 10,00 de reembolso desaparecerá da página Caixa
+- O recibo do João de 03/02 mostrará o valor correto de R$ 214,50
+- Os relatórios financeiros refletirão o lucro correto para a empresa
