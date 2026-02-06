@@ -191,6 +191,13 @@ export default function ListaCotacoes() {
     }
   }
 
+  // Extrai apenas YYYY-MM-DD de uma string de data (com ou sem timezone)
+  function extrairDataParaInput(dataStr: string | null): string {
+    if (!dataStr) return ''
+    const [dataPart] = dataStr.split('T')
+    return dataPart
+  }
+
   function abrirEdicao(cotacao: Cotacao) {
     // Calcular duração baseada no horário início/fim
     let duracao = '60'
@@ -213,10 +220,10 @@ export default function ListaCotacoes() {
       bairro: cotacao.clientes.bairro || '',
       origem_lead: cotacao.origem_lead || '',
       ocasiao: cotacao.ocasiao || '',
-      data_servico_desejada: cotacao.data_servico_desejada || '',
+      data_servico_desejada: extrairDataParaInput(cotacao.data_servico_desejada),
       horario_inicio: cotacao.horario_inicio?.substring(0, 5) || '',
       duracao: duracao,
-      data_criacao: cotacao.created_at ? cotacao.created_at.split('T')[0] : '',
+      data_criacao: extrairDataParaInput(cotacao.created_at),
       tipo_servico: ehTipoCadastrado ? tipoAtual : (tipoAtual ? 'Outros' : ''),
       tipo_servico_outro: ehTipoCadastrado ? '' : tipoAtual,
       valor_estimado: cotacao.valor_estimado?.toString() || '',
