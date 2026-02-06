@@ -1,196 +1,103 @@
 
-## Adicionar Botao Editar Pagamento
 
-### Contexto do Problema
+## Bloquear Recibo Apos Geracao
 
-Voce lancou o pagamento do recibo de 30/01/2026 com a data errada (05/02 ao inves da data correta). Atualmente nao existe forma de corrigir isso apos confirmar o pagamento.
+### Problema
+
+O instalador pode gerar o mesmo recibo varias vezes, o que pode causar confusao e pagamentos duplicados.
 
 ### Solucao
 
-Adicionar um botao "Editar" para pagamentos ja confirmados, permitindo alterar:
-- Data do pagamento
-- Comprovante PIX (opcional - substituir ou adicionar)
+Uma vez que o recibo e gerado/salvo no banco, bloquear a geracao de novos recibos para aquela data. Simples e direto.
 
 ---
 
 ### Mudancas Tecnicas
 
-**Arquivo: `src/components/admin/PagamentosInstaladores.tsx`**
+**Arquivo: `src/pages/instalador/MeuExtrato.tsx`**
 
-**1. Adicionar novo estado para modal de edicao**
+1. **Adicionar estado para controlar recibos ja gerados**
 
 ```tsx
-// Modal de edição de pagamento
-const [modalEdicao, setModalEdicao] = useState(false)
-const [editandoPagamento, setEditandoPagamento] = useState(false)
+const [recibosGerados, setRecibosGerados] = useState<string[]>([]) // datas no formato 'yyyy-MM-dd'
 ```
 
-**2. Adicionar funcao para abrir modal de edicao**
+2. **Carregar recibos ja gerados ao montar componente**
 
 ```tsx
-function abrirModalEdicao(recibo: ReciboComInstalador) {
-  setReciboSelecionado(recibo)
-  // Preencher com a data atual do pagamento
-  setDataPagamento(recibo.data_pagamento || '')
-  setComprovante(null)
-  setModalEdicao(true)
-}
-```
+async function carregarRecibosGerados() {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
 
-**3. Adicionar funcao para salvar edicao**
+  const { data } = await supabase
+    .from('recibos_diarios')
+    .select('data_referencia')
+    .eq('instalador_id', user.id)
 
-```tsx
-async function salvarEdicaoPagamento() {
-  if (!reciboSelecionado || !dataPagamento) {
-    toast({ title: 'Atencao', description: 'Informe a data', variant: 'destructive' })
-    return
-  }
-
-  try {
-    setEditandoPagamento(true)
-
-    let comprovanteUrl = reciboSelecionado.comprovante_pix_url
-
-    // Upload do novo comprovante se houver
-    if (comprovante) {
-      const fileName = `${reciboSelecionado.instalador_id}/${Date.now()}_${comprovante.name}`
-      const { error: uploadError } = await supabase.storage
-        .from('comprovantes')
-        .upload(fileName, comprovante)
-
-      if (uploadError) throw uploadError
-
-      const { data: urlData } = supabase.storage
-        .from('comprovantes')
-        .getPublicUrl(fileName)
-      
-      comprovanteUrl = urlData.publicUrl
-    }
-
-    const { error } = await supabase
-      .from('recibos_diarios')
-      .update({
-        data_pagamento: dataPagamento,
-        comprovante_pix_url: comprovanteUrl
-      })
-      .eq('id', reciboSelecionado.id)
-
-    if (error) throw error
-
-    toast({ title: 'Sucesso', description: 'Pagamento atualizado!' })
-    setModalEdicao(false)
-    carregarRecibos()
-  } catch (error) {
-    console.error('Erro ao editar pagamento:', error)
-    toast({ title: 'Erro', description: 'Nao foi possivel atualizar', variant: 'destructive' })
-  } finally {
-    setEditandoPagamento(false)
+  if (data) {
+    setRecibosGerados(data.map(r => r.data_referencia))
   }
 }
 ```
 
-**4. Adicionar botao Editar na coluna de Acoes (para pagamentos ja confirmados)**
-
-Na linha ~417-434, onde mostra os botoes para status "pago":
+3. **Adicionar seletor de data com validacao**
 
 ```tsx
-{recibo.status_pagamento === 'pago' && (
-  <>
-    <Button
-      size="sm"
-      variant="outline"
-      onClick={() => abrirModalEdicao(recibo)}
-    >
-      <Pencil className="h-4 w-4 mr-1" />
-      Editar
-    </Button>
-    {recibo.comprovante_pix_url && (
-      <Button size="sm" variant="outline" onClick={() => verComprovante(recibo.comprovante_pix_url!)}>
-        <Eye className="h-4 w-4 mr-1" />
-        Comprovante
-      </Button>
-    )}
-    {recibo.data_pagamento && (
-      <span className="text-xs text-muted-foreground self-center">
-        Pago em {format(new Date(recibo.data_pagamento), 'dd/MM')}
-      </span>
-    )}
-  </>
-)}
+const [dataRecibo, setDataRecibo] = useState<Date>(new Date())
+
+// Verificar se recibo ja foi gerado para data selecionada
+const hojeStr = format(dataRecibo, 'yyyy-MM-dd')
+const reciboJaGerado = recibosGerados.includes(hojeStr)
 ```
 
-**5. Adicionar import do icone Pencil**
+4. **Atualizar botao com bloqueio e feedback visual**
 
 ```tsx
-import { Check, Upload, Eye, Clock, DollarSign, FileText, Pencil } from 'lucide-react'
+<div className="flex items-center gap-2">
+  <Input
+    type="date"
+    value={format(dataRecibo, 'yyyy-MM-dd')}
+    onChange={(e) => setDataRecibo(new Date(e.target.value + 'T12:00:00'))}
+    max={format(new Date(), 'yyyy-MM-dd')}
+    min={format(subDays(new Date(), 7), 'yyyy-MM-dd')}
+    className="w-[150px]"
+  />
+  <Button 
+    onClick={() => setModalReciboOpen(true)}
+    disabled={servicosDataSelecionada.length === 0 || reciboJaGerado}
+  >
+    <FileText className="h-4 w-4" />
+    Gerar Recibo ({servicosDataSelecionada.length})
+  </Button>
+  {reciboJaGerado && (
+    <span className="text-sm text-orange-600 font-medium">
+      Recibo ja enviado
+    </span>
+  )}
+</div>
 ```
 
-**6. Adicionar novo modal de edicao**
+5. **Atualizar lista apos gerar recibo no modal**
 
-```tsx
-{/* Modal de Edição de Pagamento */}
-<Dialog open={modalEdicao} onOpenChange={setModalEdicao}>
-  <DialogContent>
-    <DialogHeader>
-      <DialogTitle>Editar Pagamento</DialogTitle>
-    </DialogHeader>
-    
-    {reciboSelecionado && (
-      <div className="space-y-4">
-        <div className="bg-muted p-4 rounded-lg space-y-2">
-          <p><strong>Instalador:</strong> {reciboSelecionado.instalador_nome}</p>
-          <p><strong>Data do Recibo:</strong> {formatarDataBR(reciboSelecionado.data_referencia)}</p>
-          <p className="text-lg font-bold text-primary">
-            Total: R$ {reciboSelecionado.valor_total.toFixed(2)}
-          </p>
-        </div>
-
-        <div>
-          <Label htmlFor="dataPagamentoEdit">Data do Pagamento *</Label>
-          <Input
-            id="dataPagamentoEdit"
-            type="date"
-            value={dataPagamento}
-            onChange={(e) => setDataPagamento(e.target.value)}
-            className="mt-1"
-          />
-        </div>
-
-        <div>
-          <Label htmlFor="comprovanteEdit">Novo Comprovante (opcional)</Label>
-          <Input
-            id="comprovanteEdit"
-            type="file"
-            accept="image/*,.pdf"
-            onChange={(e) => setComprovante(e.target.files?.[0] || null)}
-            className="mt-1"
-          />
-          {reciboSelecionado.comprovante_pix_url && !comprovante && (
-            <p className="text-xs text-muted-foreground mt-1">
-              Ja possui comprovante anexado. Selecione outro arquivo para substituir.
-            </p>
-          )}
-        </div>
-      </div>
-    )}
-
-    <DialogFooter>
-      <Button variant="outline" onClick={() => setModalEdicao(false)}>
-        Cancelar
-      </Button>
-      <Button onClick={salvarEdicaoPagamento} disabled={editandoPagamento}>
-        {editandoPagamento ? 'Salvando...' : 'Salvar Alteracoes'}
-      </Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
-```
+No `GerarReciboModal`, adicionar callback `onReciboGerado` que atualiza a lista de recibos gerados.
 
 ---
 
-### Resultado
+### Fluxo do Usuario
 
-- Botao "Editar" aparecera ao lado de "Detalhes" e "Comprovante" para pagamentos ja confirmados
-- Ao clicar, abre modal com a data atual preenchida para correcao
-- Possibilidade de substituir o comprovante se necessario
-- A atualizacao reflete imediatamente na listagem
+1. Instalador acessa "Meu Extrato"
+2. Sistema carrega lista de datas que ja tem recibo
+3. Por padrao, data vem com "hoje"
+4. Se hoje ja tem recibo: botao desabilitado + "Recibo ja enviado"
+5. Instalador pode mudar data para outro dia (ate 7 dias atras)
+6. Se data selecionada ja tem recibo: bloqueado
+7. Se data selecionada NAO tem recibo: pode gerar
+8. Apos gerar, data entra na lista e fica bloqueada
+
+### Beneficios
+
+- Joao pode gerar recibo do dia 5 no dia 6 (se ainda nao gerou)
+- Uma vez gerado, nao pode mais regerar
+- Voce nao recebe recibos duplicados
+- Simples de entender para o instalador
+
