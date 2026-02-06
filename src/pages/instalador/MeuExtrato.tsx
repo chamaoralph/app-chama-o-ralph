@@ -4,8 +4,9 @@ import { supabase } from '@/integrations/supabase/client'
 import { DollarSign, Package, TrendingUp, CheckCircle, FileDown, FileText } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { subDays, format, isToday } from 'date-fns'
+import { subDays, format } from 'date-fns'
 import { GerarReciboModal } from '@/components/instalador/GerarReciboModal'
 import { formatarDataBR } from '@/lib/utils'
 
@@ -30,18 +31,20 @@ export default function MeuExtrato() {
   const [tipoPeriodo, setTipoPeriodo] = useState('ultimo_mes')
   const [modalReciboOpen, setModalReciboOpen] = useState(false)
   const [instaladorNome, setInstaladorNome] = useState('')
+  const [dataRecibo, setDataRecibo] = useState<Date>(new Date())
+  const [recibosGerados, setRecibosGerados] = useState<string[]>([])
 
-  // Serviços APROVADOS de hoje (para o recibo) - usa data_conclusao com fallback para updated_at
-  const servicosHoje = servicos.filter(s => {
-    // Usa data_conclusao se existir, senão usa updated_at como fallback
+  // Verificar se recibo já foi gerado para data selecionada
+  const dataSelecionadaStr = format(dataRecibo, 'yyyy-MM-dd')
+  const reciboJaGerado = recibosGerados.includes(dataSelecionadaStr)
+
+  // Serviços APROVADOS da data selecionada (para o recibo) - usa data_conclusao com fallback para updated_at
+  const servicosDataSelecionada = servicos.filter(s => {
     const dataReferencia = s.data_conclusao || s.updated_at
     if (!dataReferencia) return false
     
-    // Comparar apenas a parte da data (YYYY-MM-DD) para evitar problemas de fuso horário
     const dataConclusaoStr = dataReferencia.split('T')[0]
-    const hojeStr = new Date().toISOString().split('T')[0]
-    
-    return dataConclusaoStr === hojeStr && s.status === 'concluido'
+    return dataConclusaoStr === dataSelecionadaStr && s.status === 'concluido'
   })
 
   // Cálculos dos cards
@@ -63,7 +66,32 @@ export default function MeuExtrato() {
   useEffect(() => {
     carregarServicos()
     carregarNomeInstalador()
+    carregarRecibosGerados()
   }, [filtroStatus, tipoPeriodo])
+
+  async function carregarRecibosGerados() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data } = await supabase
+        .from('recibos_diarios')
+        .select('data_referencia')
+        .eq('instalador_id', user.id)
+
+      if (data) {
+        setRecibosGerados(data.map(r => r.data_referencia))
+      }
+    } catch (error) {
+      console.error('Erro ao carregar recibos gerados:', error)
+    }
+  }
+
+  function handleReciboGerado() {
+    // Adiciona a data do recibo à lista de recibos gerados
+    setRecibosGerados(prev => [...prev, dataSelecionadaStr])
+    setModalReciboOpen(false)
+  }
 
   async function carregarNomeInstalador() {
     try {
@@ -289,14 +317,29 @@ export default function MeuExtrato() {
               Exportar CSV
             </Button>
 
-            <Button 
-              onClick={() => setModalReciboOpen(true)}
-              className="flex items-center gap-2"
-              disabled={servicosHoje.length === 0}
-            >
-              <FileText className="h-4 w-4" />
-              Gerar Recibo do Dia
-            </Button>
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                value={format(dataRecibo, 'yyyy-MM-dd')}
+                onChange={(e) => setDataRecibo(new Date(e.target.value + 'T12:00:00'))}
+                max={format(new Date(), 'yyyy-MM-dd')}
+                min={format(subDays(new Date(), 7), 'yyyy-MM-dd')}
+                className="w-[160px]"
+              />
+              <Button 
+                onClick={() => setModalReciboOpen(true)}
+                className="flex items-center gap-2"
+                disabled={servicosDataSelecionada.length === 0 || reciboJaGerado}
+              >
+                <FileText className="h-4 w-4" />
+                Gerar Recibo ({servicosDataSelecionada.length})
+              </Button>
+              {reciboJaGerado && (
+                <span className="text-sm text-orange-600 font-medium">
+                  Recibo já enviado
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -376,7 +419,7 @@ export default function MeuExtrato() {
         <GerarReciboModal
           open={modalReciboOpen}
           onOpenChange={setModalReciboOpen}
-          servicos={servicosHoje.map(s => ({
+          servicos={servicosDataSelecionada.map(s => ({
             id: s.id,
             codigo: s.codigo,
             cliente_nome: s.cliente_nome,
@@ -384,8 +427,9 @@ export default function MeuExtrato() {
             valor_mao_obra_instalador: s.valor_mao_obra_instalador,
             valor_reembolso_despesas: s.valor_reembolso_despesas
           }))}
-          dataReferencia={new Date()}
+          dataReferencia={dataRecibo}
           instaladorNome={instaladorNome}
+          onReciboGerado={handleReciboGerado}
         />
       </div>
     </InstaladorLayout>
