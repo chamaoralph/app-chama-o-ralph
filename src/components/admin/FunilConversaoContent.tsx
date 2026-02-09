@@ -3,9 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { format, eachDayOfInterval, parseISO } from "date-fns";
+import { format, eachDayOfInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { TrendingUp, Users, Target, DollarSign, ArrowDown, Percent, CalendarIcon, Receipt } from "lucide-react";
+import { TrendingUp, Users, Target, DollarSign, ArrowDown, Percent, CalendarIcon, Receipt, MousePointerClick, Eye, BarChart3, RefreshCw } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -21,6 +21,9 @@ interface FunnelData {
   roas: number;
   taxaConversao: number;
   ticketMedio: number;
+  clicks: number;
+  impressions: number;
+  ctr: number;
 }
 
 interface DailyData {
@@ -30,25 +33,22 @@ interface DailyData {
   leads: number;
   conversoes: number;
   receita: number;
+  clicks: number;
+  impressions: number;
 }
 
 export function FunilConversaoContent() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [lastSync, setLastSync] = useState<string | null>(null);
   const [dataInicio, setDataInicio] = useState<Date>(
     new Date(new Date().getFullYear(), new Date().getMonth(), 1)
   );
   const [dataFim, setDataFim] = useState<Date>(new Date());
   const [funnelData, setFunnelData] = useState<FunnelData>({
-    investimento: 0,
-    leads: 0,
-    agendados: 0,
-    receita: 0,
-    cpl: 0,
-    cpc: 0,
-    roas: 0,
-    taxaConversao: 0,
-    ticketMedio: 0,
+    investimento: 0, leads: 0, agendados: 0, receita: 0,
+    cpl: 0, cpc: 0, roas: 0, taxaConversao: 0, ticketMedio: 0,
+    clicks: 0, impressions: 0, ctr: 0,
   });
   const [dailyData, setDailyData] = useState<DailyData[]>([]);
 
@@ -58,22 +58,52 @@ export function FunilConversaoContent() {
       const dataInicioStr = format(dataInicio, "yyyy-MM-dd");
       const dataFimStr = format(dataFim, "yyyy-MM-dd");
 
-      const { data: despesas, error: erroDespesas } = await supabase
-        .from("lancamentos_caixa")
-        .select("valor, data_lancamento, categoria, descricao")
-        .eq("tipo", "despesa")
-        .gte("data_lancamento", dataInicioStr)
-        .lte("data_lancamento", dataFimStr);
+      // Fetch Google Ads metrics
+      const { data: adsMetrics, error: erroAds } = await supabase
+        .from("google_ads_metrics")
+        .select("*")
+        .gte("data", dataInicioStr)
+        .lte("data", dataFimStr);
 
-      if (erroDespesas) throw erroDespesas;
+      if (erroAds) throw erroAds;
 
-      const despesasGoogle = despesas?.filter(d => 
-        d.categoria?.toLowerCase().includes('google') || 
-        d.descricao?.toLowerCase().includes('google')
-      ) || [];
+      const hasAdsData = adsMetrics && adsMetrics.length > 0;
 
-      const investimento = despesasGoogle.reduce((sum, d) => sum + Number(d.valor), 0);
+      let investimento = 0;
+      let totalClicks = 0;
+      let totalImpressions = 0;
 
+      if (hasAdsData) {
+        investimento = adsMetrics.reduce((sum, m) => sum + (m.cost_micros || 0) / 1_000_000, 0);
+        totalClicks = adsMetrics.reduce((sum, m) => sum + (m.clicks || 0), 0);
+        totalImpressions = adsMetrics.reduce((sum, m) => sum + (m.impressions || 0), 0);
+
+        // Get last sync date
+        const maxSync = adsMetrics.reduce((max, m) => {
+          const s = m.synced_at;
+          return s && s > max ? s : max;
+        }, "");
+        if (maxSync) setLastSync(maxSync);
+      } else {
+        // Fallback: lancamentos_caixa
+        const { data: despesas, error: erroDespesas } = await supabase
+          .from("lancamentos_caixa")
+          .select("valor, data_lancamento, categoria, descricao")
+          .eq("tipo", "despesa")
+          .gte("data_lancamento", dataInicioStr)
+          .lte("data_lancamento", dataFimStr);
+
+        if (erroDespesas) throw erroDespesas;
+
+        const despesasGoogle = despesas?.filter(d =>
+          d.categoria?.toLowerCase().includes('google') ||
+          d.descricao?.toLowerCase().includes('google')
+        ) || [];
+
+        investimento = despesasGoogle.reduce((sum, d) => sum + Number(d.valor), 0);
+      }
+
+      // Leads & conversions (same as before)
       const { data: cotacoes, error: erroCotacoes } = await supabase
         .from("cotacoes")
         .select("id, status, created_at")
@@ -84,12 +114,11 @@ export function FunilConversaoContent() {
       if (erroCotacoes) throw erroCotacoes;
 
       const leads = cotacoes?.length || 0;
-
       const cotacaoIds = cotacoes?.map((c) => c.id) || [];
-      
+
       let agendados = 0;
       let receita = 0;
-      let servicos: { id: string; valor_total: number; status: string | null; cotacao_id: string | null; created_at: string | null }[] = [];
+      let servicos: any[] = [];
 
       if (cotacaoIds.length > 0) {
         const { data: servicosData, error: erroServicos } = await supabase
@@ -109,53 +138,52 @@ export function FunilConversaoContent() {
       const roas = investimento > 0 ? receita / investimento : 0;
       const taxaConversao = leads > 0 ? (agendados / leads) * 100 : 0;
       const ticketMedio = agendados > 0 ? receita / agendados : 0;
+      const ctr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
 
       setFunnelData({
-        investimento,
-        leads,
-        agendados,
-        receita,
-        cpl,
-        cpc,
-        roas,
-        taxaConversao,
-        ticketMedio,
+        investimento, leads, agendados, receita,
+        cpl, cpc, roas, taxaConversao, ticketMedio,
+        clicks: totalClicks, impressions: totalImpressions, ctr,
       });
 
-      // Build daily data for line chart
+      // Build daily data
       const days = eachDayOfInterval({ start: dataInicio, end: dataFim });
       const dailyMetrics: DailyData[] = days.map(day => {
         const dayStr = format(day, "yyyy-MM-dd");
         const dayLabel = format(day, "dd/MM", { locale: ptBR });
 
-        // Daily investment
-        const dayInvestimento = despesasGoogle
-          .filter(d => d.data_lancamento === dayStr)
-          .reduce((sum, d) => sum + Number(d.valor), 0);
+        let dayInvestimento = 0;
+        let dayClicks = 0;
+        let dayImpressions = 0;
 
-        // Daily leads
-        const dayLeads = cotacoes?.filter(c => 
+        if (hasAdsData) {
+          const dayAds = adsMetrics.filter(m => m.data === dayStr);
+          dayInvestimento = dayAds.reduce((sum, m) => sum + (m.cost_micros || 0) / 1_000_000, 0);
+          dayClicks = dayAds.reduce((sum, m) => sum + (m.clicks || 0), 0);
+          dayImpressions = dayAds.reduce((sum, m) => sum + (m.impressions || 0), 0);
+        }
+
+        const dayLeads = cotacoes?.filter(c =>
           c.created_at && c.created_at.startsWith(dayStr)
         ).length || 0;
 
-        // Daily conversions and revenue
-        const dayCotacaoIds = cotacoes?.filter(c => 
+        const dayCotacaoIds = cotacoes?.filter(c =>
           c.created_at && c.created_at.startsWith(dayStr)
         ).map(c => c.id) || [];
-        
-        const dayServicos = servicos.filter(s => 
+
+        const dayServicos = servicos.filter(s =>
           s.cotacao_id && dayCotacaoIds.includes(s.cotacao_id)
         );
-        const dayConversoes = dayServicos.length;
-        const dayReceita = dayServicos.reduce((sum, s) => sum + Number(s.valor_total), 0);
 
         return {
           data: dayStr,
           dataLabel: dayLabel,
           investimento: dayInvestimento,
           leads: dayLeads,
-          conversoes: dayConversoes,
-          receita: dayReceita,
+          conversoes: dayServicos.length,
+          receita: dayServicos.reduce((sum, s) => sum + Number(s.valor_total), 0),
+          clicks: dayClicks,
+          impressions: dayImpressions,
         };
       });
 
@@ -175,19 +203,26 @@ export function FunilConversaoContent() {
     carregarDados();
   }, []);
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(value);
-  };
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+
+  const formatNumber = (value: number) =>
+    new Intl.NumberFormat("pt-BR").format(value);
 
   return (
     <div className="space-y-6">
       {/* Filtros */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Período de Análise</CardTitle>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <CardTitle className="text-lg">Período de Análise</CardTitle>
+            {lastSync && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <RefreshCw className="h-3 w-3" />
+                Última sync: {format(new Date(lastSync), "dd/MM/yyyy HH:mm")}
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-4 items-end">
@@ -195,25 +230,13 @@ export function FunilConversaoContent() {
               <label className="block text-sm font-medium mb-2">Data Início</label>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-40 justify-start text-left font-normal",
-                      !dataInicio && "text-muted-foreground"
-                    )}
-                  >
+                  <Button variant="outline" className={cn("w-40 justify-start text-left font-normal", !dataInicio && "text-muted-foreground")}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {dataInicio ? format(dataInicio, "dd/MM/yyyy") : "Selecione"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={dataInicio}
-                    onSelect={(date) => date && setDataInicio(date)}
-                    initialFocus
-                    className="pointer-events-auto"
-                  />
+                  <Calendar mode="single" selected={dataInicio} onSelect={(date) => date && setDataInicio(date)} initialFocus className="pointer-events-auto" />
                 </PopoverContent>
               </Popover>
             </div>
@@ -221,25 +244,13 @@ export function FunilConversaoContent() {
               <label className="block text-sm font-medium mb-2">Data Fim</label>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-40 justify-start text-left font-normal",
-                      !dataFim && "text-muted-foreground"
-                    )}
-                  >
+                  <Button variant="outline" className={cn("w-40 justify-start text-left font-normal", !dataFim && "text-muted-foreground")}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {dataFim ? format(dataFim, "dd/MM/yyyy") : "Selecione"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={dataFim}
-                    onSelect={(date) => date && setDataFim(date)}
-                    initialFocus
-                    className="pointer-events-auto"
-                  />
+                  <Calendar mode="single" selected={dataFim} onSelect={(date) => date && setDataFim(date)} initialFocus className="pointer-events-auto" />
                 </PopoverContent>
               </Popover>
             </div>
@@ -250,70 +261,106 @@ export function FunilConversaoContent() {
         </CardContent>
       </Card>
 
-      {/* Métricas Principais */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
         <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-blue-100 text-sm">Investimento Google</p>
-                <p className="text-2xl font-bold">{formatCurrency(funnelData.investimento)}</p>
+                <p className="text-blue-100 text-xs">Investimento</p>
+                <p className="text-lg font-bold">{formatCurrency(funnelData.investimento)}</p>
               </div>
-              <DollarSign className="h-10 w-10 opacity-80" />
+              <DollarSign className="h-8 w-8 opacity-80" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-indigo-500 to-indigo-600 text-white">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-indigo-100 text-xs">Impressões</p>
+                <p className="text-lg font-bold">{formatNumber(funnelData.impressions)}</p>
+              </div>
+              <Eye className="h-8 w-8 opacity-80" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-sky-500 to-sky-600 text-white">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sky-100 text-xs">Cliques</p>
+                <p className="text-lg font-bold">{formatNumber(funnelData.clicks)}</p>
+              </div>
+              <MousePointerClick className="h-8 w-8 opacity-80" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-teal-500 to-teal-600 text-white">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-teal-100 text-xs">CTR</p>
+                <p className="text-lg font-bold">{funnelData.ctr.toFixed(2)}%</p>
+              </div>
+              <BarChart3 className="h-8 w-8 opacity-80" />
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-green-100 text-sm">Custo por Lead (CPL)</p>
-                <p className="text-2xl font-bold">{formatCurrency(funnelData.cpl)}</p>
+                <p className="text-green-100 text-xs">CPL</p>
+                <p className="text-lg font-bold">{formatCurrency(funnelData.cpl)}</p>
               </div>
-              <Users className="h-10 w-10 opacity-80" />
+              <Users className="h-8 w-8 opacity-80" />
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-purple-100 text-sm">Custo por Conversão</p>
-                <p className="text-2xl font-bold">{formatCurrency(funnelData.cpc)}</p>
+                <p className="text-purple-100 text-xs">Custo/Conversão</p>
+                <p className="text-lg font-bold">{formatCurrency(funnelData.cpc)}</p>
               </div>
-              <Target className="h-10 w-10 opacity-80" />
+              <Target className="h-8 w-8 opacity-80" />
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-gradient-to-br from-amber-500 to-amber-600 text-white">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-amber-100 text-sm">ROAS</p>
-                <p className="text-2xl font-bold">{funnelData.roas.toFixed(2)}x</p>
+                <p className="text-amber-100 text-xs">ROAS</p>
+                <p className="text-lg font-bold">{funnelData.roas.toFixed(2)}x</p>
               </div>
-              <TrendingUp className="h-10 w-10 opacity-80" />
+              <TrendingUp className="h-8 w-8 opacity-80" />
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-gradient-to-br from-cyan-500 to-cyan-600 text-white">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-cyan-100 text-sm">Ticket Médio</p>
-                <p className="text-2xl font-bold">{formatCurrency(funnelData.ticketMedio)}</p>
+                <p className="text-cyan-100 text-xs">Ticket Médio</p>
+                <p className="text-lg font-bold">{formatCurrency(funnelData.ticketMedio)}</p>
               </div>
-              <Receipt className="h-10 w-10 opacity-80" />
+              <Receipt className="h-8 w-8 opacity-80" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Gráfico de Linha - Evolução de Métricas */}
+      {/* Gráfico de Linha */}
       <MetricasLineChart dailyData={dailyData} loading={loading} />
 
       {/* Funil Visual */}
@@ -329,25 +376,19 @@ export function FunilConversaoContent() {
                 <p className="text-4xl font-bold">{funnelData.leads}</p>
               </div>
             </div>
-            
             <ArrowDown className="h-8 w-8 text-gray-400" />
-            
             <div className="flex items-center gap-2 text-gray-600">
               <Percent className="h-5 w-5" />
               <span className="font-semibold">{funnelData.taxaConversao.toFixed(1)}% de conversão</span>
             </div>
-
             <ArrowDown className="h-8 w-8 text-gray-400" />
-
             <div className="w-full max-w-sm">
               <div className="bg-green-500 text-white p-6 rounded-lg text-center">
                 <p className="text-lg font-semibold">Serviços Agendados</p>
                 <p className="text-4xl font-bold">{funnelData.agendados}</p>
               </div>
             </div>
-
             <ArrowDown className="h-8 w-8 text-gray-400" />
-
             <div className="w-full max-w-xs">
               <div className="bg-amber-500 text-white p-6 rounded-b-lg text-center">
                 <p className="text-lg font-semibold">Receita Gerada</p>
@@ -358,28 +399,28 @@ export function FunilConversaoContent() {
         </CardContent>
       </Card>
 
-      {/* Resumo Detalhado */}
+      {/* Resumo */}
       <Card>
         <CardHeader>
           <CardTitle>Resumo do Período</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <p className="text-gray-500 text-sm">Investimento Total</p>
-              <p className="text-xl font-bold text-gray-900">{formatCurrency(funnelData.investimento)}</p>
+            <div className="text-center p-4 bg-muted rounded-lg">
+              <p className="text-muted-foreground text-sm">Investimento Total</p>
+              <p className="text-xl font-bold">{formatCurrency(funnelData.investimento)}</p>
             </div>
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <p className="text-gray-500 text-sm">Total de Leads</p>
-              <p className="text-xl font-bold text-gray-900">{funnelData.leads}</p>
+            <div className="text-center p-4 bg-muted rounded-lg">
+              <p className="text-muted-foreground text-sm">Total de Leads</p>
+              <p className="text-xl font-bold">{funnelData.leads}</p>
             </div>
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <p className="text-gray-500 text-sm">Conversões</p>
-              <p className="text-xl font-bold text-gray-900">{funnelData.agendados}</p>
+            <div className="text-center p-4 bg-muted rounded-lg">
+              <p className="text-muted-foreground text-sm">Conversões</p>
+              <p className="text-xl font-bold">{funnelData.agendados}</p>
             </div>
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <p className="text-gray-500 text-sm">Receita Total</p>
-              <p className="text-xl font-bold text-gray-900">{formatCurrency(funnelData.receita)}</p>
+            <div className="text-center p-4 bg-muted rounded-lg">
+              <p className="text-muted-foreground text-sm">Receita Total</p>
+              <p className="text-xl font-bold">{formatCurrency(funnelData.receita)}</p>
             </div>
           </div>
         </CardContent>
