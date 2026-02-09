@@ -462,6 +462,47 @@ export type Database = {
         }
         Relationships: []
       }
+      google_ads_metrics: {
+        Row: {
+          clicks: number | null
+          conversions: number | null
+          cost_micros: number | null
+          data: string
+          empresa_id: string
+          id: string
+          impressions: number | null
+          synced_at: string | null
+        }
+        Insert: {
+          clicks?: number | null
+          conversions?: number | null
+          cost_micros?: number | null
+          data: string
+          empresa_id: string
+          id?: string
+          impressions?: number | null
+          synced_at?: string | null
+        }
+        Update: {
+          clicks?: number | null
+          conversions?: number | null
+          cost_micros?: number | null
+          data?: string
+          empresa_id?: string
+          id?: string
+          impressions?: number | null
+          synced_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_ads_metrics_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       importacao_clientes_log: {
         Row: {
           arquivo_nome: string
