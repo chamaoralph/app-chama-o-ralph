@@ -96,19 +96,13 @@ export default function Aprovacoes() {
 
       setServicos(servicosFormatados)
 
-      // Gerar URLs assinadas para as fotos e salvar paths originais
+      // Gerar URLs públicas para as fotos e salvar paths originais
       const urlsMap: Record<string, string[]> = {}
       const pathsMap: Record<string, string[]> = {}
       for (const servico of servicosFormatados) {
         if (servico.fotos_conclusao && servico.fotos_conclusao.length > 0) {
           pathsMap[servico.id] = servico.fotos_conclusao
-          const urls = await Promise.all(
-            servico.fotos_conclusao.map(async (path: string) => {
-              const url = await getSignedUrl(path)
-              return url || ''
-            })
-          )
-          urlsMap[servico.id] = urls.filter(u => u !== '')
+          urlsMap[servico.id] = servico.fotos_conclusao.map((path: string) => getPhotoUrl(path))
         }
       }
       setSignedUrls(urlsMap)
@@ -272,33 +266,18 @@ export default function Aprovacoes() {
     }
   }
 
-  async function getSignedUrl(pathOrUrl: string) {
-    try {
-      let path = pathOrUrl
-      
-      // Se for uma URL completa, extrair o path
-      if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
-        // Extrair path da URL: .../fotos-servicos/PATH
-        const match = pathOrUrl.match(/fotos-servicos\/(.+)$/)
-        if (match) {
-          path = match[1]
-        } else {
-          // URL não reconhecida, retornar como está
-          return pathOrUrl
-        }
-      }
-      
-      // Gera URL assinada a partir do path
-      const { data, error } = await supabase.storage
-        .from('fotos-servicos')
-        .createSignedUrl(path, 3600)
-
-      if (error) throw error
-      return data.signedUrl
-    } catch (error) {
-      console.error('Erro ao gerar URL assinada:', error)
-      return null
+  function getPhotoUrl(pathOrUrl: string) {
+    // Se for uma URL completa, retornar como está
+    if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+      return pathOrUrl
     }
+    
+    // Gera URL pública a partir do path
+    const { data } = supabase.storage
+      .from('fotos-servicos')
+      .getPublicUrl(pathOrUrl)
+
+    return data.publicUrl
   }
 
   async function getNotaFiscalUrl(pathOrUrl: string) {
