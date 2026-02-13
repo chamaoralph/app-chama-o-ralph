@@ -93,6 +93,70 @@ export type Database = {
           },
         ]
       }
+      avaliacoes: {
+        Row: {
+          cliente_id: string
+          comentario: string | null
+          created_at: string
+          empresa_id: string
+          enviado_em: string | null
+          id: string
+          nota: number | null
+          publicada: boolean
+          respondido_em: string | null
+          servico_id: string
+          status: string
+        }
+        Insert: {
+          cliente_id: string
+          comentario?: string | null
+          created_at?: string
+          empresa_id: string
+          enviado_em?: string | null
+          id?: string
+          nota?: number | null
+          publicada?: boolean
+          respondido_em?: string | null
+          servico_id: string
+          status?: string
+        }
+        Update: {
+          cliente_id?: string
+          comentario?: string | null
+          created_at?: string
+          empresa_id?: string
+          enviado_em?: string | null
+          id?: string
+          nota?: number | null
+          publicada?: boolean
+          respondido_em?: string | null
+          servico_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "avaliacoes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: true
+            referencedRelation: "servicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       certificacoes: {
         Row: {
           ativa: boolean | null
