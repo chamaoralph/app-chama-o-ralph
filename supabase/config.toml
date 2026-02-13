@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.google-ads-webhook]
 verify_jwt = false
+
+[functions.disparar-avaliacao]
+verify_jwt = false
+
+[functions.registrar-avaliacao]
+verify_jwt = false

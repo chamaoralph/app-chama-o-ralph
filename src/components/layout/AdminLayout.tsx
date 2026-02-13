@@ -133,6 +133,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               </span>
             )}
           </Link>
+          <Link to="/admin/avaliacoes" className="block px-4 py-2 rounded hover:bg-gray-800 transition-colors">
+            ⭐ Avaliações
+          </Link>
           <Link to="/admin/configuracoes" className="block px-4 py-2 rounded hover:bg-gray-800 transition-colors">
             ⚙️ Configurações
           </Link>
