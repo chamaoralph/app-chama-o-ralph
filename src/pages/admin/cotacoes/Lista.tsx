@@ -283,7 +283,7 @@ export default function ListaCotacoes() {
           horario_fim: horarioFim,
           created_at: editForm.data_criacao ? new Date(editForm.data_criacao).toISOString() : undefined,
           valor_estimado: editForm.valor_estimado ? parseFloat(editForm.valor_estimado) : null,
-          valor_material: editForm.valor_material ? parseFloat(editForm.valor_material) : null,
+          valor_material: editForm.origem_suporte === 'empresa' ? 0 : (editForm.valor_material ? parseFloat(editForm.valor_material) : null),
           origem_lead: editForm.origem_lead || null,
           ocasiao: editForm.ocasiao || null,
           descricao_servico: editForm.descricao_servico || null,
@@ -1022,10 +1022,16 @@ export default function ListaCotacoes() {
                   <Input 
                     type="number"
                     step="0.01"
-                    value={editForm.valor_material}
+                    value={editForm.origem_suporte === 'empresa' ? '' : editForm.valor_material}
                     onChange={(e) => setEditForm({...editForm, valor_material: e.target.value})}
                     placeholder="0,00"
+                    disabled={editForm.origem_suporte === 'empresa'}
                   />
+                  {editForm.origem_suporte === 'empresa' && (
+                    <p className="text-xs text-muted-foreground">
+                      💡 Sem reembolso quando a empresa fornece o suporte
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Origem</Label>
@@ -1109,7 +1115,7 @@ export default function ListaCotacoes() {
                       <Label>Origem do Suporte</Label>
                       <Select 
                         value={editForm.origem_suporte} 
-                        onValueChange={(v) => setEditForm({...editForm, origem_suporte: v})}
+                        onValueChange={(v) => setEditForm({...editForm, origem_suporte: v, valor_material: v === 'empresa' ? '' : editForm.valor_material})}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Não aplicável" />

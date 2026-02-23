@@ -230,7 +230,7 @@ export default function NovaCotacao() {
           tipo_servico: [tipoServicoFinal],
           descricao_servico: formData.descricao || tipoServicoFinal,
           valor_estimado: formData.valor_mao_obra ? parseFloat(formData.valor_mao_obra) : null,
-          valor_material: formData.valor_material ? parseFloat(formData.valor_material) : 0,
+          valor_material: formData.origem_suporte === 'empresa' ? 0 : (formData.valor_material ? parseFloat(formData.valor_material) : 0),
           origem_lead: formData.origem_lead,
           ocasiao: formData.ocasiao,
           observacoes: formData.observacoes,
@@ -378,7 +378,20 @@ export default function NovaCotacao() {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2">Valor do Material</label>
-                <input type="number" step="0.01" value={formData.valor_material} onChange={(e) => setFormData({...formData, valor_material: e.target.value})} className="w-full px-3 py-2 border rounded-md" placeholder="R$ 0,00" />
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  value={formData.origem_suporte === 'empresa' ? '' : formData.valor_material} 
+                  onChange={(e) => setFormData({...formData, valor_material: e.target.value})} 
+                  className="w-full px-3 py-2 border rounded-md disabled:opacity-50 disabled:cursor-not-allowed" 
+                  placeholder="R$ 0,00"
+                  disabled={formData.origem_suporte === 'empresa'}
+                />
+                {formData.origem_suporte === 'empresa' && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    💡 Sem reembolso de material quando a empresa fornece o suporte
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2">Horário Início</label>
@@ -461,7 +474,7 @@ export default function NovaCotacao() {
                       value={formData.origem_suporte} 
                       onChange={async (e) => {
                         const novaOrigem = e.target.value
-                        setFormData({...formData, origem_suporte: novaOrigem, custo_suporte: ''})
+                        setFormData({...formData, origem_suporte: novaOrigem, custo_suporte: '', valor_material: novaOrigem === 'empresa' ? '' : formData.valor_material})
                         
                         // Se selecionou "Empresa fornece", buscar último valor unitário
                         if (novaOrigem === 'empresa') {
