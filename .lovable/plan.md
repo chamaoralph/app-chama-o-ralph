@@ -1,63 +1,59 @@
 
-# Correção: Reembolso indevido quando empresa fornece suporte
+# Correção: Deduzir custo do suporte antes de calcular comissão
 
-## Problema identificado
+## Problema
 
-Quando a cotação é criada com "Empresa fornece" o suporte, o valor do material (que deveria ser zero nesse caso) está sendo passado como reembolso para o instalador. Isso acontece em 3 pontos do sistema.
+No SRV-2026-108:
+- Valor mão de obra: R$ 465
+- Custo suporte (empresa fornece): R$ 10
+- Cálculo atual: 465 / 2 = R$ 232,50 (errado)
+- Cálculo correto: (465 - 10) / 2 = R$ 227,50
 
-## Dados confirmados no banco
+Quando a empresa fornece o suporte, o custo do suporte deve ser **subtraído do valor da mão de obra antes** de aplicar o percentual de comissão. Isso porque a empresa investiu no hardware e precisa recuperar esse valor antes da divisão.
 
-Serviços com reembolso indevido:
-- SRV-2026-099: empresa forneceu suporte (R$ 308), mas apareceu R$ 308 como reembolso
-- SRV-2026-100: empresa forneceu suporte (R$ 41), mas apareceu R$ 41 como reembolso
-- SRV-2026-093: empresa forneceu suporte (R$ 75), reembolso de R$ 105
+## Onde corrigir (3 funções SQL)
 
-## Correções necessarias
-
-### 1. Trigger `criar_servico_ao_confirmar` (migracao SQL)
-
-Atualmente, quando `origem_suporte = 'empresa'`:
+### 1. `criar_servico_ao_confirmar`
+Linha atual:
 ```
-valor_reembolso_calc := COALESCE(NEW.valor_material, 0);
+valor_mao_obra_calc := COALESCE(NEW.valor_estimado, 0) * 0.50;
 ```
-Deveria ser:
+Corrigir para: quando `origem_suporte = 'empresa'`, subtrair `custo_suporte` antes de multiplicar pelo percentual.
+
+### 2. `sincronizar_servico_ao_editar_cotacao`
+Linha atual:
 ```
-valor_reembolso_calc := 0;
+novo_valor_mao_obra := COALESCE(NEW.valor_estimado, 0) * (percentual_instalador / 100.0);
 ```
-Quando a empresa fornece o suporte, nao existe reembolso de material para o instalador. Se o instalador tiver despesas extras, ele informa na hora de finalizar o servico.
+Mesma correção.
 
-### 2. Trigger `sincronizar_servico_ao_editar_cotacao` (mesma migracao)
-
-Mesmo problema. Atualmente:
+### 3. `atualizar_valor_ao_aceitar_servico`
+Linha atual:
 ```
-ELSE
-    novo_valor_reembolso := COALESCE(NEW.valor_material, 0);
+NEW.valor_mao_obra_instalador := valor_mao_obra_original * (percentual / 100.0);
 ```
-Corrigir para: quando `origem_suporte = 'empresa'`, reembolso = 0.
+Precisa buscar `origem_suporte` e `custo_suporte` da cotação e aplicar a mesma lógica.
 
-### 3. Corrigir servicos existentes (insert tool - UPDATE de dados)
+## Correção de dados existentes
 
-Atualizar os servicos que foram criados com reembolso incorreto:
-- Zerar `valor_reembolso_despesas` em servicos onde `origem_suporte = 'empresa'` e o reembolso veio do valor_material da cotacao
-- Apenas servicos que ainda NAO foram pagos (status != 'concluido' ou recibo pendente)
+Atualizar os serviços afetados onde `origem_suporte = 'empresa'` e a comissão foi calculada sem deduzir o custo do suporte.
 
-### 4. Formulario de cotacao (UI)
+## Lógica corrigida (resumo)
 
-Em `src/pages/admin/cotacoes/Nova.tsx`: quando `origem_suporte = 'empresa'`, limpar automaticamente o campo `valor_material` e desabilita-lo, pois nao deve haver reembolso de material quando a empresa fornece.
+```text
+SE origem_suporte = 'empresa':
+    base_calculo = valor_estimado - custo_suporte
+    comissao = base_calculo * percentual
+    reembolso = 0  (já corrigido na migração anterior)
+SENÃO:
+    base_calculo = valor_estimado
+    comissao = base_calculo * percentual
+    reembolso = (material + custo_suporte se instalador comprou)
+```
 
-Mesma correção em `src/pages/admin/cotacoes/Lista.tsx` (modal de edição).
+## Arquivos alterados
 
-## Arquivos a alterar
-
-| Arquivo | Alteracao |
-|---------|-----------|
-| Migracao SQL | Corrigir triggers `criar_servico_ao_confirmar` e `sincronizar_servico_ao_editar_cotacao` |
-| Dados existentes | UPDATE para zerar reembolso indevido nos servicos afetados |
-| `src/pages/admin/cotacoes/Nova.tsx` | Desabilitar/zerar valor_material quando empresa fornece |
-| `src/pages/admin/cotacoes/Lista.tsx` | Mesma logica no modal de edicao |
-
-## O que NAO sera alterado
-
-- Nenhuma logica de aprovacao
-- Nenhuma logica de recibos
-- Quando `origem_suporte = 'instalador'`, o reembolso continua incluindo material + custo_suporte normalmente
+| Alteração | Detalhes |
+|-----------|----------|
+| Migração SQL | Atualizar as 3 funções com a lógica de dedução do custo_suporte |
+| Dados existentes | UPDATE nos serviços com `origem_suporte = 'empresa'` para recalcular a comissão |
