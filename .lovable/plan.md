@@ -1,80 +1,63 @@
 
+# Correção: Reembolso indevido quando empresa fornece suporte
 
-# Fase 1 -- Estrutura de Avaliacoes + Disparo Automatico
+## Problema identificado
 
-Nesta fase vamos criar toda a infraestrutura de avaliacoes sem mexer na logica de aprovacao existente. Assim os servicos atuais continuam funcionando normalmente.
+Quando a cotação é criada com "Empresa fornece" o suporte, o valor do material (que deveria ser zero nesse caso) está sendo passado como reembolso para o instalador. Isso acontece em 3 pontos do sistema.
 
-## O que sera feito agora
+## Dados confirmados no banco
 
-1. Criar a tabela `avaliacoes` no banco
-2. Criar um trigger que gera a avaliacao automaticamente quando o instalador finaliza
-3. Criar a Edge Function `disparar-avaliacao` (envia webhook pro n8n)
-4. Criar a Edge Function `registrar-avaliacao` (recebe feedback do n8n)
-5. Criar a pagina `/admin/avaliacoes` para o admin visualizar e gerenciar avaliacoes
-6. Adicionar link "Avaliacoes" no menu do admin
+Serviços com reembolso indevido:
+- SRV-2026-099: empresa forneceu suporte (R$ 308), mas apareceu R$ 308 como reembolso
+- SRV-2026-100: empresa forneceu suporte (R$ 41), mas apareceu R$ 41 como reembolso
+- SRV-2026-093: empresa forneceu suporte (R$ 75), reembolso de R$ 105
 
-## O que NAO sera alterado agora
+## Correções necessarias
 
-- A pagina de Aprovacoes continua funcionando exatamente como esta
-- O botao de aprovar continua liberado independente da avaliacao
-- Nenhum fluxo existente e impactado
+### 1. Trigger `criar_servico_ao_confirmar` (migracao SQL)
 
-## Etapas
+Atualmente, quando `origem_suporte = 'empresa'`:
+```
+valor_reembolso_calc := COALESCE(NEW.valor_material, 0);
+```
+Deveria ser:
+```
+valor_reembolso_calc := 0;
+```
+Quando a empresa fornece o suporte, nao existe reembolso de material para o instalador. Se o instalador tiver despesas extras, ele informa na hora de finalizar o servico.
 
-### 1. Migracao SQL
+### 2. Trigger `sincronizar_servico_ao_editar_cotacao` (mesma migracao)
 
-Criar tabela `avaliacoes`:
-- `id`, `servico_id` (unique), `empresa_id`, `cliente_id`
-- `nota` (1-5, nullable), `comentario`, `status` (pendente / respondida / nao_avaliou)
-- `publicada` (boolean), `enviado_em`, `respondido_em`, `created_at`
+Mesmo problema. Atualmente:
+```
+ELSE
+    novo_valor_reembolso := COALESCE(NEW.valor_material, 0);
+```
+Corrigir para: quando `origem_suporte = 'empresa'`, reembolso = 0.
 
-RLS: somente admins da empresa podem ler. Sem permissao de escrita para usuarios normais (escrita via service role).
+### 3. Corrigir servicos existentes (insert tool - UPDATE de dados)
 
-Trigger: quando `servicos.status` mudar para `aguardando_aprovacao`, inserir registro em `avaliacoes` com status `pendente`.
+Atualizar os servicos que foram criados com reembolso incorreto:
+- Zerar `valor_reembolso_despesas` em servicos onde `origem_suporte = 'empresa'` e o reembolso veio do valor_material da cotacao
+- Apenas servicos que ainda NAO foram pagos (status != 'concluido' ou recibo pendente)
 
-### 2. Edge Function `disparar-avaliacao`
+### 4. Formulario de cotacao (UI)
 
-- Recebe dados do servico (via pg_net ou chamada direta)
-- Busca dados do cliente (nome, telefone) e instalador
-- Envia POST pro webhook do n8n com todas as informacoes
-- Protegida com HMAC usando `WEBHOOK_SECRET`
-- Registrada no `config.toml` com `verify_jwt = false`
+Em `src/pages/admin/cotacoes/Nova.tsx`: quando `origem_suporte = 'empresa'`, limpar automaticamente o campo `valor_material` e desabilita-lo, pois nao deve haver reembolso de material quando a empresa fornece.
 
-### 3. Edge Function `registrar-avaliacao`
+Mesma correção em `src/pages/admin/cotacoes/Lista.tsx` (modal de edição).
 
-- Endpoint para o n8n chamar quando o cliente responde ou quando expira o prazo de 12h
-- Recebe: `avaliacao_id`, `nota` (1-5 opcional), `comentario` (opcional), `status`
-- Valida input (nota entre 1-5, comentario max 1000 chars)
-- Atualiza registro via service role
-- Protegida com HMAC usando `WEBHOOK_SECRET`
+## Arquivos a alterar
 
-### 4. Pagina `/admin/avaliacoes`
+| Arquivo | Alteracao |
+|---------|-----------|
+| Migracao SQL | Corrigir triggers `criar_servico_ao_confirmar` e `sincronizar_servico_ao_editar_cotacao` |
+| Dados existentes | UPDATE para zerar reembolso indevido nos servicos afetados |
+| `src/pages/admin/cotacoes/Nova.tsx` | Desabilitar/zerar valor_material quando empresa fornece |
+| `src/pages/admin/cotacoes/Lista.tsx` | Mesma logica no modal de edicao |
 
-Pagina interna para o admin:
-- Lista todas avaliacoes com filtros (pendentes, respondidas, nao avaliou, publicadas)
-- Mostra: codigo do servico, cliente, instalador, nota, comentario, status
-- Toggle para marcar como "publicada"
-- Nota media geral e por instalador
+## O que NAO sera alterado
 
-### 5. Navegacao
-
-- Adicionar rota no `App.tsx`
-- Adicionar "Avaliacoes" no menu lateral (desktop e mobile)
-
-## Arquivos
-
-| Arquivo | Acao |
-|---------|------|
-| Migracao SQL | Criar tabela + trigger + RLS |
-| `supabase/functions/disparar-avaliacao/index.ts` | Criar |
-| `supabase/functions/registrar-avaliacao/index.ts` | Criar |
-| `supabase/config.toml` | Adicionar 2 functions |
-| `src/pages/admin/Avaliacoes.tsx` | Criar |
-| `src/App.tsx` | Adicionar rota |
-| `src/components/layout/AdminLayout.tsx` | Adicionar link menu |
-| `src/components/layout/MobileAdminLayout.tsx` | Adicionar link menu mobile |
-
-## Proxima fase (depois de validar)
-
-Alterar a pagina de Aprovacoes para mostrar o status da avaliacao e bloquear o botao "Aprovar" enquanto estiver pendente.
-
+- Nenhuma logica de aprovacao
+- Nenhuma logica de recibos
+- Quando `origem_suporte = 'instalador'`, o reembolso continua incluindo material + custo_suporte normalmente
