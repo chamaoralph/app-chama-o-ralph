@@ -1,24 +1,43 @@
 
 
-# Correção: Investimento diário sobrescrito pelo Google Ads
+# Correção: Data do lançamento de receita deve usar a data agendada do serviço
 
 ## Problema
 
-Na linha 162 do `FunilConversaoContent.tsx`, dentro do loop de dados diários, o `dayInvestimento` calculado a partir do caixa é **sobrescrito** pelo `cost_micros` do Google Ads:
+Quando um serviço é finalizado, o trigger `registrar_no_caixa_ao_aprovar()` insere a receita no caixa usando `CURRENT_DATE` (data atual). Isso faz com que serviços antigos (agendados para fevereiro, por exemplo) apareçam como receita de março quando finalizados em março.
 
-```typescript
-// linha 156-157: calcula investimento do caixa ✓
-dayInvestimento = dayDespesas.reduce(...);
+## Causa
 
-// linha 162: SOBRESCREVE com valor do Google Ads ✗
-dayInvestimento = dayAds.reduce((sum, m) => sum + (m.cost_micros || 0) / 1_000_000, 0);
+Na função `registrar_no_caixa_ao_aprovar()` (migration `20260107005210`), linha 17:
+
+```sql
+-- Usa a data de HOJE, não a data do serviço
+..., NEW.valor_total, CURRENT_DATE, 'Pix'
 ```
-
-O KPI total está correto (usa caixa), mas o gráfico diário continua usando o custo do Google Ads.
 
 ## Correção
 
-**Arquivo**: `src/components/admin/FunilConversaoContent.tsx`, linha 162
+**Migration SQL**: Alterar `CURRENT_DATE` para a data agendada do serviço:
 
-Remover a linha que sobrescreve `dayInvestimento` dentro do bloco `if (adsMetrics...)`. Manter apenas as linhas de `dayClicks` e `dayImpressions`.
+```sql
+CURRENT_DATE  →  (NEW.data_servico_agendada)::date
+```
+
+Assim, a receita será registrada na data em que o serviço estava agendado, independentemente de quando foi finalizado no sistema.
+
+**Correção de dados existentes**: Atualizar os lançamentos já registrados incorretamente, usando a data agendada dos serviços vinculados:
+
+```sql
+UPDATE lancamentos_caixa lc
+SET data_lancamento = (s.data_servico_agendada)::date
+FROM servicos s
+WHERE lc.servico_id = s.id
+  AND lc.categoria = 'Receita de Serviço'
+  AND lc.data_lancamento != (s.data_servico_agendada)::date;
+```
+
+## Resultado
+
+- Receitas passam a constar no mês em que o serviço foi agendado
+- Serviços de fevereiro finalizados em março aparecerão corretamente em fevereiro no Caixa
 
