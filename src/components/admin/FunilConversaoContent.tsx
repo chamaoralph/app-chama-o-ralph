@@ -159,7 +159,6 @@ export function FunilConversaoContent() {
         // Engagement from Google Ads
         if (adsMetrics && adsMetrics.length > 0) {
           const dayAds = adsMetrics.filter(m => m.data === dayStr);
-          dayInvestimento = dayAds.reduce((sum, m) => sum + (m.cost_micros || 0) / 1_000_000, 0);
           dayClicks = dayAds.reduce((sum, m) => sum + (m.clicks || 0), 0);
           dayImpressions = dayAds.reduce((sum, m) => sum + (m.impressions || 0), 0);
         }
