@@ -1,34 +1,24 @@
 
 
-# Correção: Investimento no Marketing usando dados do Caixa
+# Correção: Investimento diário sobrescrito pelo Google Ads
 
 ## Problema
 
-O painel de Marketing mostra **R$ 464,91** como investimento em Google Ads (vindo da tabela `google_ads_metrics`, que registra o custo consumido pela API do Google). Porém, no Caixa existem **4 lançamentos de R$ 200 = R$ 800** referentes a pagamentos reais ao Google no mesmo período.
+Na linha 162 do `FunilConversaoContent.tsx`, dentro do loop de dados diários, o `dayInvestimento` calculado a partir do caixa é **sobrescrito** pelo `cost_micros` do Google Ads:
 
-A tabela `google_ads_metrics` só tem dados de 02/02 a 09/02 (R$ 464,91 consumidos), enquanto o dinheiro efetivamente pago foi R$ 800.
+```typescript
+// linha 156-157: calcula investimento do caixa ✓
+dayInvestimento = dayDespesas.reduce(...);
 
-## Causa
+// linha 162: SOBRESCREVE com valor do Google Ads ✗
+dayInvestimento = dayAds.reduce((sum, m) => sum + (m.cost_micros || 0) / 1_000_000, 0);
+```
 
-No `FunilConversaoContent.tsx`, a lógica atual é **excludente**: se existem dados em `google_ads_metrics`, usa apenas esses para investimento. Se não existem, faz fallback para `lancamentos_caixa`. Nunca usa ambos simultaneamente.
+O KPI total está correto (usa caixa), mas o gráfico diário continua usando o custo do Google Ads.
 
-## Solução
+## Correção
 
-Separar as fontes de dados por propósito:
+**Arquivo**: `src/components/admin/FunilConversaoContent.tsx`, linha 162
 
-| Métrica | Fonte |
-|---------|-------|
-| **Investimento** | Sempre `lancamentos_caixa` (dinheiro real saído do caixa) |
-| **Cliques, Impressões, CTR** | `google_ads_metrics` (métricas de engajamento do Google) |
-
-Isso garante que o investimento mostrado no funil reflita o valor real gasto, enquanto métricas de performance continuam vindo do Google.
-
-## Alteração
-
-**Arquivo**: `src/components/admin/FunilConversaoContent.tsx`
-
-Na função `carregarDados()`:
-1. Sempre buscar investimento de `lancamentos_caixa` filtrando por categoria "Marketing" ou descrição contendo "google"
-2. Buscar cliques/impressões de `google_ads_metrics` independentemente
-3. Remover a lógica de fallback (`hasAdsData`) que tornava as duas fontes mutuamente exclusivas
+Remover a linha que sobrescreve `dayInvestimento` dentro do bloco `if (adsMetrics...)`. Manter apenas as linhas de `dayClicks` e `dayImpressions`.
 
