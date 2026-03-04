@@ -58,7 +58,25 @@ export function FunilConversaoContent() {
       const dataInicioStr = format(dataInicio, "yyyy-MM-dd");
       const dataFimStr = format(dataFim, "yyyy-MM-dd");
 
-      // Fetch Google Ads metrics
+      // Fetch investment from lancamentos_caixa (real money spent)
+      const { data: despesas, error: erroDespesas } = await supabase
+        .from("lancamentos_caixa")
+        .select("valor, data_lancamento, categoria, descricao")
+        .eq("tipo", "despesa")
+        .gte("data_lancamento", dataInicioStr)
+        .lte("data_lancamento", dataFimStr);
+
+      if (erroDespesas) throw erroDespesas;
+
+      const despesasMarketing = despesas?.filter(d =>
+        d.categoria?.toLowerCase().includes('marketing') ||
+        d.categoria?.toLowerCase().includes('google') ||
+        d.descricao?.toLowerCase().includes('google')
+      ) || [];
+
+      let investimento = despesasMarketing.reduce((sum, d) => sum + Number(d.valor), 0);
+
+      // Fetch Google Ads metrics (engagement only: clicks, impressions)
       const { data: adsMetrics, error: erroAds } = await supabase
         .from("google_ads_metrics")
         .select("*")
@@ -67,40 +85,18 @@ export function FunilConversaoContent() {
 
       if (erroAds) throw erroAds;
 
-      const hasAdsData = adsMetrics && adsMetrics.length > 0;
-
-      let investimento = 0;
       let totalClicks = 0;
       let totalImpressions = 0;
 
-      if (hasAdsData) {
-        investimento = adsMetrics.reduce((sum, m) => sum + (m.cost_micros || 0) / 1_000_000, 0);
+      if (adsMetrics && adsMetrics.length > 0) {
         totalClicks = adsMetrics.reduce((sum, m) => sum + (m.clicks || 0), 0);
         totalImpressions = adsMetrics.reduce((sum, m) => sum + (m.impressions || 0), 0);
 
-        // Get last sync date
         const maxSync = adsMetrics.reduce((max, m) => {
           const s = m.synced_at;
           return s && s > max ? s : max;
         }, "");
         if (maxSync) setLastSync(maxSync);
-      } else {
-        // Fallback: lancamentos_caixa
-        const { data: despesas, error: erroDespesas } = await supabase
-          .from("lancamentos_caixa")
-          .select("valor, data_lancamento, categoria, descricao")
-          .eq("tipo", "despesa")
-          .gte("data_lancamento", dataInicioStr)
-          .lte("data_lancamento", dataFimStr);
-
-        if (erroDespesas) throw erroDespesas;
-
-        const despesasGoogle = despesas?.filter(d =>
-          d.categoria?.toLowerCase().includes('google') ||
-          d.descricao?.toLowerCase().includes('google')
-        ) || [];
-
-        investimento = despesasGoogle.reduce((sum, d) => sum + Number(d.valor), 0);
       }
 
       // Leads & conversions (same as before)
@@ -156,7 +152,12 @@ export function FunilConversaoContent() {
         let dayClicks = 0;
         let dayImpressions = 0;
 
-        if (hasAdsData) {
+        // Investment from caixa
+        const dayDespesas = despesasMarketing.filter(d => d.data_lancamento === dayStr);
+        dayInvestimento = dayDespesas.reduce((sum, d) => sum + Number(d.valor), 0);
+
+        // Engagement from Google Ads
+        if (adsMetrics && adsMetrics.length > 0) {
           const dayAds = adsMetrics.filter(m => m.data === dayStr);
           dayInvestimento = dayAds.reduce((sum, m) => sum + (m.cost_micros || 0) / 1_000_000, 0);
           dayClicks = dayAds.reduce((sum, m) => sum + (m.clicks || 0), 0);
