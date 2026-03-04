@@ -23,7 +23,14 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { toast } from '@/hooks/use-toast'
-import { Check, Upload, Eye, Clock, DollarSign, FileText, Pencil } from 'lucide-react'
+import { Check, Upload, Eye, Clock, DollarSign, FileText, Pencil, Plus } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 interface ReciboComInstalador {
   id: string
@@ -64,6 +71,17 @@ export function PagamentosInstaladores() {
   // Modal de edição de pagamento
   const [modalEdicao, setModalEdicao] = useState(false)
   const [editandoPagamento, setEditandoPagamento] = useState(false)
+
+  // Modal de lançamento manual
+  const [modalManual, setModalManual] = useState(false)
+  const [manualData, setManualData] = useState('')
+  const [manualInstaladorId, setManualInstaladorId] = useState('')
+  const [manualQtdServicos, setManualQtdServicos] = useState(0)
+  const [manualValorMaoObra, setManualValorMaoObra] = useState(0)
+  const [manualValorReembolso, setManualValorReembolso] = useState(0)
+  const [manualValorTotal, setManualValorTotal] = useState(0)
+  const [salvandoManual, setSalvandoManual] = useState(false)
+  const [instaladoresAtivos, setInstaladoresAtivos] = useState<{id: string, nome: string}[]>([])
 
   // Cálculos
   const totalPendente = recibos
@@ -393,6 +411,89 @@ export function PagamentosInstaladores() {
     }
   }
 
+  async function abrirModalManual() {
+    setManualData(format(new Date(), 'yyyy-MM-dd'))
+    setManualInstaladorId('')
+    setManualQtdServicos(0)
+    setManualValorMaoObra(0)
+    setManualValorReembolso(0)
+    setManualValorTotal(0)
+
+    // Carregar instaladores ativos
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: userData } = await supabase
+        .from('usuarios')
+        .select('empresa_id')
+        .eq('id', user.id)
+        .single()
+      if (!userData) return
+
+      const { data: inst } = await supabase
+        .from('usuarios')
+        .select('id, nome')
+        .eq('empresa_id', userData.empresa_id)
+        .eq('tipo', 'instalador')
+        .eq('ativo', true)
+        .order('nome')
+
+      setInstaladoresAtivos(inst || [])
+    } catch (e) {
+      console.error('Erro ao carregar instaladores:', e)
+    }
+
+    setModalManual(true)
+  }
+
+  async function salvarReciboManual() {
+    if (!manualData || !manualInstaladorId) {
+      toast({ title: 'Atenção', description: 'Preencha a data e selecione o instalador', variant: 'destructive' })
+      return
+    }
+    if (manualValorTotal <= 0) {
+      toast({ title: 'Atenção', description: 'O valor total deve ser maior que zero', variant: 'destructive' })
+      return
+    }
+
+    try {
+      setSalvandoManual(true)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: userData } = await supabase
+        .from('usuarios')
+        .select('empresa_id')
+        .eq('id', user.id)
+        .single()
+      if (!userData) return
+
+      const { error } = await supabase
+        .from('recibos_diarios')
+        .insert({
+          empresa_id: userData.empresa_id,
+          instalador_id: manualInstaladorId,
+          data_referencia: manualData,
+          quantidade_servicos: manualQtdServicos,
+          valor_mao_obra: manualValorMaoObra,
+          valor_reembolso: manualValorReembolso,
+          valor_total: manualValorTotal,
+          servicos_ids: [],
+          status_pagamento: 'pendente'
+        })
+
+      if (error) throw error
+
+      toast({ title: 'Sucesso', description: 'Recibo manual lançado com sucesso!' })
+      setModalManual(false)
+      carregarRecibos()
+    } catch (error) {
+      console.error('Erro ao salvar recibo manual:', error)
+      toast({ title: 'Erro', description: 'Não foi possível salvar o recibo', variant: 'destructive' })
+    } finally {
+      setSalvandoManual(false)
+    }
+  }
+
   const recibosFiltrados = recibos.filter(r => {
     if (filtroStatus === 'todos') return true
     return r.status_pagamento === filtroStatus
@@ -443,6 +544,12 @@ export function PagamentosInstaladores() {
             <option value="pendente">Pendentes</option>
             <option value="pago">Pagos</option>
           </select>
+        </div>
+        <div className="ml-auto">
+          <Button onClick={abrirModalManual}>
+            <Plus className="h-4 w-4 mr-1" />
+            Lançar Recibo Manual
+          </Button>
         </div>
       </div>
 
@@ -775,6 +882,114 @@ export function PagamentosInstaladores() {
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Lançamento Manual */}
+      <Dialog open={modalManual} onOpenChange={setModalManual}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Lançar Recibo Manual</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="manualData">Data de Referência *</Label>
+              <Input
+                id="manualData"
+                type="date"
+                value={manualData}
+                onChange={(e) => setManualData(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="manualInstalador">Instalador *</Label>
+              <Select value={manualInstaladorId} onValueChange={setManualInstaladorId}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Selecione o instalador" />
+                </SelectTrigger>
+                <SelectContent>
+                  {instaladoresAtivos.map((inst) => (
+                    <SelectItem key={inst.id} value={inst.id}>
+                      {inst.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="manualQtd">Quantidade de Serviços</Label>
+              <Input
+                id="manualQtd"
+                type="number"
+                min="0"
+                value={manualQtdServicos}
+                onChange={(e) => setManualQtdServicos(parseInt(e.target.value) || 0)}
+                className="mt-1"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="manualMaoObra">Valor Mão de Obra *</Label>
+                <Input
+                  id="manualMaoObra"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={manualValorMaoObra || ''}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value) || 0
+                    setManualValorMaoObra(v)
+                    setManualValorTotal(v + manualValorReembolso)
+                  }}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="manualReembolso">Valor Reembolso</Label>
+                <Input
+                  id="manualReembolso"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={manualValorReembolso || ''}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value) || 0
+                    setManualValorReembolso(v)
+                    setManualValorTotal(manualValorMaoObra + v)
+                  }}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="manualTotal">Valor Total</Label>
+              <Input
+                id="manualTotal"
+                type="number"
+                min="0"
+                step="0.01"
+                value={manualValorTotal || ''}
+                onChange={(e) => setManualValorTotal(parseFloat(e.target.value) || 0)}
+                className="mt-1 font-bold"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Calculado automaticamente, mas pode ser editado.</p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setModalManual(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={salvarReciboManual} disabled={salvandoManual}>
+              {salvandoManual ? 'Salvando...' : 'Lançar Recibo'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
