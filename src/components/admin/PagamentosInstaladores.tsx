@@ -516,8 +516,127 @@ export function PagamentosInstaladores() {
       setSalvandoManual(false)
     }
   }
+  function abrirEditarValores(recibo: ReciboComInstalador) {
+    setReciboSelecionado(recibo)
+    setEditValorMaoObra(recibo.valor_mao_obra)
+    setEditValorReembolso(recibo.valor_reembolso)
+    setEditQtdServicos(recibo.quantidade_servicos)
+    setEditValorTotal(recibo.valor_total)
+    setModalEditarValores(true)
+  }
 
-  const recibosFiltrados = recibos.filter(r => {
+  async function salvarEdicaoValores() {
+    if (!reciboSelecionado) return
+
+    try {
+      setSalvandoEdicaoValores(true)
+
+      const { error } = await supabase
+        .from('recibos_diarios')
+        .update({
+          valor_mao_obra: editValorMaoObra,
+          valor_reembolso: editValorReembolso,
+          quantidade_servicos: editQtdServicos,
+          valor_total: editValorTotal,
+        })
+        .eq('id', reciboSelecionado.id)
+
+      if (error) throw error
+
+      // Se recibo já pago, atualizar lançamentos no caixa
+      if (reciboSelecionado.status_pagamento === 'pago') {
+        const dataReferenciaFormatada = format(new Date(reciboSelecionado.data_referencia + 'T12:00:00'), 'dd/MM/yyyy')
+
+        // Atualizar valor da mão de obra no caixa
+        await supabase
+          .from('lancamentos_caixa')
+          .update({ valor: editValorMaoObra })
+          .eq('categoria', 'Pagamento Instalador')
+          .ilike('descricao', `%${dataReferenciaFormatada}%`)
+          .ilike('descricao', `%${reciboSelecionado.instalador_nome}%`)
+
+        // Atualizar reembolso no caixa
+        if (editValorReembolso > 0) {
+          await supabase
+            .from('lancamentos_caixa')
+            .update({ valor: editValorReembolso })
+            .eq('categoria', 'Reembolso Materiais')
+            .ilike('descricao', `%${dataReferenciaFormatada}%`)
+            .ilike('descricao', `%${reciboSelecionado.instalador_nome}%`)
+        } else {
+          // Se reembolso zerado, deletar lançamento de reembolso
+          await supabase
+            .from('lancamentos_caixa')
+            .delete()
+            .eq('categoria', 'Reembolso Materiais')
+            .ilike('descricao', `%${dataReferenciaFormatada}%`)
+            .ilike('descricao', `%${reciboSelecionado.instalador_nome}%`)
+        }
+      }
+
+      toast({ title: 'Sucesso', description: 'Valores do recibo atualizados!' })
+      setModalEditarValores(false)
+      carregarRecibos()
+    } catch (error) {
+      console.error('Erro ao editar valores:', error)
+      toast({ title: 'Erro', description: 'Não foi possível atualizar os valores', variant: 'destructive' })
+    } finally {
+      setSalvandoEdicaoValores(false)
+    }
+  }
+
+  function confirmarApagar(recibo: ReciboComInstalador) {
+    setReciboApagar(recibo)
+    setAlertApagar(true)
+  }
+
+  async function apagarRecibo() {
+    if (!reciboApagar) return
+
+    try {
+      setApagando(true)
+
+      // Se pago, deletar lançamentos correspondentes no caixa
+      if (reciboApagar.status_pagamento === 'pago') {
+        const dataReferenciaFormatada = format(new Date(reciboApagar.data_referencia + 'T12:00:00'), 'dd/MM/yyyy')
+
+        await supabase
+          .from('lancamentos_caixa')
+          .delete()
+          .eq('categoria', 'Pagamento Instalador')
+          .ilike('descricao', `%${dataReferenciaFormatada}%`)
+          .ilike('descricao', `%${reciboApagar.instalador_nome}%`)
+
+        if (reciboApagar.valor_reembolso > 0) {
+          await supabase
+            .from('lancamentos_caixa')
+            .delete()
+            .eq('categoria', 'Reembolso Materiais')
+            .ilike('descricao', `%${dataReferenciaFormatada}%`)
+            .ilike('descricao', `%${reciboApagar.instalador_nome}%`)
+        }
+      }
+
+      const { error } = await supabase
+        .from('recibos_diarios')
+        .delete()
+        .eq('id', reciboApagar.id)
+
+      if (error) throw error
+
+      toast({ title: 'Sucesso', description: 'Recibo apagado com sucesso!' })
+      setAlertApagar(false)
+      setReciboApagar(null)
+      carregarRecibos()
+    } catch (error) {
+      console.error('Erro ao apagar recibo:', error)
+      toast({ title: 'Erro', description: 'Não foi possível apagar o recibo', variant: 'destructive' })
+    } finally {
+      setApagando(false)
+    }
+  }
+
+
     if (filtroStatus === 'todos') return true
     return r.status_pagamento === filtroStatus
   })
