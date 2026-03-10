@@ -1,34 +1,34 @@
 
 
-# Lançamento Manual de Recibo pelo Admin
+# Correção: Filtro de recibo usando data errada
 
-## Objetivo
+## Problema
+O filtro que seleciona serviços para o recibo usa `data_conclusao` (timestamp UTC). Serviços finalizados após 21h no Brasil ficam com data UTC do dia seguinte, excluindo-os do recibo.
 
-Adicionar um botão "Lançar Recibo Manual" na tela de Pagamentos (aba dentro de `/admin/instaladores`) que permite ao admin criar um recibo (`recibos_diarios`) manualmente, para casos onde o instalador não conseguiu gerar pelo sistema.
+## Solução
+Trocar a referência de `data_conclusao` para `data_servico_agendada` no filtro `servicosDataSelecionada` em `src/pages/instalador/MeuExtrato.tsx`. Também incluir status `aguardando_aprovacao`.
 
-## Alterações
+### Alteração (linhas 42-48):
 
-### 1. Frontend: `src/components/admin/PagamentosInstaladores.tsx`
+**De:**
+```typescript
+const servicosDataSelecionada = servicos.filter(s => {
+  const dataReferencia = s.data_conclusao || s.updated_at
+  if (!dataReferencia) return false
+  const dataConclusaoStr = dataReferencia.split('T')[0]
+  return dataConclusaoStr === dataSelecionadaStr && s.status === 'concluido'
+})
+```
 
-- Adicionar botão "Lançar Recibo Manual" ao lado dos filtros (Mês/Status)
-- Criar modal com os campos:
-  - **Data de referência** (date input)
-  - **Instalador** (select com lista de instaladores ativos da empresa)
-  - **Quantidade de serviços** (número, pode ser 0)
-  - **Valor Mão de Obra** (numérico)
-  - **Valor Reembolso** (numérico, default 0)
-  - **Valor Total** (calculado automaticamente = mão de obra + reembolso, editável)
-- Ao salvar, inserir diretamente na tabela `recibos_diarios` com `servicos_ids` vazio (`{}`) e status `pendente`
+**Para:**
+```typescript
+const servicosDataSelecionada = servicos.filter(s => {
+  if (!s.data_servico_agendada) return false
+  const dataAgendadaStr = s.data_servico_agendada.split('T')[0]
+  return dataAgendadaStr === dataSelecionadaStr && 
+    (s.status === 'concluido' || s.status === 'aguardando_aprovacao')
+})
+```
 
-### 2. Backend: Migration SQL
-
-- Adicionar RLS policy para permitir que admins insiram recibos na tabela `recibos_diarios` (atualmente só instaladores podem criar via `instalador_id = auth.uid()`)
-- Nova policy: admins da mesma empresa podem INSERT em `recibos_diarios`
-
-### Fluxo
-
-1. Admin clica "Lançar Recibo Manual"
-2. Preenche data, seleciona instalador, informa valores
-3. Confirma -- recibo aparece na listagem como "Pendente"
-4. Admin pode então pagar normalmente usando o fluxo existente
+Isso é consistente com o padrão timezone-agnostic já usado no dashboard admin e na agenda do instalador. Nenhuma outra alteração necessária.
 
