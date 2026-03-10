@@ -737,7 +737,7 @@ export function PagamentosInstaladores() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-2 justify-center">
+                    <div className="flex gap-2 justify-center flex-wrap">
                       {/* Botão de Detalhes - sempre visível */}
                       <Button
                         size="sm"
@@ -746,6 +746,16 @@ export function PagamentosInstaladores() {
                       >
                         <FileText className="h-4 w-4 mr-1" />
                         Detalhes
+                      </Button>
+
+                      {/* Botão Editar Valores - sempre visível */}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => abrirEditarValores(recibo)}
+                      >
+                        <Pencil className="h-4 w-4 mr-1" />
+                        Valores
                       </Button>
 
                       {recibo.status_pagamento === 'pendente' ? (
@@ -764,7 +774,7 @@ export function PagamentosInstaladores() {
                             onClick={() => abrirModalEdicao(recibo)}
                           >
                             <Pencil className="h-4 w-4 mr-1" />
-                            Editar
+                            Pgto
                           </Button>
                           {recibo.comprovante_pix_url && (
                             <Button
@@ -783,6 +793,15 @@ export function PagamentosInstaladores() {
                           )}
                         </>
                       )}
+
+                      {/* Botão Apagar - sempre visível */}
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => confirmarApagar(recibo)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
