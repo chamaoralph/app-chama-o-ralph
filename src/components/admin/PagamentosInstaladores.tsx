@@ -1153,6 +1153,133 @@ export function PagamentosInstaladores() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de Edição de Valores */}
+      <Dialog open={modalEditarValores} onOpenChange={setModalEditarValores}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Valores do Recibo</DialogTitle>
+          </DialogHeader>
+          
+          {reciboSelecionado && (
+            <div className="space-y-4">
+              <div className="bg-muted p-4 rounded-lg space-y-2">
+                <p><strong>Instalador:</strong> {reciboSelecionado.instalador_nome}</p>
+                <p><strong>Data:</strong> {formatarDataBR(reciboSelecionado.data_referencia)}</p>
+                <Badge variant={reciboSelecionado.status_pagamento === 'pago' ? 'default' : 'secondary'}>
+                  {reciboSelecionado.status_pagamento === 'pago' ? 'Pago' : 'Pendente'}
+                </Badge>
+                {reciboSelecionado.status_pagamento === 'pago' && (
+                  <p className="text-xs text-amber-600 mt-2">
+                    ⚠️ Este recibo já foi pago. Os lançamentos no caixa serão atualizados automaticamente.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="editQtd">Quantidade de Serviços</Label>
+                <Input
+                  id="editQtd"
+                  type="number"
+                  min="0"
+                  value={editQtdServicos}
+                  onChange={(e) => setEditQtdServicos(parseInt(e.target.value) || 0)}
+                  className="mt-1"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="editMaoObra">Valor Mão de Obra</Label>
+                  <Input
+                    id="editMaoObra"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={editValorMaoObra || ''}
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value) || 0
+                      setEditValorMaoObra(v)
+                      setEditValorTotal(v + editValorReembolso)
+                    }}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editReembolso">Valor Reembolso</Label>
+                  <Input
+                    id="editReembolso"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={editValorReembolso || ''}
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value) || 0
+                      setEditValorReembolso(v)
+                      setEditValorTotal(editValorMaoObra + v)
+                    }}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="editTotal">Valor Total</Label>
+                <Input
+                  id="editTotal"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editValorTotal || ''}
+                  onChange={(e) => setEditValorTotal(parseFloat(e.target.value) || 0)}
+                  className="mt-1 font-bold"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Calculado automaticamente, mas pode ser editado.</p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setModalEditarValores(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={salvarEdicaoValores} disabled={salvandoEdicaoValores}>
+              {salvandoEdicaoValores ? 'Salvando...' : 'Salvar Valores'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* AlertDialog de Confirmação de Exclusão */}
+      <AlertDialog open={alertApagar} onOpenChange={setAlertApagar}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Apagar recibo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {reciboApagar && (
+                <>
+                  Tem certeza que deseja apagar o recibo de <strong>{reciboApagar.instalador_nome}</strong> do dia <strong>{formatarDataBR(reciboApagar.data_referencia)}</strong> (R$ {reciboApagar.valor_total.toFixed(2)})?
+                  {reciboApagar.status_pagamento === 'pago' && (
+                    <span className="block mt-2 text-destructive font-medium">
+                      ⚠️ Este recibo já foi pago. Os lançamentos correspondentes no caixa também serão removidos.
+                    </span>
+                  )}
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={apagando}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={apagarRecibo}
+              disabled={apagando}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {apagando ? 'Apagando...' : 'Apagar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
