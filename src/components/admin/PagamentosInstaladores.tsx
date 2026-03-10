@@ -15,6 +15,16 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   Table,
   TableBody,
   TableCell,
@@ -23,7 +33,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { toast } from '@/hooks/use-toast'
-import { Check, Upload, Eye, Clock, DollarSign, FileText, Pencil, Plus } from 'lucide-react'
+import { Check, Upload, Eye, Clock, DollarSign, FileText, Pencil, Plus, Trash2 } from 'lucide-react'
 import {
   Select,
   SelectContent,
