@@ -38,13 +38,12 @@ export default function MeuExtrato() {
   const dataSelecionadaStr = format(dataRecibo, 'yyyy-MM-dd')
   const reciboJaGerado = recibosGerados.includes(dataSelecionadaStr)
 
-  // Serviços APROVADOS da data selecionada (para o recibo) - usa data_conclusao com fallback para updated_at
+  // Serviços da data selecionada (para o recibo) - usa data_servico_agendada (timezone-agnostic)
   const servicosDataSelecionada = servicos.filter(s => {
-    const dataReferencia = s.data_conclusao || s.updated_at
-    if (!dataReferencia) return false
-    
-    const dataConclusaoStr = dataReferencia.split('T')[0]
-    return dataConclusaoStr === dataSelecionadaStr && s.status === 'concluido'
+    if (!s.data_servico_agendada) return false
+    const dataAgendadaStr = s.data_servico_agendada.split('T')[0]
+    return dataAgendadaStr === dataSelecionadaStr && 
+      (s.status === 'concluido' || s.status === 'aguardando_aprovacao')
   })
 
   // Cálculos dos cards
