@@ -636,7 +636,7 @@ export function PagamentosInstaladores() {
     }
   }
 
-
+  const recibosFiltrados = recibos.filter(r => {
     if (filtroStatus === 'todos') return true
     return r.status_pagamento === filtroStatus
   })
