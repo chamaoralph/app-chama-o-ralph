@@ -82,6 +82,19 @@ export function PagamentosInstaladores() {
   const [modalEdicao, setModalEdicao] = useState(false)
   const [editandoPagamento, setEditandoPagamento] = useState(false)
 
+  // Modal de edição de valores
+  const [modalEditarValores, setModalEditarValores] = useState(false)
+  const [editValorMaoObra, setEditValorMaoObra] = useState(0)
+  const [editValorReembolso, setEditValorReembolso] = useState(0)
+  const [editQtdServicos, setEditQtdServicos] = useState(0)
+  const [editValorTotal, setEditValorTotal] = useState(0)
+  const [salvandoEdicaoValores, setSalvandoEdicaoValores] = useState(false)
+
+  // Exclusão de recibo
+  const [alertApagar, setAlertApagar] = useState(false)
+  const [reciboApagar, setReciboApagar] = useState<ReciboComInstalador | null>(null)
+  const [apagando, setApagando] = useState(false)
+
   // Modal de lançamento manual
   const [modalManual, setModalManual] = useState(false)
   const [manualData, setManualData] = useState('')
