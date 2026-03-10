@@ -1,34 +1,32 @@
 
 
-# Lançamento Manual de Recibo pelo Admin
+# Editar Valores e Apagar Recibos
 
-## Objetivo
+## O que muda
 
-Adicionar um botão "Lançar Recibo Manual" na tela de Pagamentos (aba dentro de `/admin/instaladores`) que permite ao admin criar um recibo (`recibos_diarios`) manualmente, para casos onde o instalador não conseguiu gerar pelo sistema.
+Na tabela de Pagamentos, cada recibo ganha dois novos botoes na coluna de Acoes:
 
-## Alterações
+1. **Editar Valores** (icone de lapis) -- abre modal para corrigir Mao de Obra, Reembolso e Qtd Servicos. Total recalcula automaticamente. Se o recibo ja estiver pago, atualiza tambem os lancamentos correspondentes no caixa.
 
-### 1. Frontend: `src/components/admin/PagamentosInstaladores.tsx`
+2. **Apagar** (icone de lixeira vermelha) -- abre dialogo de confirmacao. Se pago, avisa que os lancamentos no caixa serao removidos junto. Ao confirmar, deleta o recibo e os lancamentos associados.
 
-- Adicionar botão "Lançar Recibo Manual" ao lado dos filtros (Mês/Status)
-- Criar modal com os campos:
-  - **Data de referência** (date input)
-  - **Instalador** (select com lista de instaladores ativos da empresa)
-  - **Quantidade de serviços** (número, pode ser 0)
-  - **Valor Mão de Obra** (numérico)
-  - **Valor Reembolso** (numérico, default 0)
-  - **Valor Total** (calculado automaticamente = mão de obra + reembolso, editável)
-- Ao salvar, inserir diretamente na tabela `recibos_diarios` com `servicos_ids` vazio (`{}`) e status `pendente`
+## Alteracoes
 
-### 2. Backend: Migration SQL
+### 1. Migration SQL
+- Criar policy RLS de **DELETE** na tabela `recibos_diarios` para admins da mesma empresa (atualmente nao existe DELETE policy)
 
-- Adicionar RLS policy para permitir que admins insiram recibos na tabela `recibos_diarios` (atualmente só instaladores podem criar via `instalador_id = auth.uid()`)
-- Nova policy: admins da mesma empresa podem INSERT em `recibos_diarios`
+### 2. `src/components/admin/PagamentosInstaladores.tsx`
 
-### Fluxo
+**Modal de Edicao de Valores** (novo):
+- Campos: Mao de Obra, Reembolso, Qtd Servicos
+- Total calculado automaticamente (mao de obra + reembolso)
+- Ao salvar: update no `recibos_diarios` e, se status `pago`, atualiza valores nos `lancamentos_caixa` correspondentes (usando mesmo padrao de busca por nome do instalador + data referencia na descricao)
 
-1. Admin clica "Lançar Recibo Manual"
-2. Preenche data, seleciona instalador, informa valores
-3. Confirma -- recibo aparece na listagem como "Pendente"
-4. Admin pode então pagar normalmente usando o fluxo existente
+**Botao Apagar** (novo):
+- `AlertDialog` de confirmacao com aviso especial se recibo esta pago
+- Ao confirmar: deleta lancamentos no `lancamentos_caixa` correspondentes (se pago) e depois deleta o recibo
+
+**Posicionamento dos botoes**:
+- Editar Valores: ao lado do botao Detalhes, visivel para todos os status
+- Apagar: botao vermelho no final, visivel para todos os status
 
