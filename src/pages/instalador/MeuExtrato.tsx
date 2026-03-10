@@ -38,12 +38,11 @@ export default function MeuExtrato() {
   const dataSelecionadaStr = format(dataRecibo, 'yyyy-MM-dd')
   const reciboJaGerado = recibosGerados.includes(dataSelecionadaStr)
 
-  // Serviços da data selecionada (para o recibo) - usa data_servico_agendada (timezone-agnostic)
+  // Serviços da data selecionada (para o recibo) - usa data_conclusao convertida para fuso de Brasília
   const servicosDataSelecionada = servicos.filter(s => {
-    if (!s.data_servico_agendada) return false
-    const dataAgendadaStr = s.data_servico_agendada.split('T')[0]
-    return dataAgendadaStr === dataSelecionadaStr && 
-      (s.status === 'concluido' || s.status === 'aguardando_aprovacao')
+    if (!s.data_conclusao || s.status !== 'concluido') return false
+    const dataConclusaoBR = new Date(s.data_conclusao).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
+    return dataConclusaoBR === dataSelecionadaStr
   })
 
   // Cálculos dos cards
