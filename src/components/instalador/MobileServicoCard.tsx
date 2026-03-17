@@ -32,6 +32,7 @@ interface MobileServicoCardProps {
     tipo_servico: string[];
     valor_mao_obra_instalador: number | null;
     descricao?: string | null;
+    observacoes_instalador?: string | null;
     endereco_completo?: string;
     status?: string;
     clientes: Cliente;
@@ -93,6 +94,12 @@ export function MobileServicoCard({
             <Play className="w-3 h-3 mr-1" /> Em andamento
           </Badge>
         );
+      case "correcao_solicitada":
+        return (
+          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300">
+            ⚠️ Correção
+          </Badge>
+        );
       default:
         return null;
     }
@@ -131,7 +138,14 @@ export function MobileServicoCard({
           <p>🔧 {servico.tipo_servico?.join(", ") || "N/A"}</p>
         </div>
 
-        {servico.descricao && (
+        {servico.status === "correcao_solicitada" && servico.observacoes_instalador && (
+          <div className="bg-red-50 border border-red-200 text-red-800 p-2 rounded text-sm">
+            <p className="font-medium text-xs mb-0.5">⚠️ Correção solicitada:</p>
+            <p className="text-xs">{servico.observacoes_instalador}</p>
+          </div>
+        )}
+
+        {servico.descricao && servico.status !== "correcao_solicitada" && (
           <p className="text-sm text-gray-500 bg-gray-50 p-2 rounded">
             {servico.descricao}
           </p>
@@ -174,6 +188,15 @@ export function MobileServicoCard({
         {/* Ação principal */}
         {variant === "agenda" && (
           <>
+            {servico.status === "correcao_solicitada" && onFinalizar && (
+              <Button
+                onClick={() => onFinalizar(servico.id)}
+                className="w-full h-14 text-lg font-bold bg-red-600 hover:bg-red-700"
+              >
+                <CheckCircle className="w-6 h-6 mr-2" />
+                Corrigir e Reenviar
+              </Button>
+            )}
             {servico.status === "atribuido" && onIniciar && (
               <Button
                 onClick={() => onIniciar(servico.id)}

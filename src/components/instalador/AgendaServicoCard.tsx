@@ -18,6 +18,7 @@ interface Servico {
   tipo_servico: string[];
   valor_mao_obra_instalador: number;
   descricao?: string;
+  observacoes_instalador?: string;
   clientes: Cliente;
 }
 
@@ -52,6 +53,8 @@ export function AgendaServicoCard({ servico, onIniciar, onFinalizar }: AgendaSer
         return { label: "Pronto", className: "bg-green-100 text-green-800 border-green-200" };
       case "em_andamento":
         return { label: "Em andamento", className: "bg-blue-100 text-blue-800 border-blue-200" };
+      case "correcao_solicitada":
+        return { label: "Correção", className: "bg-red-100 text-red-800 border-red-200" };
       default:
         return { label: status, className: "bg-gray-100 text-gray-800 border-gray-200" };
     }
@@ -100,8 +103,15 @@ export function AgendaServicoCard({ servico, onIniciar, onFinalizar }: AgendaSer
             R$ {servico.valor_mao_obra_instalador?.toFixed(2)}
           </p>
 
+          {/* Alerta de correção */}
+          {servico.status === "correcao_solicitada" && servico.observacoes_instalador && (
+            <p className="text-[10px] text-red-600 font-medium mt-1 line-clamp-2">
+              ⚠️ {servico.observacoes_instalador}
+            </p>
+          )}
+
           {/* Descrição resumida */}
-          {servico.descricao && (
+          {servico.descricao && servico.status !== "correcao_solicitada" && (
             <p className="text-[10px] text-muted-foreground mt-1 line-clamp-2">
               📝 {servico.descricao}
             </p>
@@ -176,6 +186,22 @@ export function AgendaServicoCard({ servico, onIniciar, onFinalizar }: AgendaSer
           {servico.status === "solicitado" && (
             <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-3 py-2 rounded text-sm text-center">
               ⏳ Aguardando aprovação do administrador
+            </div>
+          )}
+
+          {servico.status === "correcao_solicitada" && (
+            <div className="space-y-2">
+              <div className="bg-red-50 border border-red-200 text-red-800 px-3 py-2 rounded text-sm">
+                <p className="font-medium mb-1">⚠️ Correção solicitada pelo gestor:</p>
+                <p className="text-xs">{servico.observacoes_instalador || "Verifique as fotos e informações enviadas."}</p>
+              </div>
+              <Button 
+                onClick={() => onFinalizar(servico.id)} 
+                className="w-full bg-red-600 hover:bg-red-700 gap-2"
+              >
+                <CheckCircle className="h-4 w-4" />
+                Corrigir e Reenviar
+              </Button>
             </div>
           )}
 
