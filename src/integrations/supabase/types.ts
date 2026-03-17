@@ -412,6 +412,50 @@ export type Database = {
           },
         ]
       }
+      conversoes_offline: {
+        Row: {
+          conversion_currency: string | null
+          conversion_name: string
+          conversion_time: string
+          conversion_value: number | null
+          created_at: string | null
+          empresa_id: string
+          external_attribution_data: Json | null
+          gclid: string | null
+          id: string
+        }
+        Insert: {
+          conversion_currency?: string | null
+          conversion_name: string
+          conversion_time?: string
+          conversion_value?: number | null
+          created_at?: string | null
+          empresa_id: string
+          external_attribution_data?: Json | null
+          gclid?: string | null
+          id?: string
+        }
+        Update: {
+          conversion_currency?: string | null
+          conversion_name?: string
+          conversion_time?: string
+          conversion_value?: number | null
+          created_at?: string | null
+          empresa_id?: string
+          external_attribution_data?: Json | null
+          gclid?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversoes_offline_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cotacoes: {
         Row: {
           cliente_id: string
