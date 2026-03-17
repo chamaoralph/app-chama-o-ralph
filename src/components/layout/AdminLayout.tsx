@@ -37,7 +37,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             .from("servicos")
             .select("id", { count: "exact", head: true })
             .eq("empresa_id", userData.empresa_id)
-            .in("status", ["solicitado", "aguardando_aprovacao"]);
+            .eq("status", "aguardando_aprovacao");
 
           setPendingCount(count || 0);
         }
