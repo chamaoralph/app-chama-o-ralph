@@ -245,6 +245,20 @@ export function FunilConversaoContent() {
         <CardContent>
           <div className="flex flex-wrap gap-4 items-end">
             <div>
+              <label className="block text-sm font-medium mb-2">Mês</label>
+              <Select value={mesSelecionado} onValueChange={handleMesSelect}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Selecionar mês" />
+                </SelectTrigger>
+                <SelectContent>
+                  {opcoesMeses.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label.charAt(0).toUpperCase() + m.label.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
               <label className="block text-sm font-medium mb-2">Data Início</label>
               <Popover>
                 <PopoverTrigger asChild>
