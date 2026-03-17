@@ -18,6 +18,7 @@ interface Servico {
   tipo_servico: string[];
   valor_mao_obra_instalador: number;
   descricao?: string;
+  observacoes_instalador?: string;
   clientes: Cliente;
 }
 
