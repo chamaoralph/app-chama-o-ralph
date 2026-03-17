@@ -102,8 +102,15 @@ export function AgendaServicoCard({ servico, onIniciar, onFinalizar }: AgendaSer
             R$ {servico.valor_mao_obra_instalador?.toFixed(2)}
           </p>
 
+          {/* Alerta de correção */}
+          {servico.status === "correcao_solicitada" && servico.observacoes_instalador && (
+            <p className="text-[10px] text-red-600 font-medium mt-1 line-clamp-2">
+              ⚠️ {servico.observacoes_instalador}
+            </p>
+          )}
+
           {/* Descrição resumida */}
-          {servico.descricao && (
+          {servico.descricao && servico.status !== "correcao_solicitada" && (
             <p className="text-[10px] text-muted-foreground mt-1 line-clamp-2">
               📝 {servico.descricao}
             </p>
