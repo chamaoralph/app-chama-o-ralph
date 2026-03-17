@@ -1,43 +1,34 @@
 
 
-# Melhorias na função `criar-cotacao-whatsapp`
+# Lançamento Manual de Recibo pelo Admin
 
-## Alterações no arquivo `supabase/functions/criar-cotacao-whatsapp/index.ts`
+## Objetivo
 
-### 1. Flexibilizar `tipo_servico`
-- Remover validação obrigatória de `tipo_servico` no payload
-- Se não enviado ou array vazio, usar `["A definir"]` como padrão
+Adicionar um botão "Lançar Recibo Manual" na tela de Pagamentos (aba dentro de `/admin/instaladores`) que permite ao admin criar um recibo (`recibos_diarios`) manualmente, para casos onde o instalador não conseguiu gerar pelo sistema.
 
-### 2. Preencher data automaticamente
-- Se `data_servico_desejada` não for informada, usar a data atual (`new Date().toISOString().split('T')[0]`)
-- Se `horario_inicio` não for informado, usar o horário atual formatado como `HH:MM`
+## Alterações
 
-### 3. Deduplicação 24h
-- Antes de criar a cotação, consultar se já existe uma cotação com status `pendente` para o mesmo `cliente_id` criada nas últimas 24 horas
-- Se existir, retornar a cotação existente com flag `cotacao_existente: true` (status 200) em vez de criar duplicata
+### 1. Frontend: `src/components/admin/PagamentosInstaladores.tsx`
 
-### 4. Tornar `cotacao` opcional no payload
-- Se o objeto `cotacao` não for enviado, criar um objeto padrão vazio (apenas com defaults)
-- Isso simplifica o payload mínimo do n8n para apenas `{ cliente: { nome, telefone } }`
+- Adicionar botão "Lançar Recibo Manual" ao lado dos filtros (Mês/Status)
+- Criar modal com os campos:
+  - **Data de referência** (date input)
+  - **Instalador** (select com lista de instaladores ativos da empresa)
+  - **Quantidade de serviços** (número, pode ser 0)
+  - **Valor Mão de Obra** (numérico)
+  - **Valor Reembolso** (numérico, default 0)
+  - **Valor Total** (calculado automaticamente = mão de obra + reembolso, editável)
+- Ao salvar, inserir diretamente na tabela `recibos_diarios` com `servicos_ids` vazio (`{}`) e status `pendente`
 
-## Payload mínimo após mudanças
-```json
-{
-  "cliente": { "nome": "João", "telefone": "11999998888" },
-  "cotacao": { "descricao": "Mensagem do WhatsApp", "origem_lead": "WhatsApp Auto" }
-}
-```
+### 2. Backend: Migration SQL
 
-Ou ainda mais simples:
-```json
-{
-  "cliente": { "nome": "João", "telefone": "11999998888" }
-}
-```
+- Adicionar RLS policy para permitir que admins insiram recibos na tabela `recibos_diarios` (atualmente só instaladores podem criar via `instalador_id = auth.uid()`)
+- Nova policy: admins da mesma empresa podem INSERT em `recibos_diarios`
 
-## Arquivo alterado
-- `supabase/functions/criar-cotacao-whatsapp/index.ts`
+### Fluxo
 
-## Nenhuma migration SQL necessária
-A tabela `cotacoes` já suporta valores nulos em `tipo_servico`, `data_servico_desejada`, etc.
+1. Admin clica "Lançar Recibo Manual"
+2. Preenche data, seleciona instalador, informa valores
+3. Confirma -- recibo aparece na listagem como "Pendente"
+4. Admin pode então pagar normalmente usando o fluxo existente
 
