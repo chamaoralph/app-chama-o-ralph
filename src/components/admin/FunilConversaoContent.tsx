@@ -1,13 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { format, eachDayOfInterval } from "date-fns";
+import { format, eachDayOfInterval, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { TrendingUp, Users, Target, DollarSign, ArrowDown, Percent, CalendarIcon, Receipt, MousePointerClick, Eye, BarChart3, RefreshCw } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { MetricasLineChart } from "./MetricasLineChart";
 
@@ -51,6 +52,23 @@ export function FunilConversaoContent() {
     clicks: 0, impressions: 0, ctr: 0,
   });
   const [dailyData, setDailyData] = useState<DailyData[]>([]);
+  const [mesSelecionado, setMesSelecionado] = useState<string>("");
+
+  // Gerar lista dos últimos 12 meses
+  const opcoesMeses = Array.from({ length: 12 }, (_, i) => {
+    const date = subMonths(new Date(), i);
+    return {
+      value: date.toISOString(),
+      label: format(date, "MMMM yyyy", { locale: ptBR }),
+    };
+  });
+
+  const handleMesSelect = useCallback((value: string) => {
+    setMesSelecionado(value);
+    const date = new Date(value);
+    setDataInicio(startOfMonth(date));
+    setDataFim(endOfMonth(date));
+  }, []);
 
   async function carregarDados() {
     setLoading(true);
@@ -201,7 +219,7 @@ export function FunilConversaoContent() {
 
   useEffect(() => {
     carregarDados();
-  }, []);
+  }, [dataInicio, dataFim]);
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -226,6 +244,21 @@ export function FunilConversaoContent() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-4 items-end">
+            <div>
+              <label className="block text-sm font-medium mb-2">Mês</label>
+              <Select value={mesSelecionado} onValueChange={handleMesSelect}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Selecionar mês" />
+                </SelectTrigger>
+                <SelectContent>
+                  {opcoesMeses.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label.charAt(0).toUpperCase() + m.label.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div>
               <label className="block text-sm font-medium mb-2">Data Início</label>
               <Popover>

@@ -1,23 +1,34 @@
 
 
-# Seletor de Mes na tela de Marketing
+# Lançamento Manual de Recibo pelo Admin
 
-## O que muda
+## Objetivo
 
-Adicionar um dropdown/select de mes no card "Periodo de Analise" do `FunilConversaoContent.tsx`. Ao selecionar um mes, o sistema preenche automaticamente Data Inicio (dia 1) e Data Fim (ultimo dia do mes) e dispara a busca.
+Adicionar um botão "Lançar Recibo Manual" na tela de Pagamentos (aba dentro de `/admin/instaladores`) que permite ao admin criar um recibo (`recibos_diarios`) manualmente, para casos onde o instalador não conseguiu gerar pelo sistema.
 
-## Alteracoes
+## Alterações
 
-### `src/components/admin/FunilConversaoContent.tsx`
+### 1. Frontend: `src/components/admin/PagamentosInstaladores.tsx`
 
-1. Importar `endOfMonth`, `startOfMonth`, `subMonths` de `date-fns`
-2. Gerar lista dos ultimos 12 meses (label: "Janeiro 2026", "Fevereiro 2026", etc. em pt-BR)
-3. Adicionar um `Select` (shadcn) antes dos date pickers com placeholder "Selecionar mes"
-4. Ao selecionar um mes:
-   - `setDataInicio(startOfMonth(mesSelecionado))`
-   - `setDataFim(endOfMonth(mesSelecionado))`
-   - Chamar `carregarDados()` automaticamente
-5. Os date pickers continuam funcionando normalmente para quem quiser ajuste manual
+- Adicionar botão "Lançar Recibo Manual" ao lado dos filtros (Mês/Status)
+- Criar modal com os campos:
+  - **Data de referência** (date input)
+  - **Instalador** (select com lista de instaladores ativos da empresa)
+  - **Quantidade de serviços** (número, pode ser 0)
+  - **Valor Mão de Obra** (numérico)
+  - **Valor Reembolso** (numérico, default 0)
+  - **Valor Total** (calculado automaticamente = mão de obra + reembolso, editável)
+- Ao salvar, inserir diretamente na tabela `recibos_diarios` com `servicos_ids` vazio (`{}`) e status `pendente`
 
-Layout: Select de mes aparece como primeiro elemento na linha de filtros, seguido dos dois date pickers e do botao Atualizar.
+### 2. Backend: Migration SQL
+
+- Adicionar RLS policy para permitir que admins insiram recibos na tabela `recibos_diarios` (atualmente só instaladores podem criar via `instalador_id = auth.uid()`)
+- Nova policy: admins da mesma empresa podem INSERT em `recibos_diarios`
+
+### Fluxo
+
+1. Admin clica "Lançar Recibo Manual"
+2. Preenche data, seleciona instalador, informa valores
+3. Confirma -- recibo aparece na listagem como "Pendente"
+4. Admin pode então pagar normalmente usando o fluxo existente
 
