@@ -1,34 +1,30 @@
 
 
-# Lançamento Manual de Recibo pelo Admin
+# Implementação: Tabela `conversoes_offline` + Edge Function
 
-## Objetivo
+## 1. Migration SQL
+Criar tabela `conversoes_offline` com RLS:
+- Admins podem SELECT (mesma empresa)
+- Anon bloqueado
+- Sem INSERT/UPDATE/DELETE para clientes — só via Edge Function (service role)
 
-Adicionar um botão "Lançar Recibo Manual" na tela de Pagamentos (aba dentro de `/admin/instaladores`) que permite ao admin criar um recibo (`recibos_diarios`) manualmente, para casos onde o instalador não conseguiu gerar pelo sistema.
+## 2. Edge Function `inserir-conversao-offline`
+- Autenticação via `x-webhook-token` usando `WEBHOOK_SECRET` já existente
+- Valida campos obrigatórios (`empresa_id`, `conversion_name`)
+- Insere via `SUPABASE_SERVICE_ROLE_KEY`
+- `verify_jwt = false` no config.toml
 
-## Alterações
+## 3. Config.toml
+- Adicionar `[functions.inserir-conversao-offline]` com `verify_jwt = false`
 
-### 1. Frontend: `src/components/admin/PagamentosInstaladores.tsx`
+## Credenciais para o n8n
+- **URL**: `https://xenevneonaqbrqiuvuch.supabase.co/functions/v1/inserir-conversao-offline`
+- **Header**: `x-webhook-token: <valor do WEBHOOK_SECRET>`
+- **Method**: POST
+- **Body**: JSON com `empresa_id`, `conversion_name`, `gclid`, `conversion_time`, `conversion_value`, `conversion_currency`, `external_attribution_data`
 
-- Adicionar botão "Lançar Recibo Manual" ao lado dos filtros (Mês/Status)
-- Criar modal com os campos:
-  - **Data de referência** (date input)
-  - **Instalador** (select com lista de instaladores ativos da empresa)
-  - **Quantidade de serviços** (número, pode ser 0)
-  - **Valor Mão de Obra** (numérico)
-  - **Valor Reembolso** (numérico, default 0)
-  - **Valor Total** (calculado automaticamente = mão de obra + reembolso, editável)
-- Ao salvar, inserir diretamente na tabela `recibos_diarios` com `servicos_ids` vazio (`{}`) e status `pendente`
-
-### 2. Backend: Migration SQL
-
-- Adicionar RLS policy para permitir que admins insiram recibos na tabela `recibos_diarios` (atualmente só instaladores podem criar via `instalador_id = auth.uid()`)
-- Nova policy: admins da mesma empresa podem INSERT em `recibos_diarios`
-
-### Fluxo
-
-1. Admin clica "Lançar Recibo Manual"
-2. Preenche data, seleciona instalador, informa valores
-3. Confirma -- recibo aparece na listagem como "Pendente"
-4. Admin pode então pagar normalmente usando o fluxo existente
+## Arquivos
+- Migration SQL (nova tabela + RLS)
+- `supabase/functions/inserir-conversao-offline/index.ts`
+- `supabase/config.toml` (adicionar entry)
 
