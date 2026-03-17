@@ -188,6 +188,15 @@ export function MobileServicoCard({
         {/* Ação principal */}
         {variant === "agenda" && (
           <>
+            {servico.status === "correcao_solicitada" && onFinalizar && (
+              <Button
+                onClick={() => onFinalizar(servico.id)}
+                className="w-full h-14 text-lg font-bold bg-red-600 hover:bg-red-700"
+              >
+                <CheckCircle className="w-6 h-6 mr-2" />
+                Corrigir e Reenviar
+              </Button>
+            )}
             {servico.status === "atribuido" && onIniciar && (
               <Button
                 onClick={() => onIniciar(servico.id)}

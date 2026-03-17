@@ -102,7 +102,7 @@ export default function InstaladorDashboard() {
           cliente:clientes(nome)
         `)
         .eq('instalador_id', user.id)
-        .in('status', ['atribuido', 'em_andamento'])
+        .in('status', ['atribuido', 'em_andamento', 'correcao_solicitada'])
         .gte('data_servico_agendada', now.toISOString())
         .order('data_servico_agendada')
         .limit(1)

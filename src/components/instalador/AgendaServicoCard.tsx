@@ -189,6 +189,22 @@ export function AgendaServicoCard({ servico, onIniciar, onFinalizar }: AgendaSer
             </div>
           )}
 
+          {servico.status === "correcao_solicitada" && (
+            <div className="space-y-2">
+              <div className="bg-red-50 border border-red-200 text-red-800 px-3 py-2 rounded text-sm">
+                <p className="font-medium mb-1">⚠️ Correção solicitada pelo gestor:</p>
+                <p className="text-xs">{servico.observacoes_instalador || "Verifique as fotos e informações enviadas."}</p>
+              </div>
+              <Button 
+                onClick={() => onFinalizar(servico.id)} 
+                className="w-full bg-red-600 hover:bg-red-700 gap-2"
+              >
+                <CheckCircle className="h-4 w-4" />
+                Corrigir e Reenviar
+              </Button>
+            </div>
+          )}
+
           {servico.status === "atribuido" && (
             <Button 
               onClick={() => onIniciar(servico.id)} 

@@ -200,7 +200,7 @@ export default function FinalizarServico() {
         })
         .eq("id", servicoId)
         .eq("instalador_id", user.id)
-        .in("status", ["atribuido", "em_andamento"]);
+        .in("status", ["atribuido", "em_andamento", "correcao_solicitada"]);
 
       if (updateError) throw updateError;
 

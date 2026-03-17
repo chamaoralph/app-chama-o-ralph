@@ -46,7 +46,7 @@ export default function MinhaAgenda() {
         `
         )
         .eq("instalador_id", user.id)
-        .in("status", ["solicitado", "atribuido", "em_andamento"])
+        .in("status", ["solicitado", "atribuido", "em_andamento", "correcao_solicitada"])
         .order("data_servico_agendada", { ascending: true });
 
       if (error) throw error;
