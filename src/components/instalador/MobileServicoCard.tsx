@@ -93,6 +93,12 @@ export function MobileServicoCard({
             <Play className="w-3 h-3 mr-1" /> Em andamento
           </Badge>
         );
+      case "correcao_solicitada":
+        return (
+          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300">
+            ⚠️ Correção
+          </Badge>
+        );
       default:
         return null;
     }
