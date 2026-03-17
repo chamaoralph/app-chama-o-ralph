@@ -281,7 +281,7 @@ export default function AdminDashboard() {
         .from('servicos')
         .select('id')
         .eq('empresa_id', userData.empresa_id)
-        .in('status', ['solicitado', 'aguardando_aprovacao'])
+        .eq('status', 'aguardando_aprovacao')
 
       setServicosDisponiveis(servicosDisp?.length || 0)
 

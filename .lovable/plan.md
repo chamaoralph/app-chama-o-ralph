@@ -1,44 +1,34 @@
 
-Objetivo: explicar o “1 fantasma” em Aprovações e corrigir o contador para refletir exatamente o que a tela mostra.
 
-Diagnóstico confirmado (com dados reais do banco):
-- Na empresa atual:
-  - `aguardando_aprovacao = 0`
-  - `solicitado = 1`
-- Existe 1 serviço com status `solicitado`:
-  - `SRV-2026-101` (id `40f48c0e-776e-427b-bb76-619c0c88ff45`)
+# Lançamento Manual de Recibo pelo Admin
 
-Causa raiz do erro:
-- O badge de Aprovações está contando **dois status**:
-  - `solicitado` + `aguardando_aprovacao`
-- Porém a página `/admin/aprovacoes` (filtro “Pendentes”) mostra **somente**:
-  - `aguardando_aprovacao`
-- Resultado: badge mostra “1”, tela abre vazia.  
-- Então não é inconsistência do banco; é desalinhamento de regra entre contador e listagem.
+## Objetivo
 
-Plano de correção:
-1) Alinhar regra do badge lateral
-- Arquivo: `src/components/layout/AdminLayout.tsx`
-- Trocar o filtro do contador para considerar apenas:
-  - `status = 'aguardando_aprovacao'`
+Adicionar um botão "Lançar Recibo Manual" na tela de Pagamentos (aba dentro de `/admin/instaladores`) que permite ao admin criar um recibo (`recibos_diarios`) manualmente, para casos onde o instalador não conseguiu gerar pelo sistema.
 
-2) Alinhar regra do card/badge de Aprovações no Dashboard
-- Arquivo: `src/pages/admin/Dashboard.tsx`
-- Trocar o cálculo de `servicosDisponiveis` (que hoje soma `solicitado` + `aguardando_aprovacao`) para apenas:
-  - `status = 'aguardando_aprovacao'`
+## Alterações
 
-3) Evitar confusão futura (clareza semântica)
-- Renomear variável de contagem para algo explícito (ex.: `aprovacoesPendentesCount`) no Dashboard.
-- Assim fica claro que “Aprovações” não inclui “Solicitações”.
+### 1. Frontend: `src/components/admin/PagamentosInstaladores.tsx`
 
-4) Robustez de leitura de usuário
-- Onde houver busca de perfil com `.single()` para esse contador, usar `.maybeSingle()` + fallback `0` para evitar estado inconsistente se perfil não vier.
+- Adicionar botão "Lançar Recibo Manual" ao lado dos filtros (Mês/Status)
+- Criar modal com os campos:
+  - **Data de referência** (date input)
+  - **Instalador** (select com lista de instaladores ativos da empresa)
+  - **Quantidade de serviços** (número, pode ser 0)
+  - **Valor Mão de Obra** (numérico)
+  - **Valor Reembolso** (numérico, default 0)
+  - **Valor Total** (calculado automaticamente = mão de obra + reembolso, editável)
+- Ao salvar, inserir diretamente na tabela `recibos_diarios` com `servicos_ids` vazio (`{}`) e status `pendente`
 
-Impacto esperado após ajuste:
-- Se houver apenas `solicitado`, badge de Aprovações fica 0/oculto.
-- A lista de Aprovações continua vazia (agora consistente com o badge).
-- Quando surgir item realmente em `aguardando_aprovacao`, badge e lista voltam a bater.
+### 2. Backend: Migration SQL
 
-Arquivos a ajustar:
-- `src/components/layout/AdminLayout.tsx`
-- `src/pages/admin/Dashboard.tsx`
+- Adicionar RLS policy para permitir que admins insiram recibos na tabela `recibos_diarios` (atualmente só instaladores podem criar via `instalador_id = auth.uid()`)
+- Nova policy: admins da mesma empresa podem INSERT em `recibos_diarios`
+
+### Fluxo
+
+1. Admin clica "Lançar Recibo Manual"
+2. Preenche data, seleciona instalador, informa valores
+3. Confirma -- recibo aparece na listagem como "Pendente"
+4. Admin pode então pagar normalmente usando o fluxo existente
+
