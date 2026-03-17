@@ -138,7 +138,14 @@ export function MobileServicoCard({
           <p>🔧 {servico.tipo_servico?.join(", ") || "N/A"}</p>
         </div>
 
-        {servico.descricao && (
+        {servico.status === "correcao_solicitada" && servico.observacoes_instalador && (
+          <div className="bg-red-50 border border-red-200 text-red-800 p-2 rounded text-sm">
+            <p className="font-medium text-xs mb-0.5">⚠️ Correção solicitada:</p>
+            <p className="text-xs">{servico.observacoes_instalador}</p>
+          </div>
+        )}
+
+        {servico.descricao && servico.status !== "correcao_solicitada" && (
           <p className="text-sm text-gray-500 bg-gray-50 p-2 rounded">
             {servico.descricao}
           </p>
