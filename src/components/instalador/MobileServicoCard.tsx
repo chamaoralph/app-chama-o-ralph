@@ -32,6 +32,7 @@ interface MobileServicoCardProps {
     tipo_servico: string[];
     valor_mao_obra_instalador: number | null;
     descricao?: string | null;
+    observacoes_instalador?: string | null;
     endereco_completo?: string;
     status?: string;
     clientes: Cliente;
