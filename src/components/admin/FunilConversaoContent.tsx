@@ -259,6 +259,7 @@ export function FunilConversaoContent() {
                 </SelectContent>
               </Select>
             </div>
+            <div>
               <label className="block text-sm font-medium mb-2">Data Início</label>
               <Popover>
                 <PopoverTrigger asChild>
