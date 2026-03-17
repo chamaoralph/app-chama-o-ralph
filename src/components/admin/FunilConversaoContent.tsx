@@ -54,14 +54,21 @@ export function FunilConversaoContent() {
   const [dailyData, setDailyData] = useState<DailyData[]>([]);
   const [mesSelecionado, setMesSelecionado] = useState<string>("");
 
-  // Gerar lista dos últimos 12 meses
-  const opcoesMeses = Array.from({ length: 12 }, (_, i) => {
-    const date = subMonths(new Date(), i);
-    return {
-      value: date.toISOString(),
-      label: format(date, "MMMM yyyy", { locale: ptBR }),
-    };
-  });
+  // Gerar lista de meses: de janeiro 2026 até o mês atual
+  const opcoesMeses = (() => {
+    const meses = [];
+    const inicio = new Date(2026, 0, 1); // Janeiro 2026
+    const hoje = new Date();
+    let current = startOfMonth(hoje);
+    while (current >= inicio) {
+      meses.push({
+        value: current.toISOString(),
+        label: format(current, "MMMM yyyy", { locale: ptBR }),
+      });
+      current = subMonths(current, 1);
+    }
+    return meses;
+  })();
 
   const handleMesSelect = useCallback((value: string) => {
     setMesSelecionado(value);
