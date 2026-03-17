@@ -52,6 +52,23 @@ export function FunilConversaoContent() {
     clicks: 0, impressions: 0, ctr: 0,
   });
   const [dailyData, setDailyData] = useState<DailyData[]>([]);
+  const [mesSelecionado, setMesSelecionado] = useState<string>("");
+
+  // Gerar lista dos últimos 12 meses
+  const opcoesMeses = Array.from({ length: 12 }, (_, i) => {
+    const date = subMonths(new Date(), i);
+    return {
+      value: date.toISOString(),
+      label: format(date, "MMMM yyyy", { locale: ptBR }),
+    };
+  });
+
+  const handleMesSelect = useCallback((value: string) => {
+    setMesSelecionado(value);
+    const date = new Date(value);
+    setDataInicio(startOfMonth(date));
+    setDataFim(endOfMonth(date));
+  }, []);
 
   async function carregarDados() {
     setLoading(true);
