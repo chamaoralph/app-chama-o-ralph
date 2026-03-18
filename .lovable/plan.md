@@ -1,59 +1,34 @@
 
 
-# Alterações na tabela `conversoes_offline`
+# Lançamento Manual de Recibo pelo Admin
 
-## 1. Adicionar coluna `enviado_google`
-Coluna boolean com default `false` para rastrear quais conversões já foram enviadas ao Google Ads.
+## Objetivo
 
-## 2. Adicionar RLS policy para UPDATE via anon
-Permitir que a anon key faça UPDATE na tabela (necessário para que Edge Functions ou webhooks externos marquem conversões como enviadas).
+Adicionar um botão "Lançar Recibo Manual" na tela de Pagamentos (aba dentro de `/admin/instaladores`) que permite ao admin criar um recibo (`recibos_diarios`) manualmente, para casos onde o instalador não conseguiu gerar pelo sistema.
 
-### SQL da migration
+## Alterações
 
-```sql
-ALTER TABLE public.conversoes_offline 
-ADD COLUMN enviado_google BOOLEAN DEFAULT false;
+### 1. Frontend: `src/components/admin/PagamentosInstaladores.tsx`
 
-CREATE POLICY "Anon pode atualizar conversoes_offline"
-  ON public.conversoes_offline
-  FOR UPDATE
-  TO anon
-  USING (true)
-  WITH CHECK (true);
-```
+- Adicionar botão "Lançar Recibo Manual" ao lado dos filtros (Mês/Status)
+- Criar modal com os campos:
+  - **Data de referência** (date input)
+  - **Instalador** (select com lista de instaladores ativos da empresa)
+  - **Quantidade de serviços** (número, pode ser 0)
+  - **Valor Mão de Obra** (numérico)
+  - **Valor Reembolso** (numérico, default 0)
+  - **Valor Total** (calculado automaticamente = mão de obra + reembolso, editável)
+- Ao salvar, inserir diretamente na tabela `recibos_diarios` com `servicos_ids` vazio (`{}`) e status `pendente`
 
-### Nota de segurança
-A policy anon para UPDATE é ampla. A proteção real vem do `WEBHOOK_SECRET` validado nas Edge Functions. Se preferir restringir mais, podemos limitar o UPDATE apenas à coluna `enviado_google` via trigger, mas para simplificar a implementação inicial, a policy aberta é suficiente dado que a tabela já bloqueia SELECT/INSERT/DELETE para anon.
+### 2. Backend: Migration SQL
 
-**Observação**: será necessário também remover ou ajustar a policy restritiva existente "Bloquear acesso anonimo conversoes_offline" que bloqueia ALL para anon, pois ela conflita com a nova policy de UPDATE — porém ela está marcada como PERMISSIVE (não RESTRICTIVE), então a nova policy de UPDATE prevalecerá por ser mais específica. Na prática, como ambas são PERMISSIVE e a existente usa `USING (false)` para ALL, precisamos dropar a policy antiga e recriar apenas para as operações que queremos bloquear (SELECT, INSERT, DELETE).
+- Adicionar RLS policy para permitir que admins insiram recibos na tabela `recibos_diarios` (atualmente só instaladores podem criar via `instalador_id = auth.uid()`)
+- Nova policy: admins da mesma empresa podem INSERT em `recibos_diarios`
 
-### SQL revisado
+### Fluxo
 
-```sql
-ALTER TABLE public.conversoes_offline 
-ADD COLUMN enviado_google BOOLEAN DEFAULT false;
-
--- Remover policy antiga que bloqueia tudo para anon
-DROP POLICY IF EXISTS "Bloquear acesso anonimo conversoes_offline" 
-  ON public.conversoes_offline;
-
--- Bloquear SELECT para anon
-CREATE POLICY "Bloquear select anonimo conversoes_offline"
-  ON public.conversoes_offline FOR SELECT TO anon USING (false);
-
--- Bloquear INSERT para anon
-CREATE POLICY "Bloquear insert anonimo conversoes_offline"
-  ON public.conversoes_offline FOR INSERT TO anon WITH CHECK (false);
-
--- Bloquear DELETE para anon
-CREATE POLICY "Bloquear delete anonimo conversoes_offline"
-  ON public.conversoes_offline FOR DELETE TO anon USING (false);
-
--- Permitir UPDATE para anon (usado por Edge Functions com service role)
-CREATE POLICY "Anon pode atualizar conversoes_offline"
-  ON public.conversoes_offline FOR UPDATE TO anon
-  USING (true) WITH CHECK (true);
-```
-
-Nenhuma alteração de código frontend necessária — apenas migration de banco.
+1. Admin clica "Lançar Recibo Manual"
+2. Preenche data, seleciona instalador, informa valores
+3. Confirma -- recibo aparece na listagem como "Pendente"
+4. Admin pode então pagar normalmente usando o fluxo existente
 
