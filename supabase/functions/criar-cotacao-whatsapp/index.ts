@@ -198,14 +198,13 @@ serve(async (req) => {
       console.log("✅ Novo cliente criado - ID:", clienteId);
     }
 
-    // Deduplicação 24h: verificar cotação pendente recente para o mesmo cliente
+    // Deduplicação 48h: verificar qualquer cotação recente para o mesmo cliente
     const { data: cotacaoRecente, error: erroDedupQuery } = await supabase
       .from('cotacoes')
-      .select('id, created_at')
+      .select('id, created_at, status')
       .eq('empresa_id', EMPRESA_ID)
       .eq('cliente_id', clienteId)
-      .eq('status', 'pendente')
-      .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .gte('created_at', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
