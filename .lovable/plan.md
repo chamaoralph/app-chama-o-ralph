@@ -1,23 +1,49 @@
 
 
-# Gerar PDF: Relatório da Integração WhatsApp → Cotações
+# Rastreamento de Cliques no WhatsApp
 
-Vou gerar um PDF documentando o que foi implementado na integração WhatsApp/n8n para criação automática de cotações.
+## O que será feito
 
-## Conteúdo do documento
+1. **Tabela `cliques_whatsapp`**: id (uuid PK), gclid (text), telefone (text), servico (text), created_at (timestamptz default now()). RLS habilitado com política restritiva — apenas admins autenticados podem SELECT; inserts acontecem via service role na Edge Function.
 
-1. **Título**: Documentação — Integração WhatsApp para Registro Automático de Leads
-2. **Objetivo**: Descrever a automação que captura mensagens recebidas no WhatsApp (via MegaAPI + n8n) e registra automaticamente o cliente e uma cotação no sistema.
-3. **Componentes envolvidos**:
-   - Edge Function `criar-cotacao-whatsapp`
-   - Fluxo n8n (webhook MegaAPI → preparação → chamada à Edge Function)
-   - Tabelas `clientes` e `cotacoes`
-4. **Fluxo resumido**: Diagrama textual do pipeline
-5. **Regras de negócio**: Deduplicação 24h, defaults (`tipo_servico = "A definir"`, data/hora nulos), autenticação por token
-6. **Data de implementação**: Março 2026
+2. **Edge Function `registrar-clique`**: Recebe POST com `{gclid, telefone, servico}`, valida `x-webhook-token` contra `WEBHOOK_SECRET`, insere na tabela usando service role key. Configurada com `verify_jwt = false` no config.toml.
 
-## Implementação
+3. **URL final**: `https://xenevneonaqbrqiuvuch.supabase.co/functions/v1/registrar-clique`
 
-- Script Python com `reportlab` gerando o PDF em `/mnt/documents/relatorio_integracao_whatsapp.pdf`
-- QA visual com `pdftoppm`
+## Detalhes técnicos
+
+### Migration SQL
+```sql
+CREATE TABLE public.cliques_whatsapp (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  gclid text,
+  telefone text,
+  servico text,
+  created_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE public.cliques_whatsapp ENABLE ROW LEVEL SECURITY;
+
+-- Bloquear acesso anônimo
+CREATE POLICY "Bloquear acesso anonimo cliques_whatsapp"
+  ON public.cliques_whatsapp AS RESTRICTIVE FOR ALL TO anon USING (false);
+
+-- Admins podem ver cliques da empresa (sem empresa_id, liberar para admins autenticados)
+CREATE POLICY "Admins podem ver cliques"
+  ON public.cliques_whatsapp FOR SELECT TO authenticated
+  USING (has_role(auth.uid(), 'admin'::app_role));
+```
+
+### Edge Function `supabase/functions/registrar-clique/index.ts`
+- CORS headers
+- Token validation via `x-webhook-token` / `WEBHOOK_SECRET`
+- Insert via Supabase service role client
+- Retorna 201 com o registro inserido
+
+### config.toml
+Adicionar:
+```toml
+[functions.registrar-clique]
+verify_jwt = false
+```
 
