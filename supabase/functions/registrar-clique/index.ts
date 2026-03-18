@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { gclid, telefone, servico } = await req.json();
+    const { gclid, telefone, servico, token: bodyToken } = await req.json();
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
