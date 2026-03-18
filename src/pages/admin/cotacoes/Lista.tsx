@@ -96,12 +96,23 @@ const duracoesDisponiveis = [
   { valor: '480', label: '8 horas' },
 ]
 
-// Formata data sem conversão de timezone (DD/MM/YYYY)
-function formatarDataBR(dataString: string | null): string {
+// Formata data sem conversão de timezone (DD/MM/YYYY) - para campos DATE
+function formatarDataLocal(dataString: string | null): string {
   if (!dataString) return '-';
   const [dataPart] = dataString.split('T');
   const [ano, mes, dia] = dataPart.split('-');
   return `${dia}/${mes}/${ano}`;
+}
+
+// Formata timestamp UTC para DD/MM/YYYY no fuso de São Paulo
+function formatarTimestampBR(dataString: string | null): string {
+  if (!dataString) return '-';
+  try {
+    const date = new Date(dataString);
+    return date.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+  } catch {
+    return formatarDataLocal(dataString);
+  }
 }
 
 // Função para calcular horário fim
