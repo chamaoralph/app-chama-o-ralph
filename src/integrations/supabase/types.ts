@@ -1247,6 +1247,38 @@ export type Database = {
           },
         ]
       }
+      telefones_bloqueados: {
+        Row: {
+          created_at: string | null
+          empresa_id: string
+          id: string
+          motivo: string | null
+          telefone: string
+        }
+        Insert: {
+          created_at?: string | null
+          empresa_id: string
+          id?: string
+          motivo?: string | null
+          telefone: string
+        }
+        Update: {
+          created_at?: string | null
+          empresa_id?: string
+          id?: string
+          motivo?: string | null
+          telefone?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telefones_bloqueados_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tentativas: {
         Row: {
           acertos: number

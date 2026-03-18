@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ImportacaoCotacoes } from '@/components/admin/ImportacaoCotacoes'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Trash2, XCircle, Pencil, Users, Undo2, List, Calendar, CalendarDays } from 'lucide-react'
+import { Trash2, XCircle, Pencil, Users, Undo2, List, Calendar, CalendarDays, Ban } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -168,6 +168,7 @@ export default function ListaCotacoes() {
   const [tiposServico, setTiposServico] = useState<TipoServico[]>([])
   const [showOutroInput, setShowOutroInput] = useState(false)
   const [visualizacao, setVisualizacao] = useState<VisualizacaoTipo>('lista')
+  const [bloqueandoTelefone, setBloqueandoTelefone] = useState<string | null>(null)
 
   useEffect(() => {
     fetchCotacoes()
@@ -470,6 +471,46 @@ export default function ListaCotacoes() {
         description: "Não foi possível reprovar a cotação.",
         variant: "destructive"
       })
+    }
+  }
+
+  async function bloquearTelefone(cotacao: Cotacao) {
+    const telefone = cotacao.clientes.telefone
+    const nome = cotacao.clientes.nome
+    if (!confirm(`Bloquear o número ${telefone} (${nome})?\n\nEste número não criará mais cotações automáticas pelo WhatsApp.`)) return
+
+    setBloqueandoTelefone(cotacao.id)
+    try {
+      const { data: userData } = await supabase
+        .from('usuarios')
+        .select('empresa_id')
+        .eq('id', user?.id)
+        .single()
+
+      if (!userData) throw new Error('Empresa não encontrada')
+
+      const { error } = await supabase
+        .from('telefones_bloqueados')
+        .insert({
+          empresa_id: userData.empresa_id,
+          telefone: telefone.replace(/\D/g, ''),
+          motivo: `Bloqueado da cotação de ${nome}`
+        })
+
+      if (error) {
+        if (error.code === '23505') {
+          toast({ title: '⚠️ Já bloqueado', description: 'Este número já está na lista de bloqueio.' })
+        } else {
+          throw error
+        }
+      } else {
+        toast({ title: '🚫 Número bloqueado', description: `${telefone} não criará mais cotações automáticas.` })
+      }
+    } catch (err) {
+      console.error('Erro ao bloquear:', err)
+      toast({ title: '❌ Erro', description: 'Não foi possível bloquear o número.', variant: 'destructive' })
+    } finally {
+      setBloqueandoTelefone(null)
     }
   }
 
@@ -858,6 +899,16 @@ export default function ListaCotacoes() {
                                   Reprovar
                                 </Button>
                               )}
+                              <Button
+                                onClick={() => bloquearTelefone(cotacao)}
+                                size="sm"
+                                variant="ghost"
+                                className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                disabled={bloqueandoTelefone === cotacao.id}
+                                title="Bloquear número"
+                              >
+                                <Ban className="w-4 h-4" />
+                              </Button>
                               <Button
                                 onClick={() => setCotacaoParaExcluir(cotacao.id)}
                                 size="sm"
