@@ -1,34 +1,35 @@
 
 
-# Lançamento Manual de Recibo pelo Admin
+# Melhorar Deduplicação de Cotações (24h → 48h + qualquer status)
 
-## Objetivo
+## Problema
 
-Adicionar um botão "Lançar Recibo Manual" na tela de Pagamentos (aba dentro de `/admin/instaladores`) que permite ao admin criar um recibo (`recibos_diarios`) manualmente, para casos onde o instalador não conseguiu gerar pelo sistema.
+A deduplicação atual verifica apenas cotações com status `pendente` nas últimas 24 horas. Clientes como a Ciça, que já têm cotações aprovadas/concluídas, geram novas cotações toda vez que mandam mensagem porque a verificação ignora cotações com outros status.
 
-## Alterações
+## Solução
 
-### 1. Frontend: `src/components/admin/PagamentosInstaladores.tsx`
+Expandir a lógica de deduplicação na Edge Function `criar-cotacao-whatsapp`:
 
-- Adicionar botão "Lançar Recibo Manual" ao lado dos filtros (Mês/Status)
-- Criar modal com os campos:
-  - **Data de referência** (date input)
-  - **Instalador** (select com lista de instaladores ativos da empresa)
-  - **Quantidade de serviços** (número, pode ser 0)
-  - **Valor Mão de Obra** (numérico)
-  - **Valor Reembolso** (numérico, default 0)
-  - **Valor Total** (calculado automaticamente = mão de obra + reembolso, editável)
-- Ao salvar, inserir diretamente na tabela `recibos_diarios` com `servicos_ids` vazio (`{}`) e status `pendente`
+1. **Aumentar janela de 24h para 48h**
+2. **Verificar cotações de qualquer status** (não apenas `pendente`) — se o cliente teve qualquer cotação nos últimos 2 dias (pendente, aprovada, concluída, etc.), não criar nova
+3. Manter a resposta informativa indicando qual cotação já existe
 
-### 2. Backend: Migration SQL
+### Alteração na Edge Function
 
-- Adicionar RLS policy para permitir que admins insiram recibos na tabela `recibos_diarios` (atualmente só instaladores podem criar via `instalador_id = auth.uid()`)
-- Nova policy: admins da mesma empresa podem INSERT em `recibos_diarios`
+No trecho de deduplicação (linhas ~201-229), remover o filtro `.eq('status', 'pendente')` e mudar a janela temporal de 24h para 48h:
 
-### Fluxo
+```typescript
+// Deduplicação 48h: verificar qualquer cotação recente para o mesmo cliente
+const { data: cotacaoRecente } = await supabase
+  .from('cotacoes')
+  .select('id, created_at, status')
+  .eq('empresa_id', EMPRESA_ID)
+  .eq('cliente_id', clienteId)
+  .gte('created_at', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
+  .order('created_at', { ascending: false })
+  .limit(1)
+  .maybeSingle();
+```
 
-1. Admin clica "Lançar Recibo Manual"
-2. Preenche data, seleciona instalador, informa valores
-3. Confirma -- recibo aparece na listagem como "Pendente"
-4. Admin pode então pagar normalmente usando o fluxo existente
+Nenhuma migration de banco necessária. Apenas alteração na Edge Function.
 
