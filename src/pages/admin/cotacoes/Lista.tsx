@@ -900,6 +900,16 @@ export default function ListaCotacoes() {
                                 </Button>
                               )}
                               <Button
+                                onClick={() => bloquearTelefone(cotacao)}
+                                size="sm"
+                                variant="ghost"
+                                className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                disabled={bloqueandoTelefone === cotacao.id}
+                                title="Bloquear número"
+                              >
+                                <Ban className="w-4 h-4" />
+                              </Button>
+                              <Button
                                 onClick={() => setCotacaoParaExcluir(cotacao.id)}
                                 size="sm"
                                 variant="ghost"
