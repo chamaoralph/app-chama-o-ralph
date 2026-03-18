@@ -354,6 +354,7 @@ export type Database = {
           id: string
           servico: string | null
           telefone: string | null
+          token: string | null
         }
         Insert: {
           created_at?: string | null
@@ -361,6 +362,7 @@ export type Database = {
           id?: string
           servico?: string | null
           telefone?: string | null
+          token?: string | null
         }
         Update: {
           created_at?: string | null
@@ -368,6 +370,7 @@ export type Database = {
           id?: string
           servico?: string | null
           telefone?: string | null
+          token?: string | null
         }
         Relationships: []
       }

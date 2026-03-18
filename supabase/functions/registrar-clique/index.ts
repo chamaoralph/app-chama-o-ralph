@@ -42,6 +42,7 @@ Deno.serve(async (req) => {
         gclid: gclid || null,
         telefone: telefone || null,
         servico: servico || null,
+        token: bodyToken || null,
       })
       .select()
       .single();
