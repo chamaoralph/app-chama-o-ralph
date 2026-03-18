@@ -132,6 +132,26 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Verificar se o telefone está bloqueado
+    const { data: bloqueado } = await supabase
+      .from('telefones_bloqueados')
+      .select('id')
+      .eq('empresa_id', EMPRESA_ID)
+      .eq('telefone', telefoneLimpo)
+      .maybeSingle();
+
+    if (bloqueado) {
+      console.log("🚫 Telefone bloqueado:", telefoneLimpo);
+      return new Response(
+        JSON.stringify({
+          sucesso: true,
+          bloqueado: true,
+          mensagem: "Telefone está na lista de bloqueio. Nenhuma cotação criada."
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Buscar ou criar cliente
     const { data: clienteExistente, error: erroConsulta } = await supabase
       .from('clientes')
