@@ -347,6 +347,30 @@ export type Database = {
           },
         ]
       }
+      cliques_whatsapp: {
+        Row: {
+          created_at: string | null
+          gclid: string | null
+          id: string
+          servico: string | null
+          telefone: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          gclid?: string | null
+          id?: string
+          servico?: string | null
+          telefone?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          gclid?: string | null
+          id?: string
+          servico?: string | null
+          telefone?: string | null
+        }
+        Relationships: []
+      }
       configuracoes_rfm: {
         Row: {
           created_at: string | null
