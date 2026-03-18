@@ -447,6 +447,7 @@ export type Database = {
           conversion_value: number | null
           created_at: string | null
           empresa_id: string
+          enviado_google: boolean | null
           external_attribution_data: Json | null
           gclid: string | null
           id: string
@@ -458,6 +459,7 @@ export type Database = {
           conversion_value?: number | null
           created_at?: string | null
           empresa_id: string
+          enviado_google?: boolean | null
           external_attribution_data?: Json | null
           gclid?: string | null
           id?: string
@@ -469,6 +471,7 @@ export type Database = {
           conversion_value?: number | null
           created_at?: string | null
           empresa_id?: string
+          enviado_google?: boolean | null
           external_attribution_data?: Json | null
           gclid?: string | null
           id?: string
