@@ -1,10 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { createHmac } from "https://deno.land/std@0.168.0/node/crypto.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-webhook-signature',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-webhook-token',
 };
 
 const EMPRESA_ID = "a5006ac5-230b-4687-bb88-e49ebc7811a2";
@@ -36,17 +35,6 @@ interface CotacaoPayload {
 interface RequestPayload {
   cliente: ClientePayload;
   cotacao?: CotacaoPayload;
-}
-
-function verifySignature(body: string, signature: string, secret: string): boolean {
-  try {
-    const expectedSignature = createHmac('sha256', secret)
-      .update(body)
-      .digest('hex');
-    return signature === expectedSignature;
-  } catch {
-    return false;
-  }
 }
 
 function checkRateLimit(clientIp: string): { allowed: boolean; remaining: number } {
@@ -94,25 +82,21 @@ serve(async (req) => {
       );
     }
 
-    const bodyText = await req.text();
+    // Autenticação por token simples (mesmo padrão do inserir-conversao-offline)
+    const token = req.headers.get('x-webhook-token');
+    const expectedToken = Deno.env.get('WEBHOOK_SECRET');
 
-    const webhookSecret = Deno.env.get('WEBHOOK_SECRET');
-    if (!webhookSecret) {
+    if (!expectedToken) {
       return jsonError("Configuração do servidor incompleta", "CONFIG_ERROR", 500);
     }
 
-    const signature = req.headers.get('X-Webhook-Signature') || req.headers.get('x-webhook-signature');
-    if (!signature) {
-      return jsonError("Assinatura de autenticação não fornecida", "AUTH_MISSING", 401);
-    }
-
-    if (!verifySignature(bodyText, signature, webhookSecret)) {
-      return jsonError("Assinatura de autenticação inválida", "AUTH_INVALID", 401);
+    if (!token || token !== expectedToken) {
+      return jsonError("Token de autenticação inválido", "AUTH_INVALID", 401);
     }
 
     let payload: RequestPayload;
     try {
-      payload = JSON.parse(bodyText);
+      payload = await req.json();
     } catch {
       return jsonError("JSON inválido no corpo da requisição", "JSON_INVALIDO", 400);
     }
@@ -132,8 +116,8 @@ serve(async (req) => {
     }
 
     const telefoneLimpo = payload.cliente.telefone.replace(/\D/g, '');
-    if (!/^\d{10,11}$/.test(telefoneLimpo)) {
-      return jsonError("Telefone inválido. Use formato brasileiro com DDD (10-11 dígitos)", "VALIDACAO_FALHOU", 400);
+    if (!/^\d{10,13}$/.test(telefoneLimpo)) {
+      return jsonError("Telefone inválido. Use formato brasileiro com DDD (10-13 dígitos)", "VALIDACAO_FALHOU", 400);
     }
 
     // Cotação é opcional — usar defaults se não enviada

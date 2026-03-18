@@ -1,38 +1,34 @@
 
 
-# Plano: Atualizar Edge Function + Gerar JSON do n8n
+# Lançamento Manual de Recibo pelo Admin
 
-## O que será feito
+## Objetivo
 
-### 1. Atualizar `criar-cotacao-whatsapp` para autenticação por token simples
-A função hoje usa HMAC SHA-256, mas o fluxo n8n já usa token simples (`x-webhook-token`). Vou alinhar para o mesmo padrão do `inserir-conversao-offline`.
+Adicionar um botão "Lançar Recibo Manual" na tela de Pagamentos (aba dentro de `/admin/instaladores`) que permite ao admin criar um recibo (`recibos_diarios`) manualmente, para casos onde o instalador não conseguiu gerar pelo sistema.
 
-**Arquivo**: `supabase/functions/criar-cotacao-whatsapp/index.ts`
-- Remover `createHmac` e `verifySignature`
-- Validar com `x-webhook-token === WEBHOOK_SECRET`
+## Alterações
 
-### 2. Gerar arquivo JSON completo do fluxo n8n atualizado
-Vou gerar um arquivo JSON pronto para importar no n8n com o fluxo completo baseado no que você me enviou, adicionando os nós de criação de cotação.
+### 1. Frontend: `src/components/admin/PagamentosInstaladores.tsx`
 
-**Saída**: `/mnt/documents/fluxo_whatsapp_cotacao_n8n.json`
+- Adicionar botão "Lançar Recibo Manual" ao lado dos filtros (Mês/Status)
+- Criar modal com os campos:
+  - **Data de referência** (date input)
+  - **Instalador** (select com lista de instaladores ativos da empresa)
+  - **Quantidade de serviços** (número, pode ser 0)
+  - **Valor Mão de Obra** (numérico)
+  - **Valor Reembolso** (numérico, default 0)
+  - **Valor Total** (calculado automaticamente = mão de obra + reembolso, editável)
+- Ao salvar, inserir diretamente na tabela `recibos_diarios` com `servicos_ids` vazio (`{}`) e status `pendente`
 
-O fluxo terá:
+### 2. Backend: Migration SQL
 
-```text
-Webhook MegaAPI
-      │
-  Extrair GCLID
-      │
-  Tem GCLID? ─── SIM → Salvar Conversão Offline
-  │                          │
-  │                   Preparar Cotação → Criar Cotação
-  │
-  └── NÃO → Preparar Cotação → Criar Cotação
-```
+- Adicionar RLS policy para permitir que admins insiram recibos na tabela `recibos_diarios` (atualmente só instaladores podem criar via `instalador_id = auth.uid()`)
+- Nova policy: admins da mesma empresa podem INSERT em `recibos_diarios`
 
-Os nós novos:
-- **Preparar Cotação** (Code): extrai `pushName`, `senderPn`, `conversation` do payload MegaAPI e monta o body
-- **Criar Cotação Supabase** (HTTP Request): POST para a Edge Function com header `x-webhook-token`
+### Fluxo
 
-O JSON será importável diretamente no n8n via "Import from File".
+1. Admin clica "Lançar Recibo Manual"
+2. Preenche data, seleciona instalador, informa valores
+3. Confirma -- recibo aparece na listagem como "Pendente"
+4. Admin pode então pagar normalmente usando o fluxo existente
 
