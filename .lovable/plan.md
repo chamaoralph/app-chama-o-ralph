@@ -1,32 +1,34 @@
 
 
-# Liberar SELECT anon na tabela `cliques_whatsapp`
+# Lançamento Manual de Recibo pelo Admin
 
-## Alteração
+## Objetivo
 
-Uma migration SQL que:
+Adicionar um botão "Lançar Recibo Manual" na tela de Pagamentos (aba dentro de `/admin/instaladores`) que permite ao admin criar um recibo (`recibos_diarios`) manualmente, para casos onde o instalador não conseguiu gerar pelo sistema.
 
-1. Remove a policy restritiva `Bloquear acesso anonimo cliques_whatsapp` (bloqueia ALL para anon, impede qualquer nova policy permissiva)
-2. Recria bloqueios restritivos apenas para INSERT, UPDATE e DELETE (anon continua sem poder escrever)
-3. Cria policy permissiva de SELECT para anon (permite n8n buscar por token)
+## Alterações
 
-### SQL
+### 1. Frontend: `src/components/admin/PagamentosInstaladores.tsx`
 
-```sql
-DROP POLICY "Bloquear acesso anonimo cliques_whatsapp" ON public.cliques_whatsapp;
+- Adicionar botão "Lançar Recibo Manual" ao lado dos filtros (Mês/Status)
+- Criar modal com os campos:
+  - **Data de referência** (date input)
+  - **Instalador** (select com lista de instaladores ativos da empresa)
+  - **Quantidade de serviços** (número, pode ser 0)
+  - **Valor Mão de Obra** (numérico)
+  - **Valor Reembolso** (numérico, default 0)
+  - **Valor Total** (calculado automaticamente = mão de obra + reembolso, editável)
+- Ao salvar, inserir diretamente na tabela `recibos_diarios` com `servicos_ids` vazio (`{}`) e status `pendente`
 
-CREATE POLICY "Bloquear escrita anonima cliques_whatsapp"
-  ON public.cliques_whatsapp AS RESTRICTIVE FOR INSERT TO anon WITH CHECK (false);
+### 2. Backend: Migration SQL
 
-CREATE POLICY "Bloquear update anonimo cliques_whatsapp"
-  ON public.cliques_whatsapp AS RESTRICTIVE FOR UPDATE TO anon USING (false);
+- Adicionar RLS policy para permitir que admins insiram recibos na tabela `recibos_diarios` (atualmente só instaladores podem criar via `instalador_id = auth.uid()`)
+- Nova policy: admins da mesma empresa podem INSERT em `recibos_diarios`
 
-CREATE POLICY "Bloquear delete anonimo cliques_whatsapp"
-  ON public.cliques_whatsapp AS RESTRICTIVE FOR DELETE TO anon USING (false);
+### Fluxo
 
-CREATE POLICY "Service pode ler cliques"
-  ON public.cliques_whatsapp FOR SELECT TO anon USING (true);
-```
-
-Nenhuma alteração de código frontend necessária.
+1. Admin clica "Lançar Recibo Manual"
+2. Preenche data, seleciona instalador, informa valores
+3. Confirma -- recibo aparece na listagem como "Pendente"
+4. Admin pode então pagar normalmente usando o fluxo existente
 
