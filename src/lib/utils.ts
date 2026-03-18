@@ -13,6 +13,7 @@ export function normalizarTelefone(telefone: string | null | undefined): string 
 }
 
 // Formata data ISO para DD/MM/YYYY (sem conversão de timezone)
+// Use para campos DATE como data_servico_desejada
 export function formatarDataBR(dataString: string | null): string {
   if (!dataString) return '-'
   const dataPart = dataString.includes('T') 
@@ -20,6 +21,18 @@ export function formatarDataBR(dataString: string | null): string {
     : dataString.split(' ')[0]
   const [ano, mes, dia] = dataPart.split('-')
   return `${dia}/${mes}/${ano}`
+}
+
+// Formata timestamp UTC para DD/MM/YYYY no fuso de São Paulo (UTC-3)
+// Use para campos TIMESTAMP como created_at
+export function formatarDataBR_SP(dataString: string | null): string {
+  if (!dataString) return '-'
+  try {
+    const date = new Date(dataString)
+    return date.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+  } catch {
+    return formatarDataBR(dataString)
+  }
 }
 
 // Formata timestamp para DD/MM/YYYY às HH:MM (sem conversão de timezone)
