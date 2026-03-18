@@ -210,9 +210,8 @@ serve(async (req) => {
     }
 
     // Preparar defaults para campos não enviados
-    const agora = new Date();
-    const dataServico = cotacaoInput.data_servico_desejada || agora.toISOString().split('T')[0];
-    const horarioInicio = cotacaoInput.horario_inicio || `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}`;
+    const dataServico = cotacaoInput.data_servico_desejada || null;
+    const horarioInicio = cotacaoInput.horario_inicio || null;
 
     // tipo_servico: usar default se não enviado ou vazio
     const tiposServico = (cotacaoInput.tipo_servico && cotacaoInput.tipo_servico.length > 0)
