@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { gclid, telefone, servico } = await req.json();
+    const { gclid, telefone, servico, token: bodyToken } = await req.json();
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -42,6 +42,7 @@ Deno.serve(async (req) => {
         gclid: gclid || null,
         telefone: telefone || null,
         servico: servico || null,
+        token: bodyToken || null,
       })
       .select()
       .single();

@@ -1,0 +1,1 @@
+ALTER TABLE public.cliques_whatsapp ADD COLUMN token text;
