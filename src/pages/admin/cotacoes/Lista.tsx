@@ -474,6 +474,46 @@ export default function ListaCotacoes() {
     }
   }
 
+  async function bloquearTelefone(cotacao: Cotacao) {
+    const telefone = cotacao.clientes.telefone
+    const nome = cotacao.clientes.nome
+    if (!confirm(`Bloquear o número ${telefone} (${nome})?\n\nEste número não criará mais cotações automáticas pelo WhatsApp.`)) return
+
+    setBloqueandoTelefone(cotacao.id)
+    try {
+      const { data: userData } = await supabase
+        .from('usuarios')
+        .select('empresa_id')
+        .eq('id', user?.id)
+        .single()
+
+      if (!userData) throw new Error('Empresa não encontrada')
+
+      const { error } = await supabase
+        .from('telefones_bloqueados')
+        .insert({
+          empresa_id: userData.empresa_id,
+          telefone: telefone.replace(/\D/g, ''),
+          motivo: `Bloqueado da cotação de ${nome}`
+        })
+
+      if (error) {
+        if (error.code === '23505') {
+          toast({ title: '⚠️ Já bloqueado', description: 'Este número já está na lista de bloqueio.' })
+        } else {
+          throw error
+        }
+      } else {
+        toast({ title: '🚫 Número bloqueado', description: `${telefone} não criará mais cotações automáticas.` })
+      }
+    } catch (err) {
+      console.error('Erro ao bloquear:', err)
+      toast({ title: '❌ Erro', description: 'Não foi possível bloquear o número.', variant: 'destructive' })
+    } finally {
+      setBloqueandoTelefone(null)
+    }
+  }
+
   const handleOrdenar = (campo: string) => {
     if (ordenacao.campo === campo) {
       setOrdenacao({ campo, direcao: ordenacao.direcao === 'asc' ? 'desc' : 'asc' })
