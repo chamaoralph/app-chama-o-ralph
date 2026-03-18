@@ -168,6 +168,7 @@ export default function ListaCotacoes() {
   const [tiposServico, setTiposServico] = useState<TipoServico[]>([])
   const [showOutroInput, setShowOutroInput] = useState(false)
   const [visualizacao, setVisualizacao] = useState<VisualizacaoTipo>('lista')
+  const [bloqueandoTelefone, setBloqueandoTelefone] = useState<string | null>(null)
 
   useEffect(() => {
     fetchCotacoes()
