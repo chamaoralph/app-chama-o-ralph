@@ -416,6 +416,11 @@ export default function Configuracoes() {
           <RFMConfigCard />
         </div>
 
+        {/* Telefones Bloqueados */}
+        <div className="mt-6">
+          <TelefonesBloqueadosCard />
+        </div>
+
         {/* Backup e Storage */}
         <div className="mt-6">
           <BackupStorageCard />
