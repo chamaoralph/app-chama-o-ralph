@@ -68,6 +68,7 @@ export function FunilConversaoContent() {
     clicks: 0, impressions: 0, ctr: 0,
   });
   const [dailyData, setDailyData] = useState<DailyData[]>([]);
+  const [cotacoesTimestamps, setCotacoesTimestamps] = useState<string[]>([]);
   const [mesSelecionado, setMesSelecionado] = useState<string>("");
   const [origemFiltro, setOrigemFiltro] = useState<string>("todos");
 
