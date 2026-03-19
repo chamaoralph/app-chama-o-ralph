@@ -1,25 +1,21 @@
 
 
-# Registrar e Exibir Horário Real das Cotações
+# Corrigir exibição de data das cotações com timestamp meia-noite
 
-## Contexto
-A edge function `criar-cotacao-whatsapp` já usa o default `now()` do banco para `created_at`, que registra data E hora. O problema anterior (dia errado) ocorria quando o n8n enviava apenas a data. Agora que está salvando novamente, o `created_at` deve conter o horário real.
+## Problema
+O n8n está enviando apenas a data (ex: `2026-03-18`), que o banco salva como `2026-03-18T00:00:00+00:00`. Ao converter para São Paulo (UTC-3), vira `17/03/2026 às 21:00` — dia errado.
 
-Porém, a lista de cotações usa `formatarTimestampBR` que exibe apenas DD/MM/YYYY — sem mostrar o horário. Além disso, não existe nenhuma visualização de distribuição por horário para fins de marketing.
+## Solução
+Alterar a função `formatarTimestampBR` em `src/pages/admin/cotacoes/Lista.tsx` para detectar timestamps "meia-noite UTC" (hora, minuto e segundo = 0). Nesses casos, tratar como data pura e exibir apenas `DD/MM/YYYY` sem conversão de timezone. Para timestamps com horário real, continuar exibindo `DD/MM/YYYY às HH:MM` com conversão para São Paulo.
 
-## Alterações
+### Lógica
+```text
+Se hora UTC === 0 && minuto UTC === 0 && segundo UTC === 0:
+  → Exibir apenas "DD/MM/YYYY" (extraindo direto da string, sem converter timezone)
+Senão:
+  → Exibir "DD/MM/YYYY às HH:MM" (convertendo para São Paulo)
+```
 
-### 1. Exibir horário na lista de cotações (`src/pages/admin/cotacoes/Lista.tsx`)
-- Alterar a coluna "Data Cotação" para mostrar também o horário: `DD/MM/YYYY às HH:MM`
-- Usar `toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })` para converter corretamente
-
-### 2. Gráfico de distribuição por horário no Funil (`src/components/admin/FunilConversaoContent.tsx`)
-- Adicionar um card "Horários de Pico" abaixo do funil
-- Gráfico de barras (BarChart do Recharts) mostrando quantidade de cotações por faixa horária (6h-8h, 8h-10h, 10h-12h, 12h-14h, 14h-16h, 16h-18h, 18h-20h, 20h-22h)
-- Usar os dados de `created_at` das cotações já carregadas, convertendo para hora local (São Paulo)
-- Destacar visualmente a faixa com mais cotações
-- Respeitar o filtro de origem já implementado (Google, Indicação, Todos, etc.)
-
-### Nenhuma migration necessária
-Os dados de horário já existem no `created_at`. Apenas precisamos exibi-los e analisá-los no frontend.
+### Arquivo alterado
+- `src/pages/admin/cotacoes/Lista.tsx` — função `formatarTimestampBR` (linhas 108-123)
 
