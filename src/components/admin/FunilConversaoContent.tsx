@@ -475,6 +475,9 @@ export function FunilConversaoContent() {
         </CardContent>
       </Card>
 
+      {/* Horários de Pico */}
+      <HorariosPicoChart timestamps={cotacoesTimestamps} />
+
       {/* Resumo */}
       <Card>
         <CardHeader>
