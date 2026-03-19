@@ -285,6 +285,21 @@ export function FunilConversaoContent() {
               </Select>
             </div>
             <div>
+              <label className="block text-sm font-medium mb-2">Origem</label>
+              <Select value={origemFiltro} onValueChange={setOrigemFiltro}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Filtrar origem" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ORIGENS_LEAD.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <label className="block text-sm font-medium mb-2">Data Início</label>
               <Popover>
                 <PopoverTrigger asChild>
