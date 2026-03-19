@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
 
     const { data, error } = await supabase
       .from("conversoes_offline")
-      .insert({
+      .upsert({
         empresa_id,
         conversion_name,
         gclid: gclid || null,
@@ -47,7 +47,7 @@ Deno.serve(async (req) => {
         conversion_value: conversion_value ?? 0,
         conversion_currency: conversion_currency || "BRL",
         external_attribution_data: external_attribution_data || null,
-      })
+      }, { onConflict: 'gclid,conversion_name' })
       .select()
       .single();
 
