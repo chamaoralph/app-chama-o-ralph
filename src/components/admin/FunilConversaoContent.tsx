@@ -439,7 +439,7 @@ export function FunilConversaoContent() {
       {/* Funil Visual */}
       <Card>
         <CardHeader>
-          <CardTitle>Funil de Conversão - Google Ads</CardTitle>
+          <CardTitle>Funil de Conversão - {origemLabel}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center space-y-4">
