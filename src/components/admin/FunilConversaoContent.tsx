@@ -156,6 +156,7 @@ export function FunilConversaoContent() {
 
       const leads = cotacoes?.length || 0;
       const cotacaoIds = cotacoes?.map((c) => c.id) || [];
+      setCotacoesTimestamps(cotacoes?.map(c => c.created_at).filter(Boolean) as string[] || []);
 
       let agendados = 0;
       let receita = 0;
