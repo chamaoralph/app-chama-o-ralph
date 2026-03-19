@@ -1,30 +1,25 @@
 
 
-# Filtro de Origem de Lead no Funil de Conversão
+# Registrar e Exibir Horário Real das Cotações
 
-## Problema
-Atualmente o funil filtra apenas cotações com `origem_lead` contendo "Google". O admin quer ver o funil para qualquer origem (Google, Indicação, etc.) ou para todas as origens combinadas.
+## Contexto
+A edge function `criar-cotacao-whatsapp` já usa o default `now()` do banco para `created_at`, que registra data E hora. O problema anterior (dia errado) ocorria quando o n8n enviava apenas a data. Agora que está salvando novamente, o `created_at` deve conter o horário real.
 
-## Solução
-Adicionar um dropdown "Origem" ao lado do filtro de mês, com as opções dinâmicas baseadas nos valores reais do campo `origem_lead` da tabela `cotacoes`, mais a opção "Todos".
+Porém, a lista de cotações usa `formatarTimestampBR` que exibe apenas DD/MM/YYYY — sem mostrar o horário. Além disso, não existe nenhuma visualização de distribuição por horário para fins de marketing.
 
 ## Alterações
 
-### `src/components/admin/FunilConversaoContent.tsx`
+### 1. Exibir horário na lista de cotações (`src/pages/admin/cotacoes/Lista.tsx`)
+- Alterar a coluna "Data Cotação" para mostrar também o horário: `DD/MM/YYYY às HH:MM`
+- Usar `toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })` para converter corretamente
 
-1. **Novo state**: `origemFiltro` (default: `"todos"`)
-2. **Dropdown na área de filtros**: Select com opções fixas: `Todos`, `Google`, `Indicação`, `Instagram`, `Já era cliente`, `Importação`, `WhatsApp Auto`
-3. **Lógica de query ajustada**:
-   - Quando `origemFiltro === "todos"`: remover o `.ilike("origem_lead", "%google%")` da query de cotações (buscar todas)
-   - Quando uma origem específica é selecionada: aplicar `.ilike("origem_lead", "%valor%")`
-4. **KPIs de investimento**: Manter sempre vinculados ao Google Ads (despesas de marketing), pois investimento é específico do Google. Quando o filtro for "Indicação" ou outra origem orgânica, os KPIs de investimento/ROAS/CPL ficam zerados ou com label indicando "N/A" — ou melhor, mostrar investimento normalmente mas deixar claro que os leads são de outra fonte
-5. **Título do funil visual**: Mudar de "Funil de Conversão - Google Ads" para refletir a origem selecionada (ex: "Funil de Conversão - Todos", "Funil de Conversão - Indicação")
-
-### Comportamento
-- **"Todos"**: puxa todas as cotações do período, independente de origem. Investimento continua sendo o de marketing/Google. KPIs como CPL e ROAS refletem o total
-- **"Google"**: comportamento atual (apenas cotações com origem Google)
-- **"Indicação"**, etc.: filtra pela origem específica. Investimento se mantém do Google Ads para comparação cruzada
+### 2. Gráfico de distribuição por horário no Funil (`src/components/admin/FunilConversaoContent.tsx`)
+- Adicionar um card "Horários de Pico" abaixo do funil
+- Gráfico de barras (BarChart do Recharts) mostrando quantidade de cotações por faixa horária (6h-8h, 8h-10h, 10h-12h, 12h-14h, 14h-16h, 16h-18h, 18h-20h, 20h-22h)
+- Usar os dados de `created_at` das cotações já carregadas, convertendo para hora local (São Paulo)
+- Destacar visualmente a faixa com mais cotações
+- Respeitar o filtro de origem já implementado (Google, Indicação, Todos, etc.)
 
 ### Nenhuma migration necessária
-Apenas alteração de frontend no componente `FunilConversaoContent.tsx`.
+Os dados de horário já existem no `created_at`. Apenas precisamos exibi-los e analisá-los no frontend.
 
