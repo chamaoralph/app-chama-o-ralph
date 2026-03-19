@@ -49,6 +49,75 @@ const ORIGENS_LEAD = [
   { value: "whatsapp auto", label: "WhatsApp Auto" },
 ];
 
+const FAIXAS_HORARIAS = [
+  { faixa: "6h-8h", inicio: 6, fim: 8 },
+  { faixa: "8h-10h", inicio: 8, fim: 10 },
+  { faixa: "10h-12h", inicio: 10, fim: 12 },
+  { faixa: "12h-14h", inicio: 12, fim: 14 },
+  { faixa: "14h-16h", inicio: 14, fim: 16 },
+  { faixa: "16h-18h", inicio: 16, fim: 18 },
+  { faixa: "18h-20h", inicio: 18, fim: 20 },
+  { faixa: "20h-22h", inicio: 20, fim: 22 },
+];
+
+function HorariosPicoChart({ timestamps }: { timestamps: string[] }) {
+  const dados = useMemo(() => {
+    const contagem = FAIXAS_HORARIAS.map(f => ({ faixa: f.faixa, quantidade: 0, inicio: f.inicio, fim: f.fim }));
+    
+    timestamps.forEach(ts => {
+      const date = new Date(ts);
+      // Converter para hora de São Paulo (UTC-3)
+      const horaSP = new Date(date.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+      const hora = horaSP.getHours();
+      
+      const faixa = contagem.find(f => hora >= f.inicio && hora < f.fim);
+      if (faixa) faixa.quantidade++;
+    });
+
+    const maxQtd = Math.max(...contagem.map(c => c.quantidade));
+    return contagem.map(c => ({ ...c, destaque: c.quantidade === maxQtd && maxQtd > 0 }));
+  }, [timestamps]);
+
+  if (timestamps.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Clock className="h-5 w-5" />
+          Horários de Pico
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={dados}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+              <XAxis dataKey="faixa" className="text-xs" />
+              <YAxis allowDecimals={false} className="text-xs" />
+              <Tooltip
+                formatter={(value: number) => [`${value} cotações`, "Quantidade"]}
+                contentStyle={{ borderRadius: "8px" }}
+              />
+              <Bar dataKey="quantidade" radius={[4, 4, 0, 0]}>
+                {dados.map((entry, index) => (
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={entry.destaque ? "hsl(var(--primary))" : "hsl(var(--muted-foreground) / 0.3)"}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <p className="text-xs text-muted-foreground mt-2 text-center">
+          Distribuição das cotações por faixa horária (horário de Brasília)
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function FunilConversaoContent() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
