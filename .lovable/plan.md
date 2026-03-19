@@ -1,41 +1,41 @@
 
 
-# Corrigir valor_total: não somar custo_suporte quando empresa fornece
+# Deduplicação e Constraint Unique na `conversoes_offline`
 
-## Problema
-Quando a empresa fornece o suporte de TV, o sistema está somando o custo do suporte (R$10) ao valor total do serviço. No caso da Clarissa: R$509 + R$10 = R$519. Mas o correto é R$509, porque o custo do suporte é uma despesa interna da empresa, descontada da base de cálculo da comissão do instalador.
-
-**Lógica correta:**
-- Valor total = valor_estimado + valor_material (sem somar custo_suporte quando empresa fornece)
-- Base comissão = valor_estimado - custo_suporte = 509 - 10 = 499
-- Comissão instalador = 499 × 50% = R$249,50 (já está correto)
-
-## Alteração: Migration SQL
-
-Atualizar as 3 funções de trigger para **não somar** `custo_suporte` ao `valor_total` quando `origem_suporte = 'empresa'`:
-
-### 1. `criar_servico_ao_confirmar()`
-Linha do cálculo do valor_total muda de:
+## Passo 1: Limpar duplicatas existentes
+Usar o insert tool para deletar registros duplicados, mantendo apenas o mais antigo por GCLID:
 ```sql
--- ANTES (errado)
-valor_total_calc := valor_estimado + valor_material + custo_suporte;
+DELETE FROM public.conversoes_offline
+WHERE id NOT IN (
+  SELECT DISTINCT ON (gclid, conversion_name) id
+  FROM public.conversoes_offline
+  ORDER BY gclid, conversion_name, created_at ASC
+);
+```
+Nota: o `DISTINCT ON` precisa incluir `conversion_name` também, já que a constraint será sobre ambos.
 
--- DEPOIS (correto) - quando empresa fornece
-valor_total_calc := valor_estimado + valor_material;
--- custo_suporte só soma ao total quando INSTALADOR fornece
+## Passo 2: Adicionar unique constraint
+Migration SQL para evitar duplicatas futuras:
+```sql
+ALTER TABLE public.conversoes_offline 
+ADD CONSTRAINT unique_gclid_conversion 
+UNIQUE (gclid, conversion_name);
 ```
 
-### 2. `sincronizar_servico_ao_editar_cotacao()`
-Mesma correção no cálculo do `novo_valor_total`.
+## Passo 3: Atualizar edge function `inserir-conversao-offline`
+Alterar o INSERT para usar `ON CONFLICT` (upsert), evitando erro 500 quando o n8n enviar o mesmo GCLID repetido:
+```typescript
+const { data, error } = await supabase
+  .from("conversoes_offline")
+  .upsert({
+    empresa_id, conversion_name, gclid, ...
+  }, { onConflict: 'gclid,conversion_name' })
+  .select()
+  .single();
+```
 
-### 3. `atualizar_valor_ao_aceitar_servico()`
-Esta função já está correta (só recalcula comissão, não mexe no valor_total).
-
-**Resumo da nova lógica para valor_total:**
-- `origem_suporte = 'empresa'` → `valor_total = valor_estimado + valor_material` (custo do suporte é interno)
-- `origem_suporte = 'instalador'` → `valor_total = valor_estimado + valor_material + custo_suporte` (instalador precisa ser reembolsado)
-- Sem suporte → `valor_total = valor_estimado + valor_material`
-
-### Correção do serviço existente
-Após aplicar a migration, será necessário corrigir o serviço da Clarissa (SRV-2026-157) atualizando o `valor_total` de R$519 para R$509, ou re-salvar a cotação para que o trigger de sincronização recalcule.
+### Ordem de execução
+1. Deletar duplicatas (insert tool) — necessário antes da constraint
+2. Criar migration com a constraint
+3. Atualizar edge function para upsert
 
