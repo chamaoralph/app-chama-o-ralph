@@ -104,12 +104,19 @@ function formatarDataLocal(dataString: string | null): string {
   return `${dia}/${mes}/${ano}`;
 }
 
-// Formata timestamp UTC para DD/MM/YYYY no fuso de São Paulo
+// Formata timestamp UTC para DD/MM/YYYY às HH:MM no fuso de São Paulo
 function formatarTimestampBR(dataString: string | null): string {
   if (!dataString) return '-';
   try {
     const date = new Date(dataString);
-    return date.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    return date.toLocaleString('pt-BR', { 
+      timeZone: 'America/Sao_Paulo',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).replace(',', ' às');
   } catch {
     return formatarDataLocal(dataString);
   }
