@@ -105,10 +105,24 @@ function formatarDataLocal(dataString: string | null): string {
 }
 
 // Formata timestamp UTC para DD/MM/YYYY às HH:MM no fuso de São Paulo
+// Detecta timestamps "meia-noite UTC" (data pura do n8n) e exibe apenas DD/MM/YYYY
 function formatarTimestampBR(dataString: string | null): string {
   if (!dataString) return '-';
   try {
     const date = new Date(dataString);
+    const isMidnightUTC = date.getUTCHours() === 0 && 
+                          date.getUTCMinutes() === 0 && 
+                          date.getUTCSeconds() === 0;
+
+    if (isMidnightUTC) {
+      // Data pura — extrair direto da string sem conversão de timezone
+      const dataPart = dataString.includes('T') 
+        ? dataString.split('T')[0] 
+        : dataString.split(' ')[0];
+      const [ano, mes, dia] = dataPart.split('-');
+      return `${dia}/${mes}/${ano}`;
+    }
+
     return date.toLocaleString('pt-BR', { 
       timeZone: 'America/Sao_Paulo',
       day: '2-digit',
