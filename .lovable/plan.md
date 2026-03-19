@@ -1,34 +1,30 @@
 
 
-# Lançamento Manual de Recibo pelo Admin
+# Filtro de Origem de Lead no Funil de Conversão
 
-## Objetivo
+## Problema
+Atualmente o funil filtra apenas cotações com `origem_lead` contendo "Google". O admin quer ver o funil para qualquer origem (Google, Indicação, etc.) ou para todas as origens combinadas.
 
-Adicionar um botão "Lançar Recibo Manual" na tela de Pagamentos (aba dentro de `/admin/instaladores`) que permite ao admin criar um recibo (`recibos_diarios`) manualmente, para casos onde o instalador não conseguiu gerar pelo sistema.
+## Solução
+Adicionar um dropdown "Origem" ao lado do filtro de mês, com as opções dinâmicas baseadas nos valores reais do campo `origem_lead` da tabela `cotacoes`, mais a opção "Todos".
 
 ## Alterações
 
-### 1. Frontend: `src/components/admin/PagamentosInstaladores.tsx`
+### `src/components/admin/FunilConversaoContent.tsx`
 
-- Adicionar botão "Lançar Recibo Manual" ao lado dos filtros (Mês/Status)
-- Criar modal com os campos:
-  - **Data de referência** (date input)
-  - **Instalador** (select com lista de instaladores ativos da empresa)
-  - **Quantidade de serviços** (número, pode ser 0)
-  - **Valor Mão de Obra** (numérico)
-  - **Valor Reembolso** (numérico, default 0)
-  - **Valor Total** (calculado automaticamente = mão de obra + reembolso, editável)
-- Ao salvar, inserir diretamente na tabela `recibos_diarios` com `servicos_ids` vazio (`{}`) e status `pendente`
+1. **Novo state**: `origemFiltro` (default: `"todos"`)
+2. **Dropdown na área de filtros**: Select com opções fixas: `Todos`, `Google`, `Indicação`, `Instagram`, `Já era cliente`, `Importação`, `WhatsApp Auto`
+3. **Lógica de query ajustada**:
+   - Quando `origemFiltro === "todos"`: remover o `.ilike("origem_lead", "%google%")` da query de cotações (buscar todas)
+   - Quando uma origem específica é selecionada: aplicar `.ilike("origem_lead", "%valor%")`
+4. **KPIs de investimento**: Manter sempre vinculados ao Google Ads (despesas de marketing), pois investimento é específico do Google. Quando o filtro for "Indicação" ou outra origem orgânica, os KPIs de investimento/ROAS/CPL ficam zerados ou com label indicando "N/A" — ou melhor, mostrar investimento normalmente mas deixar claro que os leads são de outra fonte
+5. **Título do funil visual**: Mudar de "Funil de Conversão - Google Ads" para refletir a origem selecionada (ex: "Funil de Conversão - Todos", "Funil de Conversão - Indicação")
 
-### 2. Backend: Migration SQL
+### Comportamento
+- **"Todos"**: puxa todas as cotações do período, independente de origem. Investimento continua sendo o de marketing/Google. KPIs como CPL e ROAS refletem o total
+- **"Google"**: comportamento atual (apenas cotações com origem Google)
+- **"Indicação"**, etc.: filtra pela origem específica. Investimento se mantém do Google Ads para comparação cruzada
 
-- Adicionar RLS policy para permitir que admins insiram recibos na tabela `recibos_diarios` (atualmente só instaladores podem criar via `instalador_id = auth.uid()`)
-- Nova policy: admins da mesma empresa podem INSERT em `recibos_diarios`
-
-### Fluxo
-
-1. Admin clica "Lançar Recibo Manual"
-2. Preenche data, seleciona instalador, informa valores
-3. Confirma -- recibo aparece na listagem como "Pendente"
-4. Admin pode então pagar normalmente usando o fluxo existente
+### Nenhuma migration necessária
+Apenas alteração de frontend no componente `FunilConversaoContent.tsx`.
 
