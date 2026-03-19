@@ -137,13 +137,18 @@ export function FunilConversaoContent() {
         if (maxSync) setLastSync(maxSync);
       }
 
-      // Leads & conversions (same as before)
-      const { data: cotacoes, error: erroCotacoes } = await supabase
+      // Leads & conversions
+      let cotacoesQuery = supabase
         .from("cotacoes")
         .select("id, status, created_at")
-        .ilike("origem_lead", "%google%")
         .gte("created_at", dataInicioStr)
         .lte("created_at", dataFimStr + "T23:59:59");
+
+      if (origemFiltro !== "todos") {
+        cotacoesQuery = cotacoesQuery.ilike("origem_lead", `%${origemFiltro}%`);
+      }
+
+      const { data: cotacoes, error: erroCotacoes } = await cotacoesQuery;
 
       if (erroCotacoes) throw erroCotacoes;
 
