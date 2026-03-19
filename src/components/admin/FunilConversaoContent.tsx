@@ -38,6 +38,16 @@ interface DailyData {
   impressions: number;
 }
 
+const ORIGENS_LEAD = [
+  { value: "todos", label: "Todos" },
+  { value: "google", label: "Google" },
+  { value: "indicação", label: "Indicação" },
+  { value: "instagram", label: "Instagram" },
+  { value: "já era cliente", label: "Já era cliente" },
+  { value: "importação", label: "Importação" },
+  { value: "whatsapp auto", label: "WhatsApp Auto" },
+];
+
 export function FunilConversaoContent() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -53,6 +63,9 @@ export function FunilConversaoContent() {
   });
   const [dailyData, setDailyData] = useState<DailyData[]>([]);
   const [mesSelecionado, setMesSelecionado] = useState<string>("");
+  const [origemFiltro, setOrigemFiltro] = useState<string>("todos");
+
+  const origemLabel = ORIGENS_LEAD.find(o => o.value === origemFiltro)?.label || "Todos";
 
   // Gerar lista de meses: de janeiro 2026 até o mês atual
   const opcoesMeses = (() => {
