@@ -38,6 +38,16 @@ interface DailyData {
   impressions: number;
 }
 
+const ORIGENS_LEAD = [
+  { value: "todos", label: "Todos" },
+  { value: "google", label: "Google" },
+  { value: "indicação", label: "Indicação" },
+  { value: "instagram", label: "Instagram" },
+  { value: "já era cliente", label: "Já era cliente" },
+  { value: "importação", label: "Importação" },
+  { value: "whatsapp auto", label: "WhatsApp Auto" },
+];
+
 export function FunilConversaoContent() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -53,6 +63,9 @@ export function FunilConversaoContent() {
   });
   const [dailyData, setDailyData] = useState<DailyData[]>([]);
   const [mesSelecionado, setMesSelecionado] = useState<string>("");
+  const [origemFiltro, setOrigemFiltro] = useState<string>("todos");
+
+  const origemLabel = ORIGENS_LEAD.find(o => o.value === origemFiltro)?.label || "Todos";
 
   // Gerar lista de meses: de janeiro 2026 até o mês atual
   const opcoesMeses = (() => {
@@ -124,13 +137,18 @@ export function FunilConversaoContent() {
         if (maxSync) setLastSync(maxSync);
       }
 
-      // Leads & conversions (same as before)
-      const { data: cotacoes, error: erroCotacoes } = await supabase
+      // Leads & conversions
+      let cotacoesQuery = supabase
         .from("cotacoes")
         .select("id, status, created_at")
-        .ilike("origem_lead", "%google%")
         .gte("created_at", dataInicioStr)
         .lte("created_at", dataFimStr + "T23:59:59");
+
+      if (origemFiltro !== "todos") {
+        cotacoesQuery = cotacoesQuery.ilike("origem_lead", `%${origemFiltro}%`);
+      }
+
+      const { data: cotacoes, error: erroCotacoes } = await cotacoesQuery;
 
       if (erroCotacoes) throw erroCotacoes;
 
@@ -226,7 +244,7 @@ export function FunilConversaoContent() {
 
   useEffect(() => {
     carregarDados();
-  }, [dataInicio, dataFim]);
+  }, [dataInicio, dataFim, origemFiltro]);
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -261,6 +279,21 @@ export function FunilConversaoContent() {
                   {opcoesMeses.map((m) => (
                     <SelectItem key={m.value} value={m.value}>
                       {m.label.charAt(0).toUpperCase() + m.label.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Origem</label>
+              <Select value={origemFiltro} onValueChange={setOrigemFiltro}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Filtrar origem" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ORIGENS_LEAD.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -406,7 +439,7 @@ export function FunilConversaoContent() {
       {/* Funil Visual */}
       <Card>
         <CardHeader>
-          <CardTitle>Funil de Conversão - Google Ads</CardTitle>
+          <CardTitle>Funil de Conversão - {origemLabel}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center space-y-4">
