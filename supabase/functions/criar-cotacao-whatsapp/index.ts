@@ -37,6 +37,16 @@ interface RequestPayload {
   cotacao?: CotacaoPayload;
 }
 
+interface RpcResponse {
+  sucesso: boolean;
+  bloqueado?: boolean;
+  cliente_id?: string;
+  cotacao_id?: string;
+  cliente_novo?: boolean;
+  cotacao_existente?: boolean;
+  mensagem?: string;
+}
+
 function checkRateLimit(clientIp: string): { allowed: boolean; remaining: number } {
   const now = Date.now();
   const entry = rateLimitMap.get(clientIp);
@@ -55,6 +65,13 @@ function jsonError(erro: string, codigo: string, status: number) {
   return new Response(
     JSON.stringify({ sucesso: false, erro, codigo }),
     { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
+function jsonSuccess(payload: RpcResponse) {
+  return new Response(
+    JSON.stringify(payload),
+    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   );
 }
 
@@ -132,150 +149,54 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verificar se o telefone está bloqueado
-    const { data: bloqueado } = await supabase
-      .from('telefones_bloqueados')
-      .select('id')
-      .eq('empresa_id', EMPRESA_ID)
-      .eq('telefone', telefoneLimpo)
-      .maybeSingle();
+    const { data, error } = await supabase.rpc('criar_cotacao_whatsapp_atomic', {
+      p_empresa_id: EMPRESA_ID,
+      p_cliente_nome: payload.cliente.nome,
+      p_cliente_telefone: telefoneLimpo,
+      p_cliente_endereco: payload.cliente.endereco ?? null,
+      p_cliente_bairro: payload.cliente.bairro ?? null,
+      p_cliente_cep: payload.cliente.cep ?? null,
+      p_tipo_servico: cotacaoInput.tipo_servico?.map((tipo) => String(tipo)) ?? null,
+      p_descricao: cotacaoInput.descricao ?? null,
+      p_valor_estimado: cotacaoInput.valor_estimado ?? null,
+      p_data_servico_desejada: cotacaoInput.data_servico_desejada ?? null,
+      p_horario_inicio: cotacaoInput.horario_inicio ?? null,
+      p_horario_fim: cotacaoInput.horario_fim ?? null,
+      p_origem_lead: cotacaoInput.origem_lead ?? null,
+      p_ocasiao: cotacaoInput.ocasiao ?? null,
+      p_observacoes: cotacaoInput.observacoes ?? null,
+    });
 
-    if (bloqueado) {
-      console.log("🚫 Telefone bloqueado:", telefoneLimpo);
-      return new Response(
-        JSON.stringify({
-          sucesso: true,
-          bloqueado: true,
-          mensagem: "Telefone está na lista de bloqueio. Nenhuma cotação criada."
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    if (error) {
+      console.error("❌ Erro ao processar cotação via função atômica:", error);
+      const message = error.message || '';
 
-    // Buscar ou criar cliente
-    const { data: clienteExistente, error: erroConsulta } = await supabase
-      .from('clientes')
-      .select('id, nome')
-      .eq('empresa_id', EMPRESA_ID)
-      .eq('telefone', telefoneLimpo)
-      .maybeSingle();
-
-    if (erroConsulta) {
-      console.error("❌ Erro ao consultar cliente:", erroConsulta);
-      return jsonError("Erro ao consultar cliente existente", "ERRO_CONSULTA", 500);
-    }
-
-    let clienteId: string;
-    let clienteNovo = false;
-
-    if (clienteExistente) {
-      clienteId = clienteExistente.id;
-      console.log("✅ Cliente encontrado:", clienteExistente.nome);
-    } else {
-      const nomeCliente = payload.cliente.nome.trim().substring(0, 100);
-      const { data: novoCliente, error: erroCriacao } = await supabase
-        .from('clientes')
-        .insert({
-          empresa_id: EMPRESA_ID,
-          nome: nomeCliente,
-          telefone: telefoneLimpo,
-          endereco_completo: payload.cliente.endereco?.trim().substring(0, 200) || null,
-          bairro: payload.cliente.bairro?.trim().substring(0, 100) || null,
-          cep: payload.cliente.cep?.replace(/\D/g, '').substring(0, 8) || null,
-          origem_lead: cotacaoInput.origem_lead?.substring(0, 50) || 'WhatsApp',
-          ativo: true
-        })
-        .select('id')
-        .single();
-
-      if (erroCriacao) {
-        console.error("❌ Erro ao criar cliente:", erroCriacao);
-        return jsonError("Erro ao criar cliente", "ERRO_CRIACAO_CLIENTE", 500);
+      if (message.includes('cliente.nome')) {
+        return jsonError("Campo 'cliente.nome' é obrigatório", "VALIDACAO_FALHOU", 400);
       }
 
-      clienteId = novoCliente.id;
-      clienteNovo = true;
-      console.log("✅ Novo cliente criado - ID:", clienteId);
+      if (message.includes('cliente.telefone')) {
+        return jsonError("Campo 'cliente.telefone' é obrigatório", "VALIDACAO_FALHOU", 400);
+      }
+
+      return jsonError("Erro ao processar cotação", "ERRO_PROCESSAMENTO_COTACAO", 500);
     }
 
-    // Deduplicação 48h: verificar qualquer cotação recente para o mesmo cliente
-    const { data: cotacaoRecente, error: erroDedupQuery } = await supabase
-      .from('cotacoes')
-      .select('id, created_at, status')
-      .eq('empresa_id', EMPRESA_ID)
-      .eq('cliente_id', clienteId)
-      .gte('created_at', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const result = data as RpcResponse | null;
 
-    if (erroDedupQuery) {
-      console.error("⚠️ Erro na verificação de dedup (continuando):", erroDedupQuery);
+    if (!result?.sucesso) {
+      return jsonError("Resposta inválida ao processar cotação", "RESPOSTA_INVALIDA", 500);
     }
 
-    if (cotacaoRecente) {
-      console.log("🔄 Cotação pendente recente encontrada - ID:", cotacaoRecente.id);
-      return new Response(
-        JSON.stringify({
-          sucesso: true,
-          cliente_id: clienteId,
-          cotacao_id: cotacaoRecente.id,
-          cliente_novo: clienteNovo,
-          cotacao_existente: true,
-          mensagem: `✅ Cotação pendente já existe para este cliente (criada em ${cotacaoRecente.created_at}). Nenhuma duplicata criada.`
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (result.bloqueado) {
+      console.log("🚫 Telefone bloqueado:", telefoneLimpo);
+    } else if (result.cotacao_existente) {
+      console.log("🔄 Cotação recente reaproveitada - ID:", result.cotacao_id);
+    } else {
+      console.log("✅ Cotação criada - ID:", result.cotacao_id);
     }
 
-    // Preparar defaults para campos não enviados
-    const dataServico = cotacaoInput.data_servico_desejada || null;
-    const horarioInicio = cotacaoInput.horario_inicio || null;
-
-    // tipo_servico: usar default se não enviado ou vazio
-    const tiposServico = (cotacaoInput.tipo_servico && cotacaoInput.tipo_servico.length > 0)
-      ? cotacaoInput.tipo_servico.map(t => String(t).trim().substring(0, 50)).filter(t => t.length > 0)
-      : ["A definir"];
-
-    const { data: novaCotacao, error: erroCotacao } = await supabase
-      .from('cotacoes')
-      .insert({
-        empresa_id: EMPRESA_ID,
-        cliente_id: clienteId,
-        tipo_servico: tiposServico,
-        descricao_servico: cotacaoInput.descricao?.trim().substring(0, 1000) || null,
-        valor_estimado: cotacaoInput.valor_estimado && cotacaoInput.valor_estimado > 0
-          ? Math.min(cotacaoInput.valor_estimado, 1000000)
-          : null,
-        data_servico_desejada: dataServico,
-        horario_inicio: horarioInicio,
-        horario_fim: cotacaoInput.horario_fim || null,
-        origem_lead: cotacaoInput.origem_lead?.substring(0, 50) || 'WhatsApp Auto',
-        ocasiao: cotacaoInput.ocasiao?.trim().substring(0, 100) || null,
-        observacoes: cotacaoInput.observacoes?.trim().substring(0, 500) || null,
-        status: 'pendente'
-      })
-      .select('id')
-      .single();
-
-    if (erroCotacao) {
-      console.error("❌ Erro ao criar cotação:", erroCotacao);
-      return jsonError("Erro ao criar cotação", "ERRO_CRIACAO_COTACAO", 500);
-    }
-
-    console.log("✅ Cotação criada - ID:", novaCotacao.id);
-
-    return new Response(
-      JSON.stringify({
-        sucesso: true,
-        cliente_id: clienteId,
-        cotacao_id: novaCotacao.id,
-        cliente_novo: clienteNovo,
-        cotacao_existente: false,
-        mensagem: `✅ Cotação criada com sucesso! ${clienteNovo ? 'Novo cliente cadastrado.' : 'Cliente já existente.'}`
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return jsonSuccess(result);
 
   } catch (error: unknown) {
     console.error("❌ Erro inesperado:", error);
