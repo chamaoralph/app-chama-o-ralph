@@ -1560,6 +1560,26 @@ export type Database = {
         }
         Returns: string
       }
+      criar_cotacao_whatsapp_atomic: {
+        Args: {
+          p_cliente_bairro?: string
+          p_cliente_cep?: string
+          p_cliente_endereco?: string
+          p_cliente_nome: string
+          p_cliente_telefone: string
+          p_data_servico_desejada?: string
+          p_descricao?: string
+          p_empresa_id: string
+          p_horario_fim?: string
+          p_horario_inicio?: string
+          p_observacoes?: string
+          p_ocasiao?: string
+          p_origem_lead?: string
+          p_tipo_servico?: string[]
+          p_valor_estimado?: number
+        }
+        Returns: Json
+      }
       get_empresa_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
