@@ -70,7 +70,7 @@ export default function FollowUp() {
       const { data: cotacoesData, error } = await supabase
         .from("cotacoes")
         .select(`
-          id, created_at, tipo_servico, valor_estimado,
+          id, created_at, tipo_servico, valor_estimado, descricao_servico,
           clientes!cotacoes_cliente_id_fkey(id, nome, telefone)
         `)
         .eq("empresa_id", empresaId!)
