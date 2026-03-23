@@ -24,6 +24,7 @@ import AdminRelatorios from "@/pages/admin/Relatorios";
 import AdminDespesas from "@/pages/admin/Despesas";
 import AdminMarketing from "@/pages/admin/Marketing";
 import AdminClientes from "@/pages/admin/Clientes";
+import AdminFollowUp from "@/pages/admin/FollowUp";
 // Instalador Pages
 import InstaladorDashboard from "@/pages/instalador/Dashboard";
 import InstaladorServicosDisponiveis from "@/pages/instalador/ServicosDisponiveis";
