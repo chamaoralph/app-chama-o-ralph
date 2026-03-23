@@ -367,6 +367,17 @@ export default function FollowUp() {
                                 size="sm"
                                 variant="outline"
                                 onClick={() => {
+                                  setCotacaoDetalhes(cotacao);
+                                  setDetalhesOpen(true);
+                                }}
+                                title="Ver detalhes"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
                                   setCotacaoSelecionada(cotacao);
                                   setModalOpen(true);
                                 }}
