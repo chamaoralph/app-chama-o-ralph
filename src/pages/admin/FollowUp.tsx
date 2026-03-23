@@ -103,6 +103,7 @@ export default function FollowUp() {
         created_at: c.created_at,
         tipo_servico: c.tipo_servico,
         valor_estimado: c.valor_estimado,
+        descricao_servico: c.descricao_servico,
         cliente: c.clientes,
         contatos: contatosMap[c.id] || [],
       })) as CotacaoPendente[];
