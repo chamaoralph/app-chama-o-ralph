@@ -1,31 +1,31 @@
 
 
-# Ajustar deduplicação do webhook WhatsApp
+# Botão "Ver Detalhes" no Follow-Up
 
-## Problema
-Hoje a função `criar_cotacao_whatsapp_atomic` só verifica se existe cotação criada nas últimas 48h. Faltam duas verificações:
+## O que será feito
 
-1. Se o cliente já tem uma **cotação ativa** (status `pendente` ou `aprovada`) — independente de quando foi criada — não criar nova
-2. Se o cliente já tem um **serviço concluído nos últimos 3 dias** (status `concluido` ou `aguardando_aprovacao`) — não criar nova
+Adicionar um botão "Ver Detalhes" (ícone de olho) na coluna de ações de cada cotação na tabela de follow-up. Ao clicar, abre um modal/dialog mostrando:
 
-## Alteração
+- **Dados da cotação**: cliente, telefone, tipo de serviço, valor estimado, data de criação, descrição
+- **Histórico completo de contatos**: lista cronológica com data/hora exata, tipo de contato, quem fez o contato, e observações de cada tentativa
 
-Uma única migration que faz `CREATE OR REPLACE FUNCTION` na `criar_cotacao_whatsapp_atomic`, substituindo o bloco de verificação atual (linhas 96-117) por três verificações em sequência:
+## Alterações
 
-```text
-1. Cotação ativa (pendente ou aprovada) → retorna "cotação ativa já existe"
-2. Serviço recente (concluído/aguardando_aprovação nos últimos 3 dias) → retorna "serviço recente já existe"
-3. Cotação criada nas últimas 48h (qualquer status) → mantém comportamento atual
-```
+### `src/pages/admin/FollowUp.tsx`
+- Adicionar estado `detalhesOpen` e `cotacaoDetalhes` para controlar o modal de detalhes
+- Adicionar ícone `Eye` do lucide-react
+- Na coluna "Ações", inserir um novo botão com ícone de olho antes dos botões existentes
+- Adicionar um segundo `Dialog` para exibir os detalhes completos:
+  - Cabeçalho com nome do cliente, telefone, serviço e valor estimado
+  - Data de criação da cotação (formatada)
+  - Descrição do serviço (se houver)
+  - Histórico de contatos com data/hora exata (formato `dd/MM/yyyy HH:mm`), tipo de contato (badge), quem registrou, e observações
 
-Cada verificação retorna um JSON com `cotacao_existente: true` ou novo campo `servico_recente: true`, com mensagem explicativa, para o n8n saber o motivo.
+### Buscar nome do usuário que registrou o contato
+- Ajustar a query de `followup_contatos` para incluir um join com `usuarios` trazendo o nome de quem fez cada contato, para exibir no histórico
 
-## Resposta para o n8n
-- Cotação ativa: `{ sucesso: true, cotacao_existente: true, mensagem: "Cliente já tem cotação ativa (pendente/aprovada)..." }`
-- Serviço recente: `{ sucesso: true, servico_recente: true, mensagem: "Cliente tem serviço concluído nos últimos 3 dias..." }`
-- Cotação 48h: mantém igual
+Nenhuma alteração de banco de dados necessária.
 
-## Arquivo envolvido
-- Nova migration SQL (apenas `CREATE OR REPLACE FUNCTION`)
-- Nenhuma alteração no edge function TypeScript (a resposta já é tratada genericamente)
+## Arquivos envolvidos
+- `src/pages/admin/FollowUp.tsx`
 
