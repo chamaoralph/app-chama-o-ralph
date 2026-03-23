@@ -232,18 +232,28 @@ export function GerarReciboModal({
         </DialogHeader>
 
         {/* Resumo Rápido */}
-        <div className="grid grid-cols-3 gap-4 p-4 bg-muted rounded-lg">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-muted rounded-lg">
           <div className="text-center">
             <p className="text-sm text-muted-foreground">Serviços</p>
             <p className="text-2xl font-bold">{servicos.length}</p>
           </div>
           <div className="text-center">
-            <p className="text-sm text-muted-foreground">Mão de Obra</p>
-            <p className="text-xl font-semibold">R$ {totalMaoObra.toFixed(2)}</p>
+            <p className="text-sm text-muted-foreground">Total Bruto</p>
+            <p className="text-xl font-semibold">R$ {totalGeral.toFixed(2)}</p>
           </div>
+          {totalRecebidoCliente > 0 && (
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground">Recebido do Cliente</p>
+              <p className="text-xl font-semibold text-orange-600">R$ {totalRecebidoCliente.toFixed(2)}</p>
+            </div>
+          )}
           <div className="text-center">
-            <p className="text-sm text-muted-foreground">Total</p>
-            <p className="text-2xl font-bold text-green-600">R$ {totalGeral.toFixed(2)}</p>
+            <p className="text-sm text-muted-foreground">
+              {saldoLiquido >= 0 ? 'Empresa Deve Pagar' : 'Devolver à Empresa'}
+            </p>
+            <p className={`text-2xl font-bold ${saldoLiquido >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              R$ {Math.abs(saldoLiquido).toFixed(2)}
+            </p>
           </div>
         </div>
 
