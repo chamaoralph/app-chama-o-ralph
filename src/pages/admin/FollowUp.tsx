@@ -46,6 +46,8 @@ export default function FollowUp() {
   const [cotacaoSelecionada, setCotacaoSelecionada] = useState<CotacaoPendente | null>(null);
   const [tipoContato, setTipoContato] = useState("whatsapp");
   const [observacoes, setObservacoes] = useState("");
+  const [detalhesOpen, setDetalhesOpen] = useState(false);
+  const [cotacaoDetalhes, setCotacaoDetalhes] = useState<CotacaoPendente | null>(null);
 
   // Fetch empresa_id
   const { data: empresaId } = useQuery({
