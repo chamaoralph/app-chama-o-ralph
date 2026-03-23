@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
-import { Phone, MessageCircle, Clock, AlertTriangle, Users, PhoneCall, Search } from "lucide-react";
+import { Phone, MessageCircle, Clock, AlertTriangle, Users, PhoneCall, Search, Eye } from "lucide-react";
 import { formatDistanceToNow, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
