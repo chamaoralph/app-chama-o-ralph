@@ -600,6 +600,58 @@ export type Database = {
         }
         Relationships: []
       }
+      followup_contatos: {
+        Row: {
+          cotacao_id: string
+          created_at: string
+          empresa_id: string
+          id: string
+          observacoes: string | null
+          tipo_contato: string
+          usuario_id: string
+        }
+        Insert: {
+          cotacao_id: string
+          created_at?: string
+          empresa_id: string
+          id?: string
+          observacoes?: string | null
+          tipo_contato: string
+          usuario_id: string
+        }
+        Update: {
+          cotacao_id?: string
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          observacoes?: string | null
+          tipo_contato?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "followup_contatos_cotacao_id_fkey"
+            columns: ["cotacao_id"]
+            isOneToOne: false
+            referencedRelation: "cotacoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "followup_contatos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "followup_contatos_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       google_ads_metrics: {
         Row: {
           clicks: number | null
