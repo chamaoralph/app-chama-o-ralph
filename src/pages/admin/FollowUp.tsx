@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
 import { Phone, MessageCircle, Clock, AlertTriangle, Users, PhoneCall, Search, Eye } from "lucide-react";
-import { formatDistanceToNow, differenceInDays } from "date-fns";
+import { formatDistanceToNow, differenceInDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface CotacaoPendente {
