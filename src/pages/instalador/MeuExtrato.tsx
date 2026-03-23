@@ -423,7 +423,8 @@ export default function MeuExtrato() {
             cliente_nome: s.cliente_nome,
             tipo_servico: s.tipo_servico,
             valor_mao_obra_instalador: s.valor_mao_obra_instalador,
-            valor_reembolso_despesas: s.valor_reembolso_despesas
+            valor_reembolso_despesas: s.valor_reembolso_despesas,
+            valor_recebido_cliente: (s as any).valor_recebido_cliente || 0
           }))}
           dataReferencia={dataRecibo}
           instaladorNome={instaladorNome}
