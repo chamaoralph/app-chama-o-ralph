@@ -1038,6 +1038,7 @@ export type Database = {
           servicos_ids: string[]
           status_pagamento: string | null
           valor_mao_obra: number
+          valor_recebido_cliente: number | null
           valor_reembolso: number
           valor_total: number
         }
@@ -1054,6 +1055,7 @@ export type Database = {
           servicos_ids: string[]
           status_pagamento?: string | null
           valor_mao_obra?: number
+          valor_recebido_cliente?: number | null
           valor_reembolso?: number
           valor_total?: number
         }
@@ -1070,6 +1072,7 @@ export type Database = {
           servicos_ids?: string[]
           status_pagamento?: string | null
           valor_mao_obra?: number
+          valor_recebido_cliente?: number | null
           valor_reembolso?: number
           valor_total?: number
         }
@@ -1157,10 +1160,12 @@ export type Database = {
           nota_fiscal_url: string | null
           observacoes_instalador: string | null
           origem_suporte: string | null
+          recebimento_cliente: string | null
           status: string | null
           tipo_servico: string[]
           updated_at: string | null
           valor_mao_obra_instalador: number | null
+          valor_recebido_cliente: number | null
           valor_reembolso_despesas: number | null
           valor_total: number
         }
@@ -1181,10 +1186,12 @@ export type Database = {
           nota_fiscal_url?: string | null
           observacoes_instalador?: string | null
           origem_suporte?: string | null
+          recebimento_cliente?: string | null
           status?: string | null
           tipo_servico: string[]
           updated_at?: string | null
           valor_mao_obra_instalador?: number | null
+          valor_recebido_cliente?: number | null
           valor_reembolso_despesas?: number | null
           valor_total: number
         }
@@ -1205,10 +1212,12 @@ export type Database = {
           nota_fiscal_url?: string | null
           observacoes_instalador?: string | null
           origem_suporte?: string | null
+          recebimento_cliente?: string | null
           status?: string | null
           tipo_servico?: string[]
           updated_at?: string | null
           valor_mao_obra_instalador?: number | null
+          valor_recebido_cliente?: number | null
           valor_reembolso_despesas?: number | null
           valor_total?: number
         }
