@@ -1,57 +1,56 @@
 
 
-# Controle de Recebimento do Cliente pelo Instalador
+# Tela de Follow-Up de Cotações Pendentes
 
-## Problema
-Hoje não há registro de quem recebeu o pagamento do cliente. O instalador às vezes cobra diretamente do cliente, às vezes a empresa cobra. O recibo precisa calcular o saldo líquido considerando o que o instalador já recebeu.
+## O que vai ser construído
 
-## Lógica do Recibo
-```text
-Exemplo 1: Instalador tem R$500 a receber, cobrou R$200 do cliente
-  Total devido: R$500
-  Já recebido pelo instalador: R$200
-  Empresa deve pagar: R$300
+Uma nova página `/admin/follow-up` dedicada ao acompanhamento de cotações pendentes, com registro de contatos feitos e atalho para envio de mensagem via WhatsApp.
 
-Exemplo 2: Instalador tem R$500 a receber, cobrou R$600 do cliente
-  Total devido: R$500
-  Já recebido pelo instalador: R$600
-  Instalador deve devolver: R$100
-```
+## Alterações no banco de dados
 
-## Alterações
+### Nova tabela: `followup_contatos`
+Registra cada tentativa de contato feita com o cliente:
+- `id` (uuid, PK)
+- `cotacao_id` (uuid, referencia cotacoes)
+- `empresa_id` (uuid)
+- `tipo_contato` (text) — "telefone", "whatsapp", "email"
+- `observacoes` (text, nullable)
+- `created_at` (timestamp, default now())
+- `usuario_id` (uuid) — quem fez o contato
 
-### 1. Migration: novos campos na tabela `servicos`
-- `valor_recebido_cliente` (numeric, default 0) — quanto o instalador recebeu do cliente
-- `recebimento_cliente` (text, nullable) — quem recebeu: `'instalador'` ou `'empresa'`
+RLS: admins da empresa podem CRUD.
 
-### 2. Tela de Finalização (`FinalizarServico.tsx`)
-Adicionar seção após as fotos:
-- Radio: "Quem recebeu do cliente?" → Instalador / Empresa
-- Se "Instalador": campo numérico "Valor recebido do cliente (R$)"
-- Se "Empresa": valor_recebido_cliente = 0
-- Salvar esses campos no update do serviço
+## Nova página: `src/pages/admin/FollowUp.tsx`
 
-### 3. Interface do Recibo (`ServicoRecibo`)
-Adicionar `valor_recebido_cliente` à interface usada no recibo.
+### Conteúdo da tabela
+Para cada cotação pendente, exibir:
+- Nome do cliente + telefone
+- Tipo de serviço
+- Data de criação da cotação (há quantos dias)
+- Quantidade de contatos já feitos
+- Data do último contato (ou "Nenhum contato")
+- Botões de ação:
+  - "Registrar Contato" — abre modal para anotar o tipo e observação
+  - "WhatsApp" — abre `wa.me/{telefone}` com mensagem pré-formatada
 
-### 4. Recibo (`ReciboPreview.tsx`)
-No resumo financeiro, adicionar:
-- "Total Recebido pelo Instalador (dos clientes): R$ X"
-- "Saldo: Empresa deve pagar R$ Y" ou "Instalador deve devolver R$ Z"
-- O cálculo: `saldo = totalGeral - totalRecebidoCliente`
-  - Se positivo → empresa paga
-  - Se negativo → instalador devolve
+### Filtros
+- Ordenar por: mais antigos primeiro, sem contato, menos contatos
+- Filtrar por: faixa de dias sem contato (ex: >7 dias, >15 dias, >30 dias)
 
-### 5. Modal do Recibo (`GerarReciboModal.tsx`)
-- Passar `valor_recebido_cliente` nos dados dos serviços
-- Atualizar o resumo rápido para mostrar o saldo líquido
+### Cards de resumo no topo
+- Total de pendentes
+- Sem nenhum contato
+- Último contato > 7 dias
+- Média de dias pendente
 
-### 6. Recibos Diários (`recibos_diarios`)
-Adicionar coluna `valor_recebido_cliente` (numeric, default 0) para registrar o total recebido pelo instalador dos clientes naquele dia, permitindo o cálculo do saldo no histórico.
+## Navegação
+- Adicionar link "📞 Follow-Up" no sidebar do admin (desktop e mobile)
+- Adicionar rota `/admin/follow-up` no `App.tsx`
 
 ## Arquivos envolvidos
-- Nova migration SQL (2 colunas em `servicos`, 1 em `recibos_diarios`)
-- `src/pages/instalador/FinalizarServico.tsx`
-- `src/components/instalador/ReciboPreview.tsx`
-- `src/components/instalador/GerarReciboModal.tsx`
+- Nova migration SQL (tabela `followup_contatos` + RLS)
+- `src/pages/admin/FollowUp.tsx` (nova página)
+- `src/App.tsx` (nova rota)
+- `src/components/layout/AdminLayout.tsx` (link no sidebar)
+- `src/components/layout/MobileAdminLayout.tsx` (link no menu mobile)
 
