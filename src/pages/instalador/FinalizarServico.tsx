@@ -340,6 +340,49 @@ export default function FinalizarServico() {
             </>
           )}
 
+          {/* Recebimento do cliente */}
+          <div>
+            <label className="block text-sm font-medium mb-2">💳 Quem recebeu o pagamento do cliente?</label>
+            <div className="flex gap-4">
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="recebimento"
+                  checked={recebimentoCliente === 'empresa'}
+                  onChange={() => setRecebimentoCliente('empresa')}
+                  className="mr-2"
+                />
+                Empresa vai receber
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="recebimento"
+                  checked={recebimentoCliente === 'instalador'}
+                  onChange={() => setRecebimentoCliente('instalador')}
+                  className="mr-2"
+                />
+                Eu recebi do cliente
+              </label>
+            </div>
+          </div>
+
+          {recebimentoCliente === 'instalador' && (
+            <div>
+              <label className="block text-sm font-medium mb-2">💰 Valor recebido do cliente (R$) *</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                required
+                value={valorRecebidoCliente}
+                onChange={(e) => setValorRecebidoCliente(e.target.value)}
+                className="w-full px-3 py-2 border rounded-md"
+                placeholder="0.00"
+              />
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium mb-2">📝 Observações (opcional)</label>
             <textarea

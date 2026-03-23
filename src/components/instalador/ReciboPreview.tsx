@@ -184,9 +184,38 @@ export function ReciboPreview({ instaladorNome, dataReferencia, servicos }: Reci
           <span style={{ fontWeight: '500' }}>R$ {totalReembolso.toFixed(2)}</span>
         </div>
         <div style={styles.totalRow}>
-          <span style={styles.totalLabel}>TOTAL A RECEBER:</span>
+          <span style={styles.totalLabel}>TOTAL BRUTO:</span>
           <span style={styles.totalValue}>R$ {totalGeral.toFixed(2)}</span>
         </div>
+
+        {totalRecebidoCliente > 0 && (
+          <>
+            <div style={{ ...styles.summaryRow, marginTop: '12px' }}>
+              <span>Recebido pelo Instalador (dos clientes):</span>
+              <span style={{ fontWeight: '500', color: '#dc2626' }}>- R$ {totalRecebidoCliente.toFixed(2)}</span>
+            </div>
+            <div style={styles.totalRow}>
+              {saldoLiquido >= 0 ? (
+                <>
+                  <span style={styles.totalLabel}>EMPRESA DEVE PAGAR:</span>
+                  <span style={styles.totalValue}>R$ {saldoLiquido.toFixed(2)}</span>
+                </>
+              ) : (
+                <>
+                  <span style={styles.totalLabel}>INSTALADOR DEVE DEVOLVER:</span>
+                  <span style={{ ...styles.totalValue, color: '#dc2626' }}>R$ {Math.abs(saldoLiquido).toFixed(2)}</span>
+                </>
+              )}
+            </div>
+          </>
+        )}
+
+        {totalRecebidoCliente === 0 && (
+          <div style={{ ...styles.totalRow, marginTop: '4px' }}>
+            <span style={styles.totalLabel}>EMPRESA DEVE PAGAR:</span>
+            <span style={styles.totalValue}>R$ {totalGeral.toFixed(2)}</span>
+          </div>
+        )}
       </div>
 
       {/* Rodapé */}

@@ -121,7 +121,8 @@ export function GerarReciboModal({
             valor_reembolso: totalReembolso,
             valor_total: totalGeral,
             quantidade_servicos: servicos.length,
-            servicos_ids: servicos.map(s => s.id)
+            servicos_ids: servicos.map(s => s.id),
+            valor_recebido_cliente: totalRecebidoCliente
           })
 
         if (error) throw error
