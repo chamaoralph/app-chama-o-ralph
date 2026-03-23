@@ -79,6 +79,7 @@ function App() {
               <Route path="clientes" element={<AdminClientes />} />
               <Route path="relatorios" element={<AdminRelatorios />} />
               <Route path="marketing" element={<AdminMarketing />} />
+              <Route path="follow-up" element={<AdminFollowUp />} />
               <Route path="conteudo" element={<AdminGerenciarConteudo />} />
               <Route path="suportes" element={<AdminSuportes />} />
               <Route path="questionarios" element={<Suspense><AdminQuestionarios /></Suspense>} />

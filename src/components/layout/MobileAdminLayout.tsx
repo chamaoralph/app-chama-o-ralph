@@ -13,6 +13,7 @@ import {
   LogOut, 
   X,
   ClipboardList,
+  PhoneCall,
   BarChart3,
   CheckCircle,
   TrendingUp,
