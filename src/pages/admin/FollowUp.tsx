@@ -477,6 +477,70 @@ export default function FollowUp() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Modal Ver Detalhes */}
+      <Dialog open={detalhesOpen} onOpenChange={setDetalhesOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Detalhes da Cotação</DialogTitle>
+          </DialogHeader>
+          {cotacaoDetalhes && (
+            <div className="space-y-4">
+              <div className="bg-muted p-4 rounded-lg space-y-1">
+                <p className="font-semibold text-lg">{cotacaoDetalhes.cliente?.nome}</p>
+                <p className="text-sm text-muted-foreground">{cotacaoDetalhes.cliente?.telefone}</p>
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {(cotacaoDetalhes.tipo_servico || []).map((t, i) => (
+                    <Badge key={i} variant="secondary">{t}</Badge>
+                  ))}
+                </div>
+                {cotacaoDetalhes.valor_estimado != null && (
+                  <p className="text-sm mt-1">
+                    Valor estimado: <span className="font-medium">R$ {cotacaoDetalhes.valor_estimado.toFixed(2)}</span>
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Criada em {format(new Date(cotacaoDetalhes.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                </p>
+              </div>
+
+              {cotacaoDetalhes.descricao_servico && (
+                <div>
+                  <p className="text-sm font-medium mb-1">Descrição</p>
+                  <p className="text-sm text-muted-foreground">{cotacaoDetalhes.descricao_servico}</p>
+                </div>
+              )}
+
+              <div>
+                <p className="text-sm font-medium mb-2">
+                  Histórico de contatos ({cotacaoDetalhes.contatos.length})
+                </p>
+                {cotacaoDetalhes.contatos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic">Nenhum contato registrado</p>
+                ) : (
+                  <div className="space-y-3 max-h-60 overflow-y-auto">
+                    {cotacaoDetalhes.contatos.map((c) => (
+                      <div key={c.id} className="border-l-2 border-primary/30 pl-3 py-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="outline" className="text-xs">{c.tipo_contato}</Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(c.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                          </span>
+                        </div>
+                        {c.usuario_nome && (
+                          <p className="text-xs text-muted-foreground mt-0.5">por {c.usuario_nome}</p>
+                        )}
+                        {c.observacoes && (
+                          <p className="text-sm text-muted-foreground mt-1">{c.observacoes}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }
