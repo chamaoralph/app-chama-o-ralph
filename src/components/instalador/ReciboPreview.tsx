@@ -8,6 +8,7 @@ interface ServicoRecibo {
   tipo_servico: string[]
   valor_mao_obra_instalador: number
   valor_reembolso_despesas: number
+  valor_recebido_cliente: number
 }
 
 interface ReciboPreviewProps {
@@ -20,6 +21,8 @@ export function ReciboPreview({ instaladorNome, dataReferencia, servicos }: Reci
   const totalMaoObra = servicos.reduce((sum, s) => sum + s.valor_mao_obra_instalador, 0)
   const totalReembolso = servicos.reduce((sum, s) => sum + s.valor_reembolso_despesas, 0)
   const totalGeral = totalMaoObra + totalReembolso
+  const totalRecebidoCliente = servicos.reduce((sum, s) => sum + (s.valor_recebido_cliente || 0), 0)
+  const saldoLiquido = totalGeral - totalRecebidoCliente
 
   // Estilos inline para garantir captura correta pelo html2canvas
   const styles = {
@@ -181,9 +184,38 @@ export function ReciboPreview({ instaladorNome, dataReferencia, servicos }: Reci
           <span style={{ fontWeight: '500' }}>R$ {totalReembolso.toFixed(2)}</span>
         </div>
         <div style={styles.totalRow}>
-          <span style={styles.totalLabel}>TOTAL A RECEBER:</span>
+          <span style={styles.totalLabel}>TOTAL BRUTO:</span>
           <span style={styles.totalValue}>R$ {totalGeral.toFixed(2)}</span>
         </div>
+
+        {totalRecebidoCliente > 0 && (
+          <>
+            <div style={{ ...styles.summaryRow, marginTop: '12px' }}>
+              <span>Recebido pelo Instalador (dos clientes):</span>
+              <span style={{ fontWeight: '500', color: '#dc2626' }}>- R$ {totalRecebidoCliente.toFixed(2)}</span>
+            </div>
+            <div style={styles.totalRow}>
+              {saldoLiquido >= 0 ? (
+                <>
+                  <span style={styles.totalLabel}>EMPRESA DEVE PAGAR:</span>
+                  <span style={styles.totalValue}>R$ {saldoLiquido.toFixed(2)}</span>
+                </>
+              ) : (
+                <>
+                  <span style={styles.totalLabel}>INSTALADOR DEVE DEVOLVER:</span>
+                  <span style={{ ...styles.totalValue, color: '#dc2626' }}>R$ {Math.abs(saldoLiquido).toFixed(2)}</span>
+                </>
+              )}
+            </div>
+          </>
+        )}
+
+        {totalRecebidoCliente === 0 && (
+          <div style={{ ...styles.totalRow, marginTop: '4px' }}>
+            <span style={styles.totalLabel}>EMPRESA DEVE PAGAR:</span>
+            <span style={styles.totalValue}>R$ {totalGeral.toFixed(2)}</span>
+          </div>
+        )}
       </div>
 
       {/* Rodapé */}
