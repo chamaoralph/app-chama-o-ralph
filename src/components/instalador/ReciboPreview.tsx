@@ -21,6 +21,8 @@ export function ReciboPreview({ instaladorNome, dataReferencia, servicos }: Reci
   const totalMaoObra = servicos.reduce((sum, s) => sum + s.valor_mao_obra_instalador, 0)
   const totalReembolso = servicos.reduce((sum, s) => sum + s.valor_reembolso_despesas, 0)
   const totalGeral = totalMaoObra + totalReembolso
+  const totalRecebidoCliente = servicos.reduce((sum, s) => sum + (s.valor_recebido_cliente || 0), 0)
+  const saldoLiquido = totalGeral - totalRecebidoCliente
 
   // Estilos inline para garantir captura correta pelo html2canvas
   const styles = {
