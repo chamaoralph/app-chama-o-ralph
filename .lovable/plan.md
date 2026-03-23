@@ -1,74 +1,57 @@
 
 
-# Corrigir duplicidade de cotação no webhook do WhatsApp
+# Controle de Recebimento do Cliente pelo Instalador
 
 ## Problema
-A duplicação não vem da tela. O erro está no fluxo do webhook: duas requisições quase simultâneas conseguem passar pela checagem de “já existe cotação nas últimas 48h” antes da primeira gravação terminar.
+Hoje não há registro de quem recebeu o pagamento do cliente. O instalador às vezes cobra diretamente do cliente, às vezes a empresa cobra. O recibo precisa calcular o saldo líquido considerando o que o instalador já recebeu.
 
-Como você mesmo vai apagar a duplicata atual, a correção aqui foca em impedir novas duplicações.
-
-## O que vou implementar
-
-### 1. Tornar a deduplicação atômica no banco
-Criar uma função no banco para centralizar o fluxo de:
-- normalizar telefone
-- buscar/criar cliente
-- verificar bloqueio
-- verificar cotação recente nas últimas 48h
-- criar a cotação só se realmente não existir outra recente
-
-Essa função vai usar um lock por telefone/empresa durante a operação, para duas requisições do mesmo lead não rodarem ao mesmo tempo.
-
-### 2. Fazer a Edge Function usar essa função
-Alterar `supabase/functions/criar-cotacao-whatsapp/index.ts` para:
-- manter validações e autenticação atuais
-- parar de fazer `select + insert` separado para cliente/cotação
-- chamar a função do banco e devolver a mesma ideia de resposta:
-  - cotação criada
-  - cotação já existente
-  - telefone bloqueado
-
-### 3. Preservar a regra atual de negócio
-Vou manter o comportamento existente:
-- deduplicação por 48h
-- telefone bloqueado não cria nada
-- cliente continua sendo reaproveitado quando já existe
-- defaults como `tipo_servico = ["A definir"]` e `origem_lead = "WhatsApp Auto"` continuam válidos
-
-## Arquivos envolvidos
-- `supabase/functions/criar-cotacao-whatsapp/index.ts`
-- nova migration em `supabase/migrations/...sql`
-
-## Resultado esperado
-Depois da correção:
-- duas chamadas quase simultâneas para o mesmo telefone não vão mais gerar duas cotações
-- uma delas cria a cotação
-- a outra recebe resposta informando que já existe cotação recente
-
-## Detalhes técnicos
+## Lógica do Recibo
 ```text
-Hoje:
-requisição A -> checa -> não encontrou
-requisição B -> checa -> não encontrou
-requisição A -> insere
-requisição B -> insere
-=> duplicou
+Exemplo 1: Instalador tem R$500 a receber, cobrou R$200 do cliente
+  Total devido: R$500
+  Já recebido pelo instalador: R$200
+  Empresa deve pagar: R$300
 
-Depois:
-requisição A -> adquire lock do telefone
-requisição B -> espera
-requisição A -> checa e insere
-requisição A -> libera lock
-requisição B -> checa e encontra a recém-criada
-=> não duplica
+Exemplo 2: Instalador tem R$500 a receber, cobrou R$600 do cliente
+  Total devido: R$500
+  Já recebido pelo instalador: R$600
+  Instalador deve devolver: R$100
 ```
 
-### Estratégia técnica recomendada
-- migration criando função `security definer` no schema `public`
-- uso de `pg_advisory_xact_lock(...)` com chave derivada de `empresa_id + telefone`
-- `INSERT ... ON CONFLICT` para reaproveitar com segurança o cliente, já que `clientes` já tem `UNIQUE (empresa_id, telefone)`
-- retorno estruturado da função para a Edge Function responder sem quebrar o n8n
+## Alterações
 
-### Observação
-Não vou incluir limpeza de dados antigos nessa mudança, já que você disse que apaga a duplicata manualmente.
+### 1. Migration: novos campos na tabela `servicos`
+- `valor_recebido_cliente` (numeric, default 0) — quanto o instalador recebeu do cliente
+- `recebimento_cliente` (text, nullable) — quem recebeu: `'instalador'` ou `'empresa'`
+
+### 2. Tela de Finalização (`FinalizarServico.tsx`)
+Adicionar seção após as fotos:
+- Radio: "Quem recebeu do cliente?" → Instalador / Empresa
+- Se "Instalador": campo numérico "Valor recebido do cliente (R$)"
+- Se "Empresa": valor_recebido_cliente = 0
+- Salvar esses campos no update do serviço
+
+### 3. Interface do Recibo (`ServicoRecibo`)
+Adicionar `valor_recebido_cliente` à interface usada no recibo.
+
+### 4. Recibo (`ReciboPreview.tsx`)
+No resumo financeiro, adicionar:
+- "Total Recebido pelo Instalador (dos clientes): R$ X"
+- "Saldo: Empresa deve pagar R$ Y" ou "Instalador deve devolver R$ Z"
+- O cálculo: `saldo = totalGeral - totalRecebidoCliente`
+  - Se positivo → empresa paga
+  - Se negativo → instalador devolve
+
+### 5. Modal do Recibo (`GerarReciboModal.tsx`)
+- Passar `valor_recebido_cliente` nos dados dos serviços
+- Atualizar o resumo rápido para mostrar o saldo líquido
+
+### 6. Recibos Diários (`recibos_diarios`)
+Adicionar coluna `valor_recebido_cliente` (numeric, default 0) para registrar o total recebido pelo instalador dos clientes naquele dia, permitindo o cálculo do saldo no histórico.
+
+## Arquivos envolvidos
+- Nova migration SQL (2 colunas em `servicos`, 1 em `recibos_diarios`)
+- `src/pages/instalador/FinalizarServico.tsx`
+- `src/components/instalador/ReciboPreview.tsx`
+- `src/components/instalador/GerarReciboModal.tsx`
 
