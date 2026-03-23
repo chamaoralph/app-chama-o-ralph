@@ -1,56 +1,31 @@
 
 
-# Tela de Follow-Up de Cotações Pendentes
+# Ajustar deduplicação do webhook WhatsApp
 
-## O que vai ser construído
+## Problema
+Hoje a função `criar_cotacao_whatsapp_atomic` só verifica se existe cotação criada nas últimas 48h. Faltam duas verificações:
 
-Uma nova página `/admin/follow-up` dedicada ao acompanhamento de cotações pendentes, com registro de contatos feitos e atalho para envio de mensagem via WhatsApp.
+1. Se o cliente já tem uma **cotação ativa** (status `pendente` ou `aprovada`) — independente de quando foi criada — não criar nova
+2. Se o cliente já tem um **serviço concluído nos últimos 3 dias** (status `concluido` ou `aguardando_aprovacao`) — não criar nova
 
-## Alterações no banco de dados
+## Alteração
 
-### Nova tabela: `followup_contatos`
-Registra cada tentativa de contato feita com o cliente:
-- `id` (uuid, PK)
-- `cotacao_id` (uuid, referencia cotacoes)
-- `empresa_id` (uuid)
-- `tipo_contato` (text) — "telefone", "whatsapp", "email"
-- `observacoes` (text, nullable)
-- `created_at` (timestamp, default now())
-- `usuario_id` (uuid) — quem fez o contato
+Uma única migration que faz `CREATE OR REPLACE FUNCTION` na `criar_cotacao_whatsapp_atomic`, substituindo o bloco de verificação atual (linhas 96-117) por três verificações em sequência:
 
-RLS: admins da empresa podem CRUD.
+```text
+1. Cotação ativa (pendente ou aprovada) → retorna "cotação ativa já existe"
+2. Serviço recente (concluído/aguardando_aprovação nos últimos 3 dias) → retorna "serviço recente já existe"
+3. Cotação criada nas últimas 48h (qualquer status) → mantém comportamento atual
+```
 
-## Nova página: `src/pages/admin/FollowUp.tsx`
+Cada verificação retorna um JSON com `cotacao_existente: true` ou novo campo `servico_recente: true`, com mensagem explicativa, para o n8n saber o motivo.
 
-### Conteúdo da tabela
-Para cada cotação pendente, exibir:
-- Nome do cliente + telefone
-- Tipo de serviço
-- Data de criação da cotação (há quantos dias)
-- Quantidade de contatos já feitos
-- Data do último contato (ou "Nenhum contato")
-- Botões de ação:
-  - "Registrar Contato" — abre modal para anotar o tipo e observação
-  - "WhatsApp" — abre `wa.me/{telefone}` com mensagem pré-formatada
+## Resposta para o n8n
+- Cotação ativa: `{ sucesso: true, cotacao_existente: true, mensagem: "Cliente já tem cotação ativa (pendente/aprovada)..." }`
+- Serviço recente: `{ sucesso: true, servico_recente: true, mensagem: "Cliente tem serviço concluído nos últimos 3 dias..." }`
+- Cotação 48h: mantém igual
 
-### Filtros
-- Ordenar por: mais antigos primeiro, sem contato, menos contatos
-- Filtrar por: faixa de dias sem contato (ex: >7 dias, >15 dias, >30 dias)
-
-### Cards de resumo no topo
-- Total de pendentes
-- Sem nenhum contato
-- Último contato > 7 dias
-- Média de dias pendente
-
-## Navegação
-- Adicionar link "📞 Follow-Up" no sidebar do admin (desktop e mobile)
-- Adicionar rota `/admin/follow-up` no `App.tsx`
-
-## Arquivos envolvidos
-- Nova migration SQL (tabela `followup_contatos` + RLS)
-- `src/pages/admin/FollowUp.tsx` (nova página)
-- `src/App.tsx` (nova rota)
-- `src/components/layout/AdminLayout.tsx` (link no sidebar)
-- `src/components/layout/MobileAdminLayout.tsx` (link no menu mobile)
+## Arquivo envolvido
+- Nova migration SQL (apenas `CREATE OR REPLACE FUNCTION`)
+- Nenhuma alteração no edge function TypeScript (a resposta já é tratada genericamente)
 
