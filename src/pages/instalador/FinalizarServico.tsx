@@ -72,6 +72,8 @@ export default function FinalizarServico() {
   const [valorReembolso, setValorReembolso] = useState("");
   const [observacoes, setObservacoes] = useState("");
   const [comprimindo, setComprimindo] = useState(false);
+  const [recebimentoCliente, setRecebimentoCliente] = useState<'empresa' | 'instalador'>('empresa');
+  const [valorRecebidoCliente, setValorRecebidoCliente] = useState("");
 
   useEffect(() => {
     console.log("servicoId da URL:", servicoId);
