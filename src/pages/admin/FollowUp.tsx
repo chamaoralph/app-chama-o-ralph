@@ -26,11 +26,13 @@ interface CotacaoPendente {
     nome: string;
     telefone: string;
   };
+  descricao_servico: string | null;
   contatos: {
     id: string;
     tipo_contato: string;
     observacoes: string | null;
     created_at: string;
+    usuario_nome: string | null;
   }[];
 }
 
