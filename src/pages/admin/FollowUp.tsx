@@ -85,13 +85,16 @@ export default function FollowUp() {
       if (cotacaoIds.length > 0) {
         const { data: contatosData } = await supabase
           .from("followup_contatos")
-          .select("id, cotacao_id, tipo_contato, observacoes, created_at")
+          .select("id, cotacao_id, tipo_contato, observacoes, created_at, usuario_id, usuarios!followup_contatos_usuario_id_fkey(nome)")
           .in("cotacao_id", cotacaoIds)
           .order("created_at", { ascending: false });
 
         (contatosData || []).forEach((c: any) => {
           if (!contatosMap[c.cotacao_id]) contatosMap[c.cotacao_id] = [];
-          contatosMap[c.cotacao_id].push(c);
+          contatosMap[c.cotacao_id].push({
+            ...c,
+            usuario_nome: c.usuarios?.nome || null,
+          });
         });
       }
 
