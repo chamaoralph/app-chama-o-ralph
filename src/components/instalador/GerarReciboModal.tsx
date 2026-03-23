@@ -41,6 +41,8 @@ export function GerarReciboModal({
   const totalMaoObra = servicos.reduce((sum, s) => sum + s.valor_mao_obra_instalador, 0)
   const totalReembolso = servicos.reduce((sum, s) => sum + s.valor_reembolso_despesas, 0)
   const totalGeral = totalMaoObra + totalReembolso
+  const totalRecebidoCliente = servicos.reduce((sum, s) => sum + (s.valor_recebido_cliente || 0), 0)
+  const saldoLiquido = totalGeral - totalRecebidoCliente
 
   async function gerarImagem(): Promise<Blob | null> {
     const hiddenContainer = hiddenContainerRef.current
