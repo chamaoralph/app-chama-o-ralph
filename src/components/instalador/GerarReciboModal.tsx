@@ -15,6 +15,7 @@ interface ServicoRecibo {
   tipo_servico: string[]
   valor_mao_obra_instalador: number
   valor_reembolso_despesas: number
+  valor_recebido_cliente: number
 }
 
 interface GerarReciboModalProps {
