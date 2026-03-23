@@ -12,8 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
-import { Phone, MessageCircle, Clock, AlertTriangle, Users, PhoneCall, Search } from "lucide-react";
-import { formatDistanceToNow, differenceInDays } from "date-fns";
+import { Phone, MessageCircle, Clock, AlertTriangle, Users, PhoneCall, Search, Eye } from "lucide-react";
+import { formatDistanceToNow, differenceInDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface CotacaoPendente {
@@ -26,11 +26,13 @@ interface CotacaoPendente {
     nome: string;
     telefone: string;
   };
+  descricao_servico: string | null;
   contatos: {
     id: string;
     tipo_contato: string;
     observacoes: string | null;
     created_at: string;
+    usuario_nome: string | null;
   }[];
 }
 
@@ -44,6 +46,8 @@ export default function FollowUp() {
   const [cotacaoSelecionada, setCotacaoSelecionada] = useState<CotacaoPendente | null>(null);
   const [tipoContato, setTipoContato] = useState("whatsapp");
   const [observacoes, setObservacoes] = useState("");
+  const [detalhesOpen, setDetalhesOpen] = useState(false);
+  const [cotacaoDetalhes, setCotacaoDetalhes] = useState<CotacaoPendente | null>(null);
 
   // Fetch empresa_id
   const { data: empresaId } = useQuery({
@@ -66,7 +70,7 @@ export default function FollowUp() {
       const { data: cotacoesData, error } = await supabase
         .from("cotacoes")
         .select(`
-          id, created_at, tipo_servico, valor_estimado,
+          id, created_at, tipo_servico, valor_estimado, descricao_servico,
           clientes!cotacoes_cliente_id_fkey(id, nome, telefone)
         `)
         .eq("empresa_id", empresaId!)
@@ -81,13 +85,16 @@ export default function FollowUp() {
       if (cotacaoIds.length > 0) {
         const { data: contatosData } = await supabase
           .from("followup_contatos")
-          .select("id, cotacao_id, tipo_contato, observacoes, created_at")
+          .select("id, cotacao_id, tipo_contato, observacoes, created_at, usuario_id, usuarios!followup_contatos_usuario_id_fkey(nome)")
           .in("cotacao_id", cotacaoIds)
           .order("created_at", { ascending: false });
 
         (contatosData || []).forEach((c: any) => {
           if (!contatosMap[c.cotacao_id]) contatosMap[c.cotacao_id] = [];
-          contatosMap[c.cotacao_id].push(c);
+          contatosMap[c.cotacao_id].push({
+            ...c,
+            usuario_nome: c.usuarios?.nome || null,
+          });
         });
       }
 
@@ -96,6 +103,7 @@ export default function FollowUp() {
         created_at: c.created_at,
         tipo_servico: c.tipo_servico,
         valor_estimado: c.valor_estimado,
+        descricao_servico: c.descricao_servico,
         cliente: c.clientes,
         contatos: contatosMap[c.id] || [],
       })) as CotacaoPendente[];
@@ -359,6 +367,17 @@ export default function FollowUp() {
                                 size="sm"
                                 variant="outline"
                                 onClick={() => {
+                                  setCotacaoDetalhes(cotacao);
+                                  setDetalhesOpen(true);
+                                }}
+                                title="Ver detalhes"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
                                   setCotacaoSelecionada(cotacao);
                                   setModalOpen(true);
                                 }}
@@ -456,6 +475,70 @@ export default function FollowUp() {
               {registrarContato.isPending ? "Salvando..." : "Registrar"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Modal Ver Detalhes */}
+      <Dialog open={detalhesOpen} onOpenChange={setDetalhesOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Detalhes da Cotação</DialogTitle>
+          </DialogHeader>
+          {cotacaoDetalhes && (
+            <div className="space-y-4">
+              <div className="bg-muted p-4 rounded-lg space-y-1">
+                <p className="font-semibold text-lg">{cotacaoDetalhes.cliente?.nome}</p>
+                <p className="text-sm text-muted-foreground">{cotacaoDetalhes.cliente?.telefone}</p>
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {(cotacaoDetalhes.tipo_servico || []).map((t, i) => (
+                    <Badge key={i} variant="secondary">{t}</Badge>
+                  ))}
+                </div>
+                {cotacaoDetalhes.valor_estimado != null && (
+                  <p className="text-sm mt-1">
+                    Valor estimado: <span className="font-medium">R$ {cotacaoDetalhes.valor_estimado.toFixed(2)}</span>
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Criada em {format(new Date(cotacaoDetalhes.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                </p>
+              </div>
+
+              {cotacaoDetalhes.descricao_servico && (
+                <div>
+                  <p className="text-sm font-medium mb-1">Descrição</p>
+                  <p className="text-sm text-muted-foreground">{cotacaoDetalhes.descricao_servico}</p>
+                </div>
+              )}
+
+              <div>
+                <p className="text-sm font-medium mb-2">
+                  Histórico de contatos ({cotacaoDetalhes.contatos.length})
+                </p>
+                {cotacaoDetalhes.contatos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic">Nenhum contato registrado</p>
+                ) : (
+                  <div className="space-y-3 max-h-60 overflow-y-auto">
+                    {cotacaoDetalhes.contatos.map((c) => (
+                      <div key={c.id} className="border-l-2 border-primary/30 pl-3 py-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="outline" className="text-xs">{c.tipo_contato}</Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(c.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                          </span>
+                        </div>
+                        {c.usuario_nome && (
+                          <p className="text-xs text-muted-foreground mt-0.5">por {c.usuario_nome}</p>
+                        )}
+                        {c.observacoes && (
+                          <p className="text-sm text-muted-foreground mt-1">{c.observacoes}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </AdminLayout>
