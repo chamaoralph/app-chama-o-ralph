@@ -340,7 +340,13 @@ export default function ListaServicos() {
       : <ArrowDown className="w-4 h-4 ml-1" />
   }
 
-  const servicosOrdenados = [...servicos].sort((a, b) => {
+  const servicosFiltrados = servicos.filter((s) => {
+    if (filtroInstalador === "todos") return true
+    if (filtroInstalador === "sem_instalador") return s.instalador_id === null
+    return s.instalador_id === filtroInstalador
+  })
+
+  const servicosOrdenados = [...servicosFiltrados].sort((a, b) => {
     let comparison = 0
     
     switch (sortField) {
@@ -393,7 +399,7 @@ export default function ListaServicos() {
   return (
     <AdminLayout>
       <div>
-        <div className="flex justify-between items-center mb-6">
+        <div className={`flex ${isMobile ? 'flex-col gap-3' : 'justify-between items-center'} mb-6`}>
           <div>
             <h1 className={`font-bold text-foreground ${isMobile ? 'text-2xl' : 'text-3xl'}`}>Serviços</h1>
             {!isMobile && (
@@ -401,16 +407,34 @@ export default function ListaServicos() {
             )}
           </div>
           
-          {servicosSelecionados.size > 0 && (
-            <Button 
-              onClick={() => abrirModalAtribuicao(null)}
-              className="bg-purple-600 hover:bg-purple-700"
-              size={isMobile ? "sm" : "default"}
-            >
-              <Users className="w-4 h-4 mr-2" />
-              {isMobile ? `(${servicosSelecionados.size})` : `Definir Instalador (${servicosSelecionados.size})`}
-            </Button>
-          )}
+          <div className="flex items-center gap-3">
+            <div className={`flex items-center gap-2 ${isMobile ? '' : ''}`}>
+              <Label className="text-sm text-muted-foreground whitespace-nowrap">Instalador:</Label>
+              <Select value={filtroInstalador} onValueChange={setFiltroInstalador}>
+                <SelectTrigger className={isMobile ? "w-[180px]" : "w-[200px]"}>
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="sem_instalador">Sem instalador</SelectItem>
+                  {instaladores.map((inst) => (
+                    <SelectItem key={inst.id} value={inst.id}>{inst.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {servicosSelecionados.size > 0 && (
+              <Button 
+                onClick={() => abrirModalAtribuicao(null)}
+                className="bg-purple-600 hover:bg-purple-700"
+                size={isMobile ? "sm" : "default"}
+              >
+                <Users className="w-4 h-4 mr-2" />
+                {isMobile ? `(${servicosSelecionados.size})` : `Definir Instalador (${servicosSelecionados.size})`}
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Mobile: Cards */}
