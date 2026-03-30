@@ -75,6 +75,9 @@ export default function ListaServicos() {
   const [sortField, setSortField] = useState<SortField>('data_servico_agendada')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
+  // Estado para filtro por instalador
+  const [filtroInstalador, setFiltroInstalador] = useState<string>("todos")
+
   useEffect(() => {
     fetchServicos()
     fetchInstaladores()
