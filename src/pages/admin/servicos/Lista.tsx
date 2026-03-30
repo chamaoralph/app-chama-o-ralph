@@ -440,10 +440,10 @@ export default function ListaServicos() {
         {/* Mobile: Cards */}
         {isMobile ? (
           <div className="space-y-3">
-            {servicos.length === 0 ? (
+            {servicosFiltrados.length === 0 ? (
               <div className="bg-card rounded-lg p-8 text-center">
-                <p className="text-lg font-medium text-foreground">Nenhum serviço cadastrado</p>
-                <p className="text-sm text-muted-foreground mt-1">Confirme uma cotação para criar um serviço</p>
+                <p className="text-lg font-medium text-foreground">Nenhum serviço encontrado</p>
+                <p className="text-sm text-muted-foreground mt-1">{filtroInstalador !== "todos" ? "Nenhum serviço para este filtro" : "Confirme uma cotação para criar um serviço"}</p>
               </div>
             ) : (
               <>
