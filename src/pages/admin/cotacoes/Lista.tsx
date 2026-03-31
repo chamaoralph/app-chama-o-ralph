@@ -392,7 +392,7 @@ export default function ListaCotacoes() {
       if (erroServico) throw erroServico
 
       if (servico) {
-        const statusPermitidos = ['disponivel', 'solicitado', 'cancelado']
+        const statusPermitidos = ['disponivel', 'solicitado', 'atribuido', 'cancelado']
 
         if (!statusPermitidos.includes(servico.status || '')) {
           toast({
