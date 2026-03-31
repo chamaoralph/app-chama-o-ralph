@@ -383,25 +383,75 @@ export default function ListaCotacoes() {
 
   async function excluirCotacao(id: string) {
     try {
+      const { data: servico, error: erroServico } = await supabase
+        .from('servicos')
+        .select('id, status')
+        .eq('cotacao_id', id)
+        .maybeSingle()
+
+      if (erroServico) throw erroServico
+
+      if (servico) {
+        const statusPermitidos = ['disponivel', 'solicitado', 'cancelado']
+
+        if (!statusPermitidos.includes(servico.status || '')) {
+          toast({
+            title: 'Não é possível excluir',
+            description: `Esta cotação já gerou um serviço com status "${servico.status}". Remova ou reverta o serviço antes de excluir a cotação.`,
+            variant: 'destructive'
+          })
+          return
+        }
+
+        const { error: erroMovimentacoes } = await supabase
+          .from('movimentacoes_suportes')
+          .delete()
+          .eq('servico_id', servico.id)
+
+        if (erroMovimentacoes) throw erroMovimentacoes
+
+        const { error: erroLancamentos } = await supabase
+          .from('lancamentos_caixa')
+          .delete()
+          .eq('servico_id', servico.id)
+
+        if (erroLancamentos) throw erroLancamentos
+
+        const { error: erroDeletarServico } = await supabase
+          .from('servicos')
+          .delete()
+          .eq('id', servico.id)
+
+        if (erroDeletarServico) throw erroDeletarServico
+      }
+
       const { error } = await supabase
         .from('cotacoes')
         .delete()
         .eq('id', id)
-      
+
       if (error) throw error
-      
+
       toast({
-        title: "Cotação excluída",
-        description: "A cotação foi removida com sucesso.",
+        title: 'Cotação excluída',
+        description: servico
+          ? 'A cotação e o serviço vinculado foram removidos com sucesso.'
+          : 'A cotação foi removida com sucesso.',
       })
-      
+
       fetchCotacoes()
     } catch (err) {
       console.error('Erro ao excluir cotação:', err)
+
+      const mensagem =
+        typeof err === 'object' && err !== null && 'message' in err
+          ? String(err.message)
+          : 'Não foi possível excluir a cotação.'
+
       toast({
-        title: "Erro",
-        description: "Não foi possível excluir a cotação.",
-        variant: "destructive"
+        title: 'Erro',
+        description: mensagem,
+        variant: 'destructive'
       })
     }
   }
