@@ -1,18 +1,47 @@
 
 
-# Filtro por Instalador na página de Serviços
+# Correção: Não consegue excluir cotação
 
-## O que será feito
+## Problema
 
-Adicionar um dropdown de filtro por instalador na página `/admin/servicos`. A lista `instaladores` já é carregada no componente, então basta adicionar o estado do filtro e aplicá-lo antes da ordenação.
+A política de segurança (RLS) para deletar cotações exige que o usuário tenha a role `admin` na tabela `user_roles`. Porém, essa verificação usa a função `has_role()` que consulta a tabela `user_roles`.
 
-## Alterações em `src/pages/admin/servicos/Lista.tsx`
+Atualmente, apenas **1 usuário** tem a role `admin` na tabela `user_roles` (ID: `7c547e2c-...`). Se você está logado com outro usuário admin (ou se a tabela `usuarios` marca como `tipo = 'admin'` mas o `user_roles` não tem o registro correspondente), a exclusão é bloqueada silenciosamente pelo banco.
 
-1. **Novo estado**: `filtroInstalador` (string, default `"todos"`)
-2. **Filtro visual**: Um `Select` com as opções "Todos", "Sem instalador" e cada instalador ativo, posicionado ao lado do título/header
-3. **Lógica de filtragem**: Filtrar `servicos` antes da ordenação:
-   - `"todos"` → sem filtro
-   - `"sem_instalador"` → `instalador_id === null`
-   - UUID específico → `instalador_id === filtroInstalador`
-4. **Mobile**: Incluir o filtro também na versão mobile, acima dos cards de ordenação
+## Solução
+
+Alterar a política de DELETE para usar a mesma lógica das outras políticas (SELECT/UPDATE), que verificam `empresa_id` via tabela `usuarios`, em vez de exigir role na `user_roles`:
+
+```sql
+DROP POLICY "Admins podem deletar cotações da empresa" ON public.cotacoes;
+
+CREATE POLICY "Usuários podem deletar cotações da sua empresa"
+ON public.cotacoes FOR DELETE TO authenticated
+USING (
+  empresa_id IN (
+    SELECT empresa_id FROM usuarios WHERE id = auth.uid()
+  )
+);
+```
+
+Isso torna a exclusão consistente com as demais operações (SELECT, UPDATE) que já usam o mesmo padrão de `empresa_id`.
+
+## Alternativa mais restritiva
+
+Se quiser manter a exclusão apenas para admins, mas sem depender da tabela `user_roles`:
+
+```sql
+DROP POLICY "Admins podem deletar cotações da empresa" ON public.cotacoes;
+
+CREATE POLICY "Admins podem deletar cotações da empresa"
+ON public.cotacoes FOR DELETE TO authenticated
+USING (
+  empresa_id IN (
+    SELECT empresa_id FROM usuarios WHERE id = auth.uid() AND tipo = 'admin'
+  )
+);
+```
+
+## Arquivo alterado
+- Apenas uma migration SQL — nenhuma alteração de código necessária
 
