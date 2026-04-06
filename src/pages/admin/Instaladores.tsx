@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { AdminLayout } from '@/components/layout/AdminLayout'
 import { supabase } from '@/integrations/supabase/client'
-import { Users, UserCheck, UserX, Mail, Copy, Trash2, Plus, Clock, CheckCircle, XCircle } from 'lucide-react'
+import { Users, UserCheck, UserX, Mail, Copy, Trash2, Plus, Clock, CheckCircle, XCircle, ChevronLeft, ChevronRight, TrendingUp, Wrench, DollarSign } from 'lucide-react'
+import { startOfMonth, endOfMonth, format, subMonths, addMonths } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
