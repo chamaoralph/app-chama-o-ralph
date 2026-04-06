@@ -26,6 +26,7 @@ export default function Caixa() {
   
   // Total de instaladores baseado em recibos pagos (fonte única de verdade)
   const [totalInstaladoresRecibos, setTotalInstaladoresRecibos] = useState(0);
+  const [totalProjecao, setTotalProjecao] = useState(0);
 
   const alternarOrdenacao = (coluna: typeof ordenacao.coluna) => {
     setOrdenacao(prev => ({
@@ -45,6 +46,7 @@ export default function Caixa() {
     if (filtroMes) {
       carregarLancamentos();
       carregarTotalRecibos();
+      carregarProjecao();
     }
   }, [filtroMes]);
 
@@ -67,6 +69,28 @@ export default function Caixa() {
       setTotalInstaladoresRecibos(total);
     } catch (error) {
       console.error("Erro ao carregar total de recibos:", error);
+    }
+  }
+
+  async function carregarProjecao() {
+    try {
+      const [ano, mes] = filtroMes.split("-");
+      const primeiroDia = `${ano}-${mes}-01`;
+      const lastDay = new Date(Number(ano), Number(mes), 0).getDate();
+      const ultimoDia = `${ano}-${mes}-${String(lastDay).padStart(2, "0")}`;
+
+      const { data, error } = await supabase
+        .from("servicos")
+        .select("valor_total")
+        .gte("data_servico_agendada", primeiroDia)
+        .lte("data_servico_agendada", ultimoDia + "T23:59:59")
+        .not("status", "eq", "cancelado");
+
+      if (error) throw error;
+      const total = (data || []).reduce((sum, s) => sum + Number(s.valor_total), 0);
+      setTotalProjecao(total);
+    } catch (error) {
+      console.error("Erro ao carregar projeção:", error);
     }
   }
 
@@ -198,7 +222,12 @@ export default function Caixa() {
         </div>
 
         {/* Cards de Resumo */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-5 gap-4 mb-6">
+          <div className="bg-amber-50 border-2 border-amber-200 rounded-lg p-6">
+            <p className="text-sm text-amber-600 font-medium mb-1">PROJEÇÃO</p>
+            <p className="text-3xl font-bold text-amber-700">R$ {totalProjecao.toFixed(2)}</p>
+          </div>
+
           <div 
             onClick={() => setFiltroTipo(filtroTipo === "receitas" ? "todos" : "receitas")}
             className={`bg-green-50 border-2 rounded-lg p-6 cursor-pointer transition-all hover:shadow-lg ${
