@@ -55,6 +55,11 @@ export default function Instaladores() {
   const [historico, setHistorico] = useState<ServicoHistorico[]>([])
   const [loadingHistorico, setLoadingHistorico] = useState(false)
 
+  // Estado para Desempenho
+  const [mesDesempenho, setMesDesempenho] = useState(new Date())
+  const [desempenhoData, setDesempenhoData] = useState<{ instalador_id: string; nome: string; total_servicos: number; receita: number; mao_obra: number }[]>([])
+  const [loadingDesempenho, setLoadingDesempenho] = useState(false)
+
   // Estado para Convites
   const [convites, setConvites] = useState<Convite[]>([])
   const [loadingConvites, setLoadingConvites] = useState(false)
