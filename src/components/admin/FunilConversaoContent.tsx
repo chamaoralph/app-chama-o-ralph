@@ -426,6 +426,9 @@ export function FunilConversaoContent() {
               <div>
                 <p className="text-blue-100 text-xs">Investimento</p>
                 <p className="text-lg font-bold">{formatCurrency(funnelData.investimento)}</p>
+                <p className="text-blue-200 text-[10px] mt-0.5">
+                  {fonteInvestimento === "google_ads" ? "📡 Google Ads" : "📝 Lançamentos manuais"}
+                </p>
               </div>
               <DollarSign className="h-8 w-8 opacity-80" />
             </div>
