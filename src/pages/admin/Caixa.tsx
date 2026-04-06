@@ -72,6 +72,28 @@ export default function Caixa() {
     }
   }
 
+  async function carregarProjecao() {
+    try {
+      const [ano, mes] = filtroMes.split("-");
+      const primeiroDia = `${ano}-${mes}-01`;
+      const lastDay = new Date(Number(ano), Number(mes), 0).getDate();
+      const ultimoDia = `${ano}-${mes}-${String(lastDay).padStart(2, "0")}`;
+
+      const { data, error } = await supabase
+        .from("servicos")
+        .select("valor_total")
+        .gte("data_servico_agendada", primeiroDia)
+        .lte("data_servico_agendada", ultimoDia + "T23:59:59")
+        .not("status", "eq", "cancelado");
+
+      if (error) throw error;
+      const total = (data || []).reduce((sum, s) => sum + Number(s.valor_total), 0);
+      setTotalProjecao(total);
+    } catch (error) {
+      console.error("Erro ao carregar projeção:", error);
+    }
+  }
+
   async function carregarLancamentos() {
     setLoading(true);
     try {
