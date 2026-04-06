@@ -46,6 +46,7 @@ export default function Caixa() {
     if (filtroMes) {
       carregarLancamentos();
       carregarTotalRecibos();
+      carregarProjecao();
     }
   }, [filtroMes]);
 
