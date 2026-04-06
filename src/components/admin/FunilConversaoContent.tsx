@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, eachDayOfInterval, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { TrendingUp, Users, Target, DollarSign, ArrowDown, Percent, CalendarIcon, Receipt, MousePointerClick, Eye, BarChart3, RefreshCw, Clock } from "lucide-react";
+import { TrendingUp, Users, Target, DollarSign, ArrowDown, Percent, CalendarIcon, Receipt, MousePointerClick, Eye, BarChart3, RefreshCw, Clock, CheckCircle2 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -134,6 +134,7 @@ export function FunilConversaoContent() {
   });
   const [dailyData, setDailyData] = useState<DailyData[]>([]);
   const [cotacoesTimestamps, setCotacoesTimestamps] = useState<string[]>([]);
+  const [conversoesGoogle, setConversoesGoogle] = useState<number>(0);
   const [mesSelecionado, setMesSelecionado] = useState<string>("");
   const [origemFiltro, setOrigemFiltro] = useState<string>("todos");
 
@@ -220,6 +221,10 @@ export function FunilConversaoContent() {
       }
 
       setFonteInvestimento(usandoGoogleAds ? "google_ads" : "manual");
+
+      // Conversões reportadas pelo Google Ads
+      const totalConversoesGoogle = adsMetrics?.reduce((sum, m) => sum + Number(m.conversions || 0), 0) || 0;
+      setConversoesGoogle(Math.round(totalConversoesGoogle * 100) / 100);
 
       // Leads & conversions
       let cotacoesQuery = supabase
@@ -419,7 +424,7 @@ export function FunilConversaoContent() {
       </Card>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-9 gap-4">
         <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -470,6 +475,23 @@ export function FunilConversaoContent() {
             </div>
           </CardContent>
         </Card>
+
+        {conversoesGoogle > 0 && (
+          <Card className="bg-gradient-to-br from-violet-500 to-violet-600 text-white">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-violet-100 text-xs">Conv. Google</p>
+                  <p className="text-lg font-bold">{conversoesGoogle.toFixed(0)}</p>
+                  <p className="text-violet-200 text-[10px] mt-0.5">
+                    {funnelData.leads > 0 ? `${((funnelData.leads / conversoesGoogle) * 100).toFixed(0)}% confirmados` : "—"}
+                  </p>
+                </div>
+                <CheckCircle2 className="h-8 w-8 opacity-80" />
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
           <CardContent className="p-4">
@@ -530,18 +552,39 @@ export function FunilConversaoContent() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center space-y-4">
+            {conversoesGoogle > 0 && (
+              <>
+                <div className="w-full max-w-lg">
+                  <div className="bg-violet-500 text-white p-6 rounded-t-lg text-center">
+                    <p className="text-lg font-semibold">Conversões Google Ads</p>
+                    <p className="text-4xl font-bold">{conversoesGoogle.toFixed(0)}</p>
+                    <p className="text-violet-200 text-xs mt-1">Reportadas pelo Google</p>
+                  </div>
+                </div>
+                <ArrowDown className="h-8 w-8 text-muted-foreground" />
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <CheckCircle2 className="h-5 w-5" />
+                  <span className="font-semibold">
+                    {conversoesGoogle > 0
+                      ? `${((funnelData.leads / conversoesGoogle) * 100).toFixed(0)}% confirmados no sistema`
+                      : "—"}
+                  </span>
+                </div>
+                <ArrowDown className="h-8 w-8 text-muted-foreground" />
+              </>
+            )}
             <div className="w-full max-w-md">
               <div className="bg-blue-500 text-white p-6 rounded-t-lg text-center">
                 <p className="text-lg font-semibold">Leads (Cotações)</p>
                 <p className="text-4xl font-bold">{funnelData.leads}</p>
               </div>
             </div>
-            <ArrowDown className="h-8 w-8 text-gray-400" />
-            <div className="flex items-center gap-2 text-gray-600">
+            <ArrowDown className="h-8 w-8 text-muted-foreground" />
+            <div className="flex items-center gap-2 text-muted-foreground">
               <Percent className="h-5 w-5" />
               <span className="font-semibold">{funnelData.taxaConversao.toFixed(1)}% de conversão</span>
             </div>
-            <ArrowDown className="h-8 w-8 text-gray-400" />
+            <ArrowDown className="h-8 w-8 text-muted-foreground" />
             <div className="w-full max-w-sm">
               <div className="bg-green-500 text-white p-6 rounded-lg text-center">
                 <p className="text-lg font-semibold">Serviços Agendados</p>
