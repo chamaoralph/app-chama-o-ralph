@@ -144,6 +144,67 @@ export default function Instaladores() {
       })
     } finally {
       setLoading(false)
+  }
+
+  async function carregarDesempenho() {
+    try {
+      setLoadingDesempenho(true)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: userData } = await supabase
+        .from('usuarios')
+        .select('empresa_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!userData) return
+
+      const inicio = format(startOfMonth(mesDesempenho), 'yyyy-MM-dd')
+      const fim = format(endOfMonth(mesDesempenho), 'yyyy-MM-dd')
+
+      const { data: servicos, error } = await supabase
+        .from('servicos')
+        .select('instalador_id, valor_total, valor_mao_obra_instalador')
+        .eq('empresa_id', userData.empresa_id)
+        .eq('status', 'concluido')
+        .gte('data_servico_agendada', `${inicio}T00:00:00`)
+        .lte('data_servico_agendada', `${fim}T23:59:59`)
+
+      if (error) throw error
+
+      // Buscar nomes dos instaladores
+      const { data: instaladoresData } = await supabase
+        .from('usuarios')
+        .select('id, nome')
+        .eq('tipo', 'instalador')
+        .eq('empresa_id', userData.empresa_id)
+
+      const nomesMap = new Map((instaladoresData || []).map(i => [i.id, i.nome]))
+
+      // Agrupar por instalador
+      const agrupado = new Map<string, { total_servicos: number; receita: number; mao_obra: number }>()
+
+      for (const s of servicos || []) {
+        if (!s.instalador_id) continue
+        const atual = agrupado.get(s.instalador_id) || { total_servicos: 0, receita: 0, mao_obra: 0 }
+        atual.total_servicos += 1
+        atual.receita += s.valor_total || 0
+        atual.mao_obra += s.valor_mao_obra_instalador || 0
+        agrupado.set(s.instalador_id, atual)
+      }
+
+      const resultado = Array.from(agrupado.entries()).map(([id, dados]) => ({
+        instalador_id: id,
+        nome: nomesMap.get(id) || 'Desconhecido',
+        ...dados
+      })).sort((a, b) => b.receita - a.receita)
+
+      setDesempenhoData(resultado)
+    } catch (error) {
+      console.error('Erro ao carregar desempenho:', error)
+    } finally {
+      setLoadingDesempenho(false)
     }
   }
 
