@@ -1,46 +1,30 @@
 
 
-# Adicionar camada "Conversões Google" no topo do Funil
+# Adicionar card "Projeção" na página Caixa
 
 ## O que será feito
-Adicionar uma nova camada no topo do funil visual mostrando as **conversões que o Google Ads reporta** (`conversions` da tabela `google_ads_metrics`), acima da camada de "Leads (Cotações)" que já existe. Isso permite comparar:
+Adicionar um novo card **"PROJEÇÃO"** antes do card de Receitas, mostrando a soma do `valor_total` de todos os serviços agendados no mês selecionado (tabela `servicos`, status que indica agendamento ativo).
 
-- **Conversões Google**: o que o Google diz que converteu
-- **Leads (Cotações Google)**: o que você de fato registrou no sistema como vindo do Google
-
-## Mudanças no funil visual (de cima para baixo)
+## Mudanças visuais
 
 ```text
-┌─────────────────────────────────┐
-│   Conversões Google Ads: 15     │  ← NOVA (dados do Google)
-└─────────────────────────────────┘
-              ↓
-┌───────────────────────────────┐
-│   Leads (Cotações): 12        │  ← já existe
-└───────────────────────────────┘
-              ↓
-        Taxa de conversão
-              ↓
-┌─────────────────────────────┐
-│   Serviços Agendados: 8    │  ← já existe
-└─────────────────────────────┘
-              ↓
-┌───────────────────────────┐
-│   Receita Gerada: R$X     │  ← já existe
-└───────────────────────────┘
+┌──────────┬──────────┬──────────────┬──────────────┬────────┐
+│ PROJEÇÃO │ RECEITAS │ DESP. GERAIS │ INSTALADORES │ SALDO  │
+│ R$ X     │ R$ X     │ R$ X         │ R$ X         │ R$ X   │
+└──────────┴──────────┴──────────────┴──────────────┴────────┘
 ```
 
-Entre "Conversões Google" e "Leads" será exibida a **taxa de confirmação** (ex: "80% confirmados no sistema"), para você ver quanto do que o Google reporta de fato virou cotação registrada.
+O grid passa de 4 para 5 colunas. O card de Projeção terá fundo amarelo/âmbar para diferenciar.
 
 ## Arquivo alterado
-- `src/components/admin/FunilConversaoContent.tsx`
-  - Somar `conversions` do `google_ads_metrics` no período e guardar em novo estado `conversoesGoogle`
-  - Adicionar bloco visual roxo/violeta no topo do funil com o total de conversões do Google
-  - Mostrar taxa de confirmação (leads / conversoesGoogle) entre as duas primeiras camadas
-  - Adicionar card de KPI "Conversões Google" na linha de cards superior
+- `src/pages/admin/Caixa.tsx`
+  - Novo estado `totalProjecao`
+  - Nova função `carregarProjecao()` que consulta `servicos` onde `data_servico_agendada` está no mês selecionado e status indica serviço ativo (ex: `disponivel`, `atribuido`, `solicitado`, `em_andamento`, `aguardando_aprovacao` — ou seja, não cancelado/concluído), somando `valor_total`
+  - Chamar `carregarProjecao()` junto com os outros loads quando `filtroMes` muda
+  - Inserir o card antes do card de Receitas no grid, mudando para `grid-cols-5`
 
 ## Detalhes técnicos
-- Campo `conversions` já existe na tabela `google_ads_metrics` e já é populado pelo webhook
+- Query: `supabase.from("servicos").select("valor_total").gte("data_servico_agendada", primeiroDia).lte("data_servico_agendada", ultimoDia).not("status", "in", "(cancelado)")`
+- Isso inclui serviços já concluídos + os pendentes, dando a projeção total do mês
 - Nenhuma migration necessária
-- A nova camada só aparece quando há dados de conversões do Google (> 0)
 
