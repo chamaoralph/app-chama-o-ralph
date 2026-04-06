@@ -476,6 +476,23 @@ export function FunilConversaoContent() {
           </CardContent>
         </Card>
 
+        {conversoesGoogle > 0 && (
+          <Card className="bg-gradient-to-br from-violet-500 to-violet-600 text-white">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-violet-100 text-xs">Conv. Google</p>
+                  <p className="text-lg font-bold">{conversoesGoogle.toFixed(0)}</p>
+                  <p className="text-violet-200 text-[10px] mt-0.5">
+                    {funnelData.leads > 0 ? `${((funnelData.leads / conversoesGoogle) * 100).toFixed(0)}% confirmados` : "—"}
+                  </p>
+                </div>
+                <CheckCircle2 className="h-8 w-8 opacity-80" />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
