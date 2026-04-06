@@ -26,6 +26,7 @@ export default function Caixa() {
   
   // Total de instaladores baseado em recibos pagos (fonte única de verdade)
   const [totalInstaladoresRecibos, setTotalInstaladoresRecibos] = useState(0);
+  const [totalProjecao, setTotalProjecao] = useState(0);
 
   const alternarOrdenacao = (coluna: typeof ordenacao.coluna) => {
     setOrdenacao(prev => ({
