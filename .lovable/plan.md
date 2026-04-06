@@ -1,27 +1,46 @@
 
 
-# Usar investimento real do Google Ads no Funil de Marketing
-
-## Situação atual
-- O funil já busca **cliques e impressões** da tabela `google_ads_metrics`
-- Mas o **investimento** vem de `lancamentos_caixa` (lançamentos manuais com categoria "marketing/google")
-- A tabela `google_ads_metrics` já recebe `cost_micros` do Google Ads via webhook — dado que hoje é ignorado no cálculo
+# Adicionar camada "Conversões Google" no topo do Funil
 
 ## O que será feito
-Alterar o `FunilConversaoContent.tsx` para usar `cost_micros` da `google_ads_metrics` como fonte primária de investimento, com fallback para os lançamentos manuais caso não haja dados do Google Ads.
+Adicionar uma nova camada no topo do funil visual mostrando as **conversões que o Google Ads reporta** (`conversions` da tabela `google_ads_metrics`), acima da camada de "Leads (Cotações)" que já existe. Isso permite comparar:
 
-Mudanças específicas:
-1. **Investimento total**: somar `cost_micros` de todos os dias do período e converter para reais (dividir por 1.000.000)
-2. **Investimento diário**: no gráfico diário, usar `cost_micros` do dia convertido em vez do valor manual
-3. **Fallback**: se não houver dados em `google_ads_metrics` para o período, manter o comportamento atual (lancamentos_caixa)
-4. **Indicador visual**: mostrar de onde vem o dado de investimento ("Google Ads" ou "Lançamentos manuais") para o usuário saber a fonte
+- **Conversões Google**: o que o Google diz que converteu
+- **Leads (Cotações Google)**: o que você de fato registrou no sistema como vindo do Google
+
+## Mudanças no funil visual (de cima para baixo)
+
+```text
+┌─────────────────────────────────┐
+│   Conversões Google Ads: 15     │  ← NOVA (dados do Google)
+└─────────────────────────────────┘
+              ↓
+┌───────────────────────────────┐
+│   Leads (Cotações): 12        │  ← já existe
+└───────────────────────────────┘
+              ↓
+        Taxa de conversão
+              ↓
+┌─────────────────────────────┐
+│   Serviços Agendados: 8    │  ← já existe
+└─────────────────────────────┘
+              ↓
+┌───────────────────────────┐
+│   Receita Gerada: R$X     │  ← já existe
+└───────────────────────────┘
+```
+
+Entre "Conversões Google" e "Leads" será exibida a **taxa de confirmação** (ex: "80% confirmados no sistema"), para você ver quanto do que o Google reporta de fato virou cotação registrada.
 
 ## Arquivo alterado
-- `src/components/admin/FunilConversaoContent.tsx` — trocar fonte de investimento para `cost_micros` com fallback
+- `src/components/admin/FunilConversaoContent.tsx`
+  - Somar `conversions` do `google_ads_metrics` no período e guardar em novo estado `conversoesGoogle`
+  - Adicionar bloco visual roxo/violeta no topo do funil com o total de conversões do Google
+  - Mostrar taxa de confirmação (leads / conversoesGoogle) entre as duas primeiras camadas
+  - Adicionar card de KPI "Conversões Google" na linha de cards superior
 
 ## Detalhes técnicos
-- `cost_micros` do Google Ads = valor em micros (1.000.000 = R$ 1,00)
-- Conversão: `investimento = cost_micros / 1_000_000`
-- Todos os KPIs derivados (CPL, CPC, ROAS) serão automaticamente recalculados pois dependem da variável `investimento`
-- Nenhuma migration necessária — dados já existem na tabela
+- Campo `conversions` já existe na tabela `google_ads_metrics` e já é populado pelo webhook
+- Nenhuma migration necessária
+- A nova camada só aparece quando há dados de conversões do Google (> 0)
 
