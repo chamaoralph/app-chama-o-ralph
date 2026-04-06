@@ -280,15 +280,14 @@ export function FunilConversaoContent() {
         let dayClicks = 0;
         let dayImpressions = 0;
 
-        // Investment from caixa
-        const dayDespesas = despesasMarketing.filter(d => d.data_lancamento === dayStr);
-        dayInvestimento = dayDespesas.reduce((sum, d) => sum + Number(d.valor), 0);
-
-        // Engagement from Google Ads
+        // Engagement + investment from Google Ads
         if (adsMetrics && adsMetrics.length > 0) {
           const dayAds = adsMetrics.filter(m => m.data === dayStr);
           dayClicks = dayAds.reduce((sum, m) => sum + (m.clicks || 0), 0);
           dayImpressions = dayAds.reduce((sum, m) => sum + (m.impressions || 0), 0);
+          if (usandoGoogleAds) {
+            dayInvestimento = dayAds.reduce((sum, m) => sum + Number(m.cost_micros || 0), 0) / 1_000_000;
+          }
         }
 
         const dayLeads = cotacoes?.filter(c =>
