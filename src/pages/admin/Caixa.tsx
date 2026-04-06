@@ -222,7 +222,12 @@ export default function Caixa() {
         </div>
 
         {/* Cards de Resumo */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-5 gap-4 mb-6">
+          <div className="bg-amber-50 border-2 border-amber-200 rounded-lg p-6">
+            <p className="text-sm text-amber-600 font-medium mb-1">PROJEÇÃO</p>
+            <p className="text-3xl font-bold text-amber-700">R$ {totalProjecao.toFixed(2)}</p>
+          </div>
+
           <div 
             onClick={() => setFiltroTipo(filtroTipo === "receitas" ? "todos" : "receitas")}
             className={`bg-green-50 border-2 rounded-lg p-6 cursor-pointer transition-all hover:shadow-lg ${
