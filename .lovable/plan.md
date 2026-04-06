@@ -1,47 +1,37 @@
 
 
-# Correção: Não consegue excluir cotação
+# Aba "Desempenho Mensal" na página Instaladores
 
-## Problema
+## O que será feito
 
-A política de segurança (RLS) para deletar cotações exige que o usuário tenha a role `admin` na tabela `user_roles`. Porém, essa verificação usa a função `has_role()` que consulta a tabela `user_roles`.
+Adicionar uma nova aba **"Desempenho"** na página de Gestão de Instaladores (`/admin/instaladores`), ao lado das abas Lista, Pagamentos e Convites.
 
-Atualmente, apenas **1 usuário** tem a role `admin` na tabela `user_roles` (ID: `7c547e2c-...`). Se você está logado com outro usuário admin (ou se a tabela `usuarios` marca como `tipo = 'admin'` mas o `user_roles` não tem o registro correspondente), a exclusão é bloqueada silenciosamente pelo banco.
+Essa aba mostrará, para o mês selecionado:
+- Uma tabela com cada instalador, quantidade de serviços concluidos, e receita total gerada (valor_total dos servicos)
+- Seletor de mês/ano para navegar entre meses
+- Totais gerais no rodape da tabela
+- Cards de resumo no topo (total de servicos do mes, receita total, media por instalador)
 
-## Solução
+## Dados utilizados
 
-Alterar a política de DELETE para usar a mesma lógica das outras políticas (SELECT/UPDATE), que verificam `empresa_id` via tabela `usuarios`, em vez de exigir role na `user_roles`:
+Consulta na tabela `servicos` filtrando por:
+- `status = 'concluido'`
+- `data_servico_agendada` dentro do mes selecionado
+- `empresa_id` do usuario logado
+- Agrupado por `instalador_id`, com JOIN na tabela `usuarios` para pegar o nome
 
-```sql
-DROP POLICY "Admins podem deletar cotações da empresa" ON public.cotacoes;
-
-CREATE POLICY "Usuários podem deletar cotações da sua empresa"
-ON public.cotacoes FOR DELETE TO authenticated
-USING (
-  empresa_id IN (
-    SELECT empresa_id FROM usuarios WHERE id = auth.uid()
-  )
-);
-```
-
-Isso torna a exclusão consistente com as demais operações (SELECT, UPDATE) que já usam o mesmo padrão de `empresa_id`.
-
-## Alternativa mais restritiva
-
-Se quiser manter a exclusão apenas para admins, mas sem depender da tabela `user_roles`:
-
-```sql
-DROP POLICY "Admins podem deletar cotações da empresa" ON public.cotacoes;
-
-CREATE POLICY "Admins podem deletar cotações da empresa"
-ON public.cotacoes FOR DELETE TO authenticated
-USING (
-  empresa_id IN (
-    SELECT empresa_id FROM usuarios WHERE id = auth.uid() AND tipo = 'admin'
-  )
-);
-```
+Colunas exibidas:
+| Instalador | Servicos Concluidos | Receita Gerada (valor_total) | Mao de Obra (valor_mao_obra_instalador) |
+|---|---|---|---|
 
 ## Arquivo alterado
-- Apenas uma migration SQL — nenhuma alteração de código necessária
+
+- `src/pages/admin/Instaladores.tsx` — adicionar a aba "Desempenho" com o componente inline ou extraido
+
+## Detalhes tecnicos
+
+- Reutilizar o layout de Tabs existente (grid-cols-3 vira grid-cols-4)
+- Seletor de mes usando inputs nativos ou botoes prev/next
+- Query unica com `.eq('status', 'concluido')` e filtro por range de datas do mes
+- Nenhuma migration necessaria — dados ja existem
 
