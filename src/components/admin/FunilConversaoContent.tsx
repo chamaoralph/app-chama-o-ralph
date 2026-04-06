@@ -122,6 +122,7 @@ export function FunilConversaoContent() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
+  const [fonteInvestimento, setFonteInvestimento] = useState<"google_ads" | "manual">("manual");
   const [dataInicio, setDataInicio] = useState<Date>(
     new Date(new Date().getFullYear(), new Date().getMonth(), 1)
   );
@@ -167,25 +168,7 @@ export function FunilConversaoContent() {
       const dataInicioStr = format(dataInicio, "yyyy-MM-dd");
       const dataFimStr = format(dataFim, "yyyy-MM-dd");
 
-      // Fetch investment from lancamentos_caixa (real money spent)
-      const { data: despesas, error: erroDespesas } = await supabase
-        .from("lancamentos_caixa")
-        .select("valor, data_lancamento, categoria, descricao")
-        .eq("tipo", "despesa")
-        .gte("data_lancamento", dataInicioStr)
-        .lte("data_lancamento", dataFimStr);
-
-      if (erroDespesas) throw erroDespesas;
-
-      const despesasMarketing = despesas?.filter(d =>
-        d.categoria?.toLowerCase().includes('marketing') ||
-        d.categoria?.toLowerCase().includes('google') ||
-        d.descricao?.toLowerCase().includes('google')
-      ) || [];
-
-      let investimento = despesasMarketing.reduce((sum, d) => sum + Number(d.valor), 0);
-
-      // Fetch Google Ads metrics (engagement only: clicks, impressions)
+      // Fetch Google Ads metrics (cost, clicks, impressions)
       const { data: adsMetrics, error: erroAds } = await supabase
         .from("google_ads_metrics")
         .select("*")
@@ -196,10 +179,18 @@ export function FunilConversaoContent() {
 
       let totalClicks = 0;
       let totalImpressions = 0;
+      let investimento = 0;
+      let usandoGoogleAds = false;
 
       if (adsMetrics && adsMetrics.length > 0) {
         totalClicks = adsMetrics.reduce((sum, m) => sum + (m.clicks || 0), 0);
         totalImpressions = adsMetrics.reduce((sum, m) => sum + (m.impressions || 0), 0);
+        
+        const totalCostMicros = adsMetrics.reduce((sum, m) => sum + Number(m.cost_micros || 0), 0);
+        if (totalCostMicros > 0) {
+          investimento = totalCostMicros / 1_000_000;
+          usandoGoogleAds = true;
+        }
 
         const maxSync = adsMetrics.reduce((max, m) => {
           const s = m.synced_at;
@@ -207,6 +198,28 @@ export function FunilConversaoContent() {
         }, "");
         if (maxSync) setLastSync(maxSync);
       }
+
+      // Fallback: se não tem custo do Google Ads, usar lancamentos_caixa
+      if (!usandoGoogleAds) {
+        const { data: despesas, error: erroDespesas } = await supabase
+          .from("lancamentos_caixa")
+          .select("valor, data_lancamento, categoria, descricao")
+          .eq("tipo", "despesa")
+          .gte("data_lancamento", dataInicioStr)
+          .lte("data_lancamento", dataFimStr);
+
+        if (erroDespesas) throw erroDespesas;
+
+        const despesasMarketing = despesas?.filter(d =>
+          d.categoria?.toLowerCase().includes('marketing') ||
+          d.categoria?.toLowerCase().includes('google') ||
+          d.descricao?.toLowerCase().includes('google')
+        ) || [];
+
+        investimento = despesasMarketing.reduce((sum, d) => sum + Number(d.valor), 0);
+      }
+
+      setFonteInvestimento(usandoGoogleAds ? "google_ads" : "manual");
 
       // Leads & conversions
       let cotacoesQuery = supabase
@@ -267,15 +280,14 @@ export function FunilConversaoContent() {
         let dayClicks = 0;
         let dayImpressions = 0;
 
-        // Investment from caixa
-        const dayDespesas = despesasMarketing.filter(d => d.data_lancamento === dayStr);
-        dayInvestimento = dayDespesas.reduce((sum, d) => sum + Number(d.valor), 0);
-
-        // Engagement from Google Ads
+        // Engagement + investment from Google Ads
         if (adsMetrics && adsMetrics.length > 0) {
           const dayAds = adsMetrics.filter(m => m.data === dayStr);
           dayClicks = dayAds.reduce((sum, m) => sum + (m.clicks || 0), 0);
           dayImpressions = dayAds.reduce((sum, m) => sum + (m.impressions || 0), 0);
+          if (usandoGoogleAds) {
+            dayInvestimento = dayAds.reduce((sum, m) => sum + Number(m.cost_micros || 0), 0) / 1_000_000;
+          }
         }
 
         const dayLeads = cotacoes?.filter(c =>
@@ -414,6 +426,9 @@ export function FunilConversaoContent() {
               <div>
                 <p className="text-blue-100 text-xs">Investimento</p>
                 <p className="text-lg font-bold">{formatCurrency(funnelData.investimento)}</p>
+                <p className="text-blue-200 text-[10px] mt-0.5">
+                  {fonteInvestimento === "google_ads" ? "📡 Google Ads" : "📝 Lançamentos manuais"}
+                </p>
               </div>
               <DollarSign className="h-8 w-8 opacity-80" />
             </div>
