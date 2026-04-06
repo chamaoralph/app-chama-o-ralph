@@ -563,11 +563,11 @@ export function FunilConversaoContent() {
               </div>
             </div>
             <ArrowDown className="h-8 w-8 text-muted-foreground" />
-            <div className="flex items-center gap-2 text-gray-600">
+            <div className="flex items-center gap-2 text-muted-foreground">
               <Percent className="h-5 w-5" />
               <span className="font-semibold">{funnelData.taxaConversao.toFixed(1)}% de conversão</span>
             </div>
-            <ArrowDown className="h-8 w-8 text-gray-400" />
+            <ArrowDown className="h-8 w-8 text-muted-foreground" />
             <div className="w-full max-w-sm">
               <div className="bg-green-500 text-white p-6 rounded-lg text-center">
                 <p className="text-lg font-semibold">Serviços Agendados</p>
