@@ -421,8 +421,9 @@ export default function Instaladores() {
         <h1 className="text-3xl font-bold">👷 Gestão de Instaladores</h1>
 
         <Tabs defaultValue="lista" className="w-full">
-          <TabsList className="grid w-full max-w-lg grid-cols-3">
+          <TabsList className="grid w-full max-w-2xl grid-cols-4">
             <TabsTrigger value="lista">Lista</TabsTrigger>
+            <TabsTrigger value="desempenho">Desempenho</TabsTrigger>
             <TabsTrigger value="pagamentos">Pagamentos</TabsTrigger>
             <TabsTrigger value="convites" className="flex items-center gap-1">
               Convites
