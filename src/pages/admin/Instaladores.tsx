@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { AdminLayout } from '@/components/layout/AdminLayout'
 import { supabase } from '@/integrations/supabase/client'
-import { Users, UserCheck, UserX, Mail, Copy, Trash2, Plus, Clock, CheckCircle, XCircle } from 'lucide-react'
+import { Users, UserCheck, UserX, Mail, Copy, Trash2, Plus, Clock, CheckCircle, XCircle, ChevronLeft, ChevronRight, TrendingUp, Wrench, DollarSign } from 'lucide-react'
+import { startOfMonth, endOfMonth, format, subMonths, addMonths } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -53,6 +55,11 @@ export default function Instaladores() {
   const [historico, setHistorico] = useState<ServicoHistorico[]>([])
   const [loadingHistorico, setLoadingHistorico] = useState(false)
 
+  // Estado para Desempenho
+  const [mesDesempenho, setMesDesempenho] = useState(new Date())
+  const [desempenhoData, setDesempenhoData] = useState<{ instalador_id: string; nome: string; total_servicos: number; receita: number; mao_obra: number }[]>([])
+  const [loadingDesempenho, setLoadingDesempenho] = useState(false)
+
   // Estado para Convites
   const [convites, setConvites] = useState<Convite[]>([])
   const [loadingConvites, setLoadingConvites] = useState(false)
@@ -74,6 +81,10 @@ export default function Instaladores() {
     carregarInstaladores()
     carregarConvites()
   }, [])
+
+  useEffect(() => {
+    carregarDesempenho()
+  }, [mesDesempenho])
 
   async function carregarInstaladores() {
     try {
@@ -133,6 +144,67 @@ export default function Instaladores() {
       })
     } finally {
       setLoading(false)
+    }
+  }
+  async function carregarDesempenho() {
+    try {
+      setLoadingDesempenho(true)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: userData } = await supabase
+        .from('usuarios')
+        .select('empresa_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!userData) return
+
+      const inicio = format(startOfMonth(mesDesempenho), 'yyyy-MM-dd')
+      const fim = format(endOfMonth(mesDesempenho), 'yyyy-MM-dd')
+
+      const { data: servicos, error } = await supabase
+        .from('servicos')
+        .select('instalador_id, valor_total, valor_mao_obra_instalador')
+        .eq('empresa_id', userData.empresa_id)
+        .eq('status', 'concluido')
+        .gte('data_servico_agendada', `${inicio}T00:00:00`)
+        .lte('data_servico_agendada', `${fim}T23:59:59`)
+
+      if (error) throw error
+
+      // Buscar nomes dos instaladores
+      const { data: instaladoresData } = await supabase
+        .from('usuarios')
+        .select('id, nome')
+        .eq('tipo', 'instalador')
+        .eq('empresa_id', userData.empresa_id)
+
+      const nomesMap = new Map((instaladoresData || []).map(i => [i.id, i.nome]))
+
+      // Agrupar por instalador
+      const agrupado = new Map<string, { total_servicos: number; receita: number; mao_obra: number }>()
+
+      for (const s of servicos || []) {
+        if (!s.instalador_id) continue
+        const atual = agrupado.get(s.instalador_id) || { total_servicos: 0, receita: 0, mao_obra: 0 }
+        atual.total_servicos += 1
+        atual.receita += s.valor_total || 0
+        atual.mao_obra += s.valor_mao_obra_instalador || 0
+        agrupado.set(s.instalador_id, atual)
+      }
+
+      const resultado = Array.from(agrupado.entries()).map(([id, dados]) => ({
+        instalador_id: id,
+        nome: nomesMap.get(id) || 'Desconhecido',
+        ...dados
+      })).sort((a, b) => b.receita - a.receita)
+
+      setDesempenhoData(resultado)
+    } catch (error) {
+      console.error('Erro ao carregar desempenho:', error)
+    } finally {
+      setLoadingDesempenho(false)
     }
   }
 
@@ -349,8 +421,9 @@ export default function Instaladores() {
         <h1 className="text-3xl font-bold">👷 Gestão de Instaladores</h1>
 
         <Tabs defaultValue="lista" className="w-full">
-          <TabsList className="grid w-full max-w-lg grid-cols-3">
+          <TabsList className="grid w-full max-w-2xl grid-cols-4">
             <TabsTrigger value="lista">Lista</TabsTrigger>
+            <TabsTrigger value="desempenho">Desempenho</TabsTrigger>
             <TabsTrigger value="pagamentos">Pagamentos</TabsTrigger>
             <TabsTrigger value="convites" className="flex items-center gap-1">
               Convites
@@ -466,6 +539,103 @@ export default function Instaladores() {
               )}
             </div>
 
+          </TabsContent>
+
+          <TabsContent value="desempenho" className="space-y-6 mt-6">
+            {/* Seletor de Mês */}
+            <div className="flex items-center gap-4">
+              <Button variant="outline" size="icon" onClick={() => setMesDesempenho(prev => subMonths(prev, 1))}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-lg font-semibold capitalize min-w-[180px] text-center">
+                {format(mesDesempenho, 'MMMM yyyy', { locale: ptBR })}
+              </span>
+              <Button variant="outline" size="icon" onClick={() => setMesDesempenho(prev => addMonths(prev, 1))}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Cards de Resumo */}
+            {(() => {
+              const totalServicos = desempenhoData.reduce((s, d) => s + d.total_servicos, 0)
+              const totalReceita = desempenhoData.reduce((s, d) => s + d.receita, 0)
+              const mediaPorInstalador = desempenhoData.length > 0 ? totalReceita / desempenhoData.length : 0
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg shadow-lg p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <Wrench className="h-8 w-8" />
+                      <span className="text-3xl opacity-30">🔧</span>
+                    </div>
+                    <div className="text-2xl font-bold">{totalServicos}</div>
+                    <div className="text-sm opacity-90">Serviços Concluídos</div>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg shadow-lg p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <DollarSign className="h-8 w-8" />
+                      <span className="text-3xl opacity-30">💰</span>
+                    </div>
+                    <div className="text-2xl font-bold">R$ {totalReceita.toFixed(2)}</div>
+                    <div className="text-sm opacity-90">Receita Total</div>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-lg shadow-lg p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <TrendingUp className="h-8 w-8" />
+                      <span className="text-3xl opacity-30">📊</span>
+                    </div>
+                    <div className="text-2xl font-bold">R$ {mediaPorInstalador.toFixed(2)}</div>
+                    <div className="text-sm opacity-90">Média por Instalador</div>
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* Tabela de Desempenho */}
+            <div className="bg-card rounded-lg shadow overflow-hidden">
+              {loadingDesempenho ? (
+                <div className="p-8 text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                </div>
+              ) : desempenhoData.length === 0 ? (
+                <div className="p-8 text-center text-muted-foreground">
+                  <Wrench className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Nenhum serviço concluído neste mês</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-muted">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Instalador</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Serviços Concluídos</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Receita Gerada</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Mão de Obra</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {desempenhoData.map((item) => (
+                        <tr key={item.instalador_id} className="hover:bg-muted/50">
+                          <td className="px-4 py-3 text-sm font-medium">{item.nome}</td>
+                          <td className="px-4 py-3 text-sm text-right">{item.total_servicos}</td>
+                          <td className="px-4 py-3 text-sm text-right font-bold text-green-600">R$ {item.receita.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-sm text-right">R$ {item.mao_obra.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-muted">
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-bold">TOTAL</td>
+                        <td className="px-4 py-3 text-sm text-right font-bold">{desempenhoData.reduce((s, d) => s + d.total_servicos, 0)}</td>
+                        <td className="px-4 py-3 text-sm text-right font-bold text-green-600">R$ {desempenhoData.reduce((s, d) => s + d.receita, 0).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-sm text-right font-bold">R$ {desempenhoData.reduce((s, d) => s + d.mao_obra, 0).toFixed(2)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="pagamentos" className="mt-6">
