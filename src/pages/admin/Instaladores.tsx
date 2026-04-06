@@ -144,8 +144,8 @@ export default function Instaladores() {
       })
     } finally {
       setLoading(false)
+    }
   }
-
   async function carregarDesempenho() {
     try {
       setLoadingDesempenho(true)
