@@ -222,6 +222,10 @@ export function FunilConversaoContent() {
 
       setFonteInvestimento(usandoGoogleAds ? "google_ads" : "manual");
 
+      // Conversões reportadas pelo Google Ads
+      const totalConversoesGoogle = adsMetrics?.reduce((sum, m) => sum + Number(m.conversions || 0), 0) || 0;
+      setConversoesGoogle(Math.round(totalConversoesGoogle * 100) / 100);
+
       // Leads & conversions
       let cotacoesQuery = supabase
         .from("cotacoes")
