@@ -122,6 +122,7 @@ export function FunilConversaoContent() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
+  const [fonteInvestimento, setFonteInvestimento] = useState<"google_ads" | "manual">("manual");
   const [dataInicio, setDataInicio] = useState<Date>(
     new Date(new Date().getFullYear(), new Date().getMonth(), 1)
   );
