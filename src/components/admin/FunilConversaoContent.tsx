@@ -134,6 +134,7 @@ export function FunilConversaoContent() {
   });
   const [dailyData, setDailyData] = useState<DailyData[]>([]);
   const [cotacoesTimestamps, setCotacoesTimestamps] = useState<string[]>([]);
+  const [conversoesGoogle, setConversoesGoogle] = useState<number>(0);
   const [mesSelecionado, setMesSelecionado] = useState<string>("");
   const [origemFiltro, setOrigemFiltro] = useState<string>("todos");
 
