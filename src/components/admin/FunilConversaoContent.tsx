@@ -535,13 +535,34 @@ export function FunilConversaoContent() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center space-y-4">
+            {conversoesGoogle > 0 && (
+              <>
+                <div className="w-full max-w-lg">
+                  <div className="bg-violet-500 text-white p-6 rounded-t-lg text-center">
+                    <p className="text-lg font-semibold">Conversões Google Ads</p>
+                    <p className="text-4xl font-bold">{conversoesGoogle.toFixed(0)}</p>
+                    <p className="text-violet-200 text-xs mt-1">Reportadas pelo Google</p>
+                  </div>
+                </div>
+                <ArrowDown className="h-8 w-8 text-muted-foreground" />
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <CheckCircle2 className="h-5 w-5" />
+                  <span className="font-semibold">
+                    {conversoesGoogle > 0
+                      ? `${((funnelData.leads / conversoesGoogle) * 100).toFixed(0)}% confirmados no sistema`
+                      : "—"}
+                  </span>
+                </div>
+                <ArrowDown className="h-8 w-8 text-muted-foreground" />
+              </>
+            )}
             <div className="w-full max-w-md">
               <div className="bg-blue-500 text-white p-6 rounded-t-lg text-center">
                 <p className="text-lg font-semibold">Leads (Cotações)</p>
                 <p className="text-4xl font-bold">{funnelData.leads}</p>
               </div>
             </div>
-            <ArrowDown className="h-8 w-8 text-gray-400" />
+            <ArrowDown className="h-8 w-8 text-muted-foreground" />
             <div className="flex items-center gap-2 text-gray-600">
               <Percent className="h-5 w-5" />
               <span className="font-semibold">{funnelData.taxaConversao.toFixed(1)}% de conversão</span>
