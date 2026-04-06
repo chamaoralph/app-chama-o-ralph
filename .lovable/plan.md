@@ -1,37 +1,27 @@
 
 
-# Aba "Desempenho Mensal" na página Instaladores
+# Usar investimento real do Google Ads no Funil de Marketing
+
+## Situação atual
+- O funil já busca **cliques e impressões** da tabela `google_ads_metrics`
+- Mas o **investimento** vem de `lancamentos_caixa` (lançamentos manuais com categoria "marketing/google")
+- A tabela `google_ads_metrics` já recebe `cost_micros` do Google Ads via webhook — dado que hoje é ignorado no cálculo
 
 ## O que será feito
+Alterar o `FunilConversaoContent.tsx` para usar `cost_micros` da `google_ads_metrics` como fonte primária de investimento, com fallback para os lançamentos manuais caso não haja dados do Google Ads.
 
-Adicionar uma nova aba **"Desempenho"** na página de Gestão de Instaladores (`/admin/instaladores`), ao lado das abas Lista, Pagamentos e Convites.
-
-Essa aba mostrará, para o mês selecionado:
-- Uma tabela com cada instalador, quantidade de serviços concluidos, e receita total gerada (valor_total dos servicos)
-- Seletor de mês/ano para navegar entre meses
-- Totais gerais no rodape da tabela
-- Cards de resumo no topo (total de servicos do mes, receita total, media por instalador)
-
-## Dados utilizados
-
-Consulta na tabela `servicos` filtrando por:
-- `status = 'concluido'`
-- `data_servico_agendada` dentro do mes selecionado
-- `empresa_id` do usuario logado
-- Agrupado por `instalador_id`, com JOIN na tabela `usuarios` para pegar o nome
-
-Colunas exibidas:
-| Instalador | Servicos Concluidos | Receita Gerada (valor_total) | Mao de Obra (valor_mao_obra_instalador) |
-|---|---|---|---|
+Mudanças específicas:
+1. **Investimento total**: somar `cost_micros` de todos os dias do período e converter para reais (dividir por 1.000.000)
+2. **Investimento diário**: no gráfico diário, usar `cost_micros` do dia convertido em vez do valor manual
+3. **Fallback**: se não houver dados em `google_ads_metrics` para o período, manter o comportamento atual (lancamentos_caixa)
+4. **Indicador visual**: mostrar de onde vem o dado de investimento ("Google Ads" ou "Lançamentos manuais") para o usuário saber a fonte
 
 ## Arquivo alterado
+- `src/components/admin/FunilConversaoContent.tsx` — trocar fonte de investimento para `cost_micros` com fallback
 
-- `src/pages/admin/Instaladores.tsx` — adicionar a aba "Desempenho" com o componente inline ou extraido
-
-## Detalhes tecnicos
-
-- Reutilizar o layout de Tabs existente (grid-cols-3 vira grid-cols-4)
-- Seletor de mes usando inputs nativos ou botoes prev/next
-- Query unica com `.eq('status', 'concluido')` e filtro por range de datas do mes
-- Nenhuma migration necessaria — dados ja existem
+## Detalhes técnicos
+- `cost_micros` do Google Ads = valor em micros (1.000.000 = R$ 1,00)
+- Conversão: `investimento = cost_micros / 1_000_000`
+- Todos os KPIs derivados (CPL, CPC, ROAS) serão automaticamente recalculados pois dependem da variável `investimento`
+- Nenhuma migration necessária — dados já existem na tabela
 
