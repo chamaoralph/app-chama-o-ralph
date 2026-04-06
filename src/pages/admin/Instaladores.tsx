@@ -82,6 +82,10 @@ export default function Instaladores() {
     carregarConvites()
   }, [])
 
+  useEffect(() => {
+    carregarDesempenho()
+  }, [mesDesempenho])
+
   async function carregarInstaladores() {
     try {
       setLoading(true)
