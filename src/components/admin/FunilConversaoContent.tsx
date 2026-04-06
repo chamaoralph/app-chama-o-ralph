@@ -424,7 +424,7 @@ export function FunilConversaoContent() {
       </Card>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-9 gap-4">
         <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
