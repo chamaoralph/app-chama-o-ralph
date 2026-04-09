@@ -128,19 +128,6 @@ export default function BaseConhecimento() {
     enabled: !!user
   });
 
-  const getEmbedUrl = (url: string) => {
-    if (url.includes("youtube.com") || url.includes("youtu.be")) {
-      const videoId = url.includes("watch?v=")
-        ? url.split("watch?v=")[1]?.split("&")[0]
-        : url.split("youtu.be/")[1]?.split("?")[0];
-      return `https://www.youtube.com/embed/${videoId}`;
-    }
-    if (url.includes("vimeo.com")) {
-      const videoId = url.split("vimeo.com/")[1]?.split("?")[0];
-      return `https://player.vimeo.com/video/${videoId}`;
-    }
-    return url;
-  };
 
   return (
     <InstaladorLayout>
