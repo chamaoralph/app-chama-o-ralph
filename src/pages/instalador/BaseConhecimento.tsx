@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
 import { Badge } from "@/components/ui/badge";
 import { Search, BookOpen, Play, FileQuestion, Award } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -38,8 +38,6 @@ export default function BaseConhecimento() {
   const navigate = useNavigate();
   const [busca, setBusca] = useState("");
   const [categoria, setCategoria] = useState("Todas");
-  const [artigoSelecionado, setArtigoSelecionado] = useState<any>(null);
-  const [treinamentoSelecionado, setTreinamentoSelecionado] = useState<any>(null);
 
   const { data: artigos, isLoading: loadingArtigos } = useQuery({
     queryKey: ["artigos", busca, categoria],
@@ -130,19 +128,6 @@ export default function BaseConhecimento() {
     enabled: !!user
   });
 
-  const getEmbedUrl = (url: string) => {
-    if (url.includes("youtube.com") || url.includes("youtu.be")) {
-      const videoId = url.includes("watch?v=")
-        ? url.split("watch?v=")[1]?.split("&")[0]
-        : url.split("youtu.be/")[1]?.split("?")[0];
-      return `https://www.youtube.com/embed/${videoId}`;
-    }
-    if (url.includes("vimeo.com")) {
-      const videoId = url.split("vimeo.com/")[1]?.split("?")[0];
-      return `https://player.vimeo.com/video/${videoId}`;
-    }
-    return url;
-  };
 
   return (
     <InstaladorLayout>
@@ -299,7 +284,7 @@ export default function BaseConhecimento() {
                           </Badge>
                         ))}
                       </div>
-                      <Button onClick={() => setArtigoSelecionado(artigo)} className="w-full">
+                      <Button onClick={() => navigate(`/instalador/conhecimento/artigo/${artigo.id}`)} className="w-full">
                         Ler Artigo
                       </Button>
                     </CardContent>
@@ -351,7 +336,7 @@ export default function BaseConhecimento() {
                         </p>
                       )}
                       <Button
-                        onClick={() => setTreinamentoSelecionado(treinamento)}
+                        onClick={() => navigate(`/instalador/conhecimento/treinamento/${treinamento.id}`)}
                         className="w-full"
                       >
                         <Play className="h-4 w-4 mr-2" />
@@ -371,54 +356,6 @@ export default function BaseConhecimento() {
         </Tabs>
       </div>
 
-      {/* Modal de Artigo */}
-      <Dialog open={!!artigoSelecionado} onOpenChange={() => setArtigoSelecionado(null)}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">{artigoSelecionado?.titulo}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              <Badge className={categoriaCores[artigoSelecionado?.categoria] || "bg-muted text-muted-foreground"}>
-                {artigoSelecionado?.categoria}
-              </Badge>
-              {artigoSelecionado?.tags?.map((tag: string) => (
-                <Badge key={tag} variant="outline">
-                  {tag}
-                </Badge>
-              ))}
-            </div>
-            <div className="prose dark:prose-invert max-w-none">
-              <p className="whitespace-pre-wrap">{artigoSelecionado?.conteudo}</p>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Modal de Treinamento */}
-      <Dialog
-        open={!!treinamentoSelecionado}
-        onOpenChange={() => setTreinamentoSelecionado(null)}
-      >
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">{treinamentoSelecionado?.titulo}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {treinamentoSelecionado?.descricao && (
-              <p className="text-muted-foreground">{treinamentoSelecionado.descricao}</p>
-            )}
-            <div className="aspect-video">
-              <iframe
-                src={getEmbedUrl(treinamentoSelecionado?.video_url || "")}
-                className="w-full h-full rounded-lg"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </InstaladorLayout>
   );
 }

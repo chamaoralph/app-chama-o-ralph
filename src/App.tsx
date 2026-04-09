@@ -43,6 +43,8 @@ const AdminAvaliacoes = lazy(() => import('./pages/admin/Avaliacoes'));
 const InstaladorFazerQuestionario = lazy(() => import('./pages/instalador/FazerQuestionario'));
 const InstaladorResultado = lazy(() => import('./pages/instalador/ResultadoQuestionario'));
 const InstaladorCertificados = lazy(() => import('./pages/instalador/MeusCertificados'));
+const InstaladorArtigoDetalhe = lazy(() => import('./pages/instalador/ArtigoDetalhe'));
+const InstaladorTreinamentoDetalhe = lazy(() => import('./pages/instalador/TreinamentoDetalhe'));
 
 const queryClient = new QueryClient();
 
@@ -109,6 +111,8 @@ function App() {
               <Route path="fazer-questionario/:id" element={<Suspense><InstaladorFazerQuestionario /></Suspense>} />
               <Route path="resultado-questionario/:tentativaId" element={<Suspense><InstaladorResultado /></Suspense>} />
               <Route path="meus-certificados" element={<Suspense><InstaladorCertificados /></Suspense>} />
+              <Route path="conhecimento/artigo/:id" element={<Suspense><InstaladorArtigoDetalhe /></Suspense>} />
+              <Route path="conhecimento/treinamento/:id" element={<Suspense><InstaladorTreinamentoDetalhe /></Suspense>} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
