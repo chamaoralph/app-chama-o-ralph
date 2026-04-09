@@ -1,30 +1,24 @@
 
 
-# Adicionar card "Projeção" na página Caixa
+# Corrigir erro "function pg_catalog.extract(unknown, integer) does not exist" no RFM
 
-## O que será feito
-Adicionar um novo card **"PROJEÇÃO"** antes do card de Receitas, mostrando a soma do `valor_total` de todos os serviços agendados no mês selecionado (tabela `servicos`, status que indica agendamento ativo).
+## Problema
+A função `calculate_rfm` usa `EXTRACT(DAY FROM (CURRENT_DATE - MAX(s.data_servico_agendada::date)))`, mas em PostgreSQL, `date - date` retorna um **integer** (dias), não um `interval`. O `EXTRACT()` não aceita integer como entrada, gerando o erro.
 
-## Mudanças visuais
+## Solução
+Remover o `EXTRACT(DAY FROM ...)` e usar diretamente `(CURRENT_DATE - MAX(s.data_servico_agendada::date))`, que já retorna o número de dias como integer.
 
-```text
-┌──────────┬──────────┬──────────────┬──────────────┬────────┐
-│ PROJEÇÃO │ RECEITAS │ DESP. GERAIS │ INSTALADORES │ SALDO  │
-│ R$ X     │ R$ X     │ R$ X         │ R$ X         │ R$ X   │
-└──────────┴──────────┴──────────────┴──────────────┴────────┘
-```
+## Mudança
+- **Migration SQL**: Recriar a função `calculate_rfm` substituindo todas as ocorrências de:
+  ```sql
+  EXTRACT(DAY FROM (CURRENT_DATE - MAX(s.data_servico_agendada::date)))::INTEGER
+  ```
+  por:
+  ```sql
+  (CURRENT_DATE - MAX(s.data_servico_agendada::date))
+  ```
+  Há ~6 ocorrências dessa expressão na função que precisam ser corrigidas.
 
-O grid passa de 4 para 5 colunas. O card de Projeção terá fundo amarelo/âmbar para diferenciar.
-
-## Arquivo alterado
-- `src/pages/admin/Caixa.tsx`
-  - Novo estado `totalProjecao`
-  - Nova função `carregarProjecao()` que consulta `servicos` onde `data_servico_agendada` está no mês selecionado e status indica serviço ativo (ex: `disponivel`, `atribuido`, `solicitado`, `em_andamento`, `aguardando_aprovacao` — ou seja, não cancelado/concluído), somando `valor_total`
-  - Chamar `carregarProjecao()` junto com os outros loads quando `filtroMes` muda
-  - Inserir o card antes do card de Receitas no grid, mudando para `grid-cols-5`
-
-## Detalhes técnicos
-- Query: `supabase.from("servicos").select("valor_total").gte("data_servico_agendada", primeiroDia).lte("data_servico_agendada", ultimoDia).not("status", "in", "(cancelado)")`
-- Isso inclui serviços já concluídos + os pendentes, dando a projeção total do mês
-- Nenhuma migration necessária
+## Nenhuma mudança no frontend
+O código TypeScript permanece igual, apenas a função do banco é corrigida.
 
