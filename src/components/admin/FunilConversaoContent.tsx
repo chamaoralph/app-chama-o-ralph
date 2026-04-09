@@ -183,15 +183,13 @@ export function FunilConversaoContent() {
       let investimento = 0;
       let usandoGoogleAds = false;
 
+      let investimentoAds = 0;
       if (adsMetrics && adsMetrics.length > 0) {
         totalClicks = adsMetrics.reduce((sum, m) => sum + (m.clicks || 0), 0);
         totalImpressions = adsMetrics.reduce((sum, m) => sum + (m.impressions || 0), 0);
         
         const totalCostMicros = adsMetrics.reduce((sum, m) => sum + Number(m.cost_micros || 0), 0);
-        if (totalCostMicros > 0) {
-          investimento = totalCostMicros / 1_000_000;
-          usandoGoogleAds = true;
-        }
+        investimentoAds = totalCostMicros / 1_000_000;
 
         const maxSync = adsMetrics.reduce((max, m) => {
           const s = m.synced_at;
@@ -200,24 +198,34 @@ export function FunilConversaoContent() {
         if (maxSync) setLastSync(maxSync);
       }
 
-      // Fallback: se não tem custo do Google Ads, usar lancamentos_caixa
-      if (!usandoGoogleAds) {
-        const { data: despesas, error: erroDespesas } = await supabase
-          .from("lancamentos_caixa")
-          .select("valor, data_lancamento, categoria, descricao")
-          .eq("tipo", "despesa")
-          .gte("data_lancamento", dataInicioStr)
-          .lte("data_lancamento", dataFimStr);
+      // Sempre buscar lançamentos manuais para comparar
+      const { data: despesas, error: erroDespesas } = await supabase
+        .from("lancamentos_caixa")
+        .select("valor, data_lancamento, categoria, descricao")
+        .eq("tipo", "despesa")
+        .gte("data_lancamento", dataInicioStr)
+        .lte("data_lancamento", dataFimStr);
 
-        if (erroDespesas) throw erroDespesas;
+      if (erroDespesas) throw erroDespesas;
 
-        const despesasMarketing = despesas?.filter(d =>
-          d.categoria?.toLowerCase().includes('marketing') ||
-          d.categoria?.toLowerCase().includes('google') ||
-          d.descricao?.toLowerCase().includes('google')
-        ) || [];
+      const despesasMarketing = despesas?.filter(d =>
+        d.categoria?.toLowerCase().includes('marketing') ||
+        d.categoria?.toLowerCase().includes('google') ||
+        d.descricao?.toLowerCase().includes('google')
+      ) || [];
 
-        investimento = despesasMarketing.reduce((sum, d) => sum + Number(d.valor), 0);
+      const investimentoManual = despesasMarketing.reduce((sum, d) => sum + Number(d.valor), 0);
+
+      // Usar o maior valor entre API e manual (dados parciais da API não devem subestimar)
+      if (investimentoAds > 0 && investimentoAds >= investimentoManual) {
+        investimento = investimentoAds;
+        usandoGoogleAds = true;
+      } else if (investimentoManual > 0) {
+        investimento = investimentoManual;
+        usandoGoogleAds = false;
+      } else {
+        investimento = investimentoAds;
+        usandoGoogleAds = investimentoAds > 0;
       }
 
       setFonteInvestimento(usandoGoogleAds ? "google_ads" : "manual");
