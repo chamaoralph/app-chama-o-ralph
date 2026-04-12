@@ -4,10 +4,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Star, MessageSquare, Clock, Filter } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Star, MessageSquare, Clock, Filter, ClipboardCheck } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -33,6 +36,14 @@ export default function Avaliacoes() {
   const [loading, setLoading] = useState(true);
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [stats, setStats] = useState({ total: 0, media: 0, respondidas: 0, pendentes: 0 });
+
+  // Dialog state
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [avaliacaoSelecionada, setAvaliacaoSelecionada] = useState<Avaliacao | null>(null);
+  const [dialogStatus, setDialogStatus] = useState<string>("respondida");
+  const [dialogNota, setDialogNota] = useState<number>(5);
+  const [dialogComentario, setDialogComentario] = useState("");
+  const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
     if (user?.id) fetchAvaliacoes();
@@ -64,7 +75,6 @@ export default function Avaliacoes() {
       const { data, error } = await query;
       if (error) throw error;
 
-      // Buscar dados relacionados
       const servicoIds = (data || []).map((a: any) => a.servico_id);
       const clienteIds = (data || []).map((a: any) => a.cliente_id);
 
@@ -99,7 +109,6 @@ export default function Avaliacoes() {
 
       setAvaliacoes(enriched);
 
-      // Stats
       const todas = enriched;
       const comNota = todas.filter((a: any) => a.nota != null);
       setStats({
@@ -134,6 +143,70 @@ export default function Avaliacoes() {
     toast.success(!current ? "Avaliação publicada" : "Publicação removida");
   }
 
+  function abrirDialogRegistro(avaliacao: Avaliacao) {
+    setAvaliacaoSelecionada(avaliacao);
+    setDialogStatus("respondida");
+    setDialogNota(5);
+    setDialogComentario("");
+    setDialogOpen(true);
+  }
+
+  async function registrarAvaliacao() {
+    if (!avaliacaoSelecionada) return;
+    setSalvando(true);
+
+    const updateData: any = {
+      status: dialogStatus,
+      respondido_em: new Date().toISOString(),
+    };
+
+    if (dialogStatus === "respondida") {
+      updateData.nota = dialogNota;
+      updateData.comentario = dialogComentario.trim() || null;
+    }
+
+    const { error } = await supabase
+      .from("avaliacoes")
+      .update(updateData)
+      .eq("id", avaliacaoSelecionada.id);
+
+    setSalvando(false);
+
+    if (error) {
+      toast.error("Erro ao registrar avaliação");
+      return;
+    }
+
+    setAvaliacoes((prev) =>
+      prev.map((a) =>
+        a.id === avaliacaoSelecionada.id
+          ? { ...a, ...updateData }
+          : a
+      )
+    );
+
+    // Recalculate stats
+    const updated = avaliacoes.map((a) =>
+      a.id === avaliacaoSelecionada.id ? { ...a, ...updateData } : a
+    );
+    const comNota = updated.filter((a) => a.nota != null);
+    setStats({
+      total: updated.length,
+      media: comNota.length > 0
+        ? comNota.reduce((acc, a) => acc + (a.nota || 0), 0) / comNota.length
+        : 0,
+      respondidas: updated.filter((a) => a.status === "respondida").length,
+      pendentes: updated.filter((a) => a.status === "pendente").length,
+    });
+
+    setDialogOpen(false);
+    toast.success(
+      dialogStatus === "respondida"
+        ? "Avaliação registrada com sucesso!"
+        : "Marcada como 'Não avaliou'"
+    );
+  }
+
   function statusBadge(status: string) {
     switch (status) {
       case "pendente":
@@ -147,17 +220,21 @@ export default function Avaliacoes() {
     }
   }
 
-  function renderStars(nota: number | null) {
-    if (nota == null) return <span className="text-muted-foreground text-sm">—</span>;
+  function renderStars(nota: number | null, interactive = false, onSelect?: (n: number) => void) {
+    if (nota == null && !interactive) return <span className="text-muted-foreground text-sm">—</span>;
+    const display = nota ?? 0;
     return (
       <div className="flex items-center gap-0.5">
         {[1, 2, 3, 4, 5].map((i) => (
           <Star
             key={i}
-            className={`h-4 w-4 ${i <= nota ? "text-yellow-400 fill-yellow-400" : "text-gray-300"}`}
+            className={`h-5 w-5 transition-colors ${
+              i <= display ? "text-yellow-400 fill-yellow-400" : "text-gray-300"
+            } ${interactive ? "cursor-pointer hover:scale-110" : ""}`}
+            onClick={interactive && onSelect ? () => onSelect(i) : undefined}
           />
         ))}
-        <span className="ml-1 text-sm font-medium">{nota}</span>
+        {!interactive && nota != null && <span className="ml-1 text-sm font-medium">{nota}</span>}
       </div>
     );
   }
@@ -250,6 +327,7 @@ export default function Avaliacoes() {
                   <TableHead>Comentário</TableHead>
                   <TableHead>Data</TableHead>
                   <TableHead>Publicada</TableHead>
+                  <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -275,6 +353,19 @@ export default function Avaliacoes() {
                         disabled={a.status === "pendente"}
                       />
                     </TableCell>
+                    <TableCell>
+                      {a.status === "pendente" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => abrirDialogRegistro(a)}
+                          className="gap-1"
+                        >
+                          <ClipboardCheck className="h-4 w-4" />
+                          Registrar
+                        </Button>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -282,6 +373,66 @@ export default function Avaliacoes() {
           </div>
         )}
       </div>
+
+      {/* Dialog de registro manual */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Registrar Avaliação</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">
+                Serviço: <span className="font-mono font-medium text-foreground">{avaliacaoSelecionada?.servico?.codigo}</span>
+                {" — "}
+                {avaliacaoSelecionada?.cliente?.nome}
+              </p>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Status</label>
+              <Select value={dialogStatus} onValueChange={setDialogStatus}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="respondida">✅ Respondida (avaliou)</SelectItem>
+                  <SelectItem value="nao_avaliou">⏱️ Não avaliou</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {dialogStatus === "respondida" && (
+              <>
+                <div>
+                  <label className="text-sm font-medium">Nota do cliente</label>
+                  <div className="mt-2">
+                    {renderStars(dialogNota, true, setDialogNota)}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Comentário (opcional)</label>
+                  <Textarea
+                    className="mt-1"
+                    placeholder="O que o cliente disse..."
+                    value={dialogComentario}
+                    onChange={(e) => setDialogComentario(e.target.value.slice(0, 1000))}
+                    maxLength={1000}
+                    rows={3}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">{dialogComentario.length}/1000</p>
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={registrarAvaliacao} disabled={salvando}>
+              {salvando ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }
