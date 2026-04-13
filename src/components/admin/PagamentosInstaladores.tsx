@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 import { format, endOfMonth } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -33,7 +33,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { toast } from '@/hooks/use-toast'
-import { Check, Upload, Eye, Clock, DollarSign, FileText, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Check, Upload, Eye, Clock, DollarSign, FileText, Pencil, Plus, Trash2, AlertTriangle, Loader2 } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -54,6 +54,22 @@ interface ReciboComInstalador {
   status_pagamento: string
   data_pagamento: string | null
   comprovante_pix_url: string | null
+}
+
+interface ReciboFaltante {
+  instalador_id: string
+  instalador_nome: string
+  data: string // yyyy-MM-dd
+  servicos: {
+    id: string
+    valor_mao_obra_instalador: number
+    valor_reembolso_despesas: number
+    valor_recebido_cliente: number
+  }[]
+  totalMaoObra: number
+  totalReembolso: number
+  totalRecebidoCliente: number
+  totalGeral: number
 }
 
 export function PagamentosInstaladores() {
@@ -106,6 +122,12 @@ export function PagamentosInstaladores() {
   const [salvandoManual, setSalvandoManual] = useState(false)
   const [instaladoresAtivos, setInstaladoresAtivos] = useState<{id: string, nome: string}[]>([])
 
+  // Recibos faltantes
+  const [recibosFaltantes, setRecibosFaltantes] = useState<ReciboFaltante[]>([])
+  const [gerandoRecibo, setGerandoRecibo] = useState<string | null>(null) // data+instalador_id key
+  const [gerandoTodos, setGerandoTodos] = useState(false)
+  const [empresaId, setEmpresaId] = useState<string | null>(null)
+
   // Cálculos
   const totalPendente = recibos
     .filter(r => r.status_pagamento === 'pendente')
@@ -139,6 +161,7 @@ export function PagamentosInstaladores() {
         .single()
 
       if (!userData) return
+      setEmpresaId(userData.empresa_id)
 
       // Filtrar por mês
       const [ano, mes] = filtroMes.split('-')
@@ -146,37 +169,49 @@ export function PagamentosInstaladores() {
       const ultimoDia = endOfMonth(new Date(parseInt(ano), parseInt(mes) - 1, 1))
       const dataFim = format(ultimoDia, 'yyyy-MM-dd')
 
-      const { data, error } = await supabase
-        .from('recibos_diarios')
-        .select(`
-          id,
-          data_referencia,
-          instalador_id,
-          quantidade_servicos,
-          valor_mao_obra,
-          valor_reembolso,
-          valor_total,
-          status_pagamento,
-          data_pagamento,
-          comprovante_pix_url
-        `)
-        .eq('empresa_id', userData.empresa_id)
-        .gte('data_referencia', dataInicio)
-        .lte('data_referencia', dataFim)
-        .order('data_referencia', { ascending: false })
+      // Buscar recibos e serviços concluídos em paralelo
+      const [recibosRes, servicosRes] = await Promise.all([
+        supabase
+          .from('recibos_diarios')
+          .select(`
+            id, data_referencia, instalador_id, quantidade_servicos,
+            valor_mao_obra, valor_reembolso, valor_total,
+            status_pagamento, data_pagamento, comprovante_pix_url
+          `)
+          .eq('empresa_id', userData.empresa_id)
+          .gte('data_referencia', dataInicio)
+          .lte('data_referencia', dataFim)
+          .order('data_referencia', { ascending: false }),
+        supabase
+          .from('servicos')
+          .select('id, instalador_id, data_conclusao, valor_mao_obra_instalador, valor_reembolso_despesas, valor_recebido_cliente')
+          .eq('empresa_id', userData.empresa_id)
+          .eq('status', 'concluido')
+          .not('data_conclusao', 'is', null)
+          .not('instalador_id', 'is', null)
+          .gte('data_conclusao', `${ano}-${mes}-01T00:00:00`)
+          .lt('data_conclusao', format(new Date(parseInt(ano), parseInt(mes), 1), "yyyy-MM-dd'T'HH:mm:ss"))
+      ])
 
-      if (error) throw error
+      if (recibosRes.error) throw recibosRes.error
 
-      // Buscar nomes dos instaladores
-      const instaladorIds = [...new Set((data || []).map(r => r.instalador_id))]
-      const { data: instaladores } = await supabase
-        .from('usuarios')
-        .select('id, nome')
-        .in('id', instaladorIds)
+      const data = recibosRes.data || []
+      const servicosConcluidos = servicosRes.data || []
 
-      const instaladoresMap = new Map(instaladores?.map(i => [i.id, i.nome]) || [])
+      // Buscar nomes dos instaladores (de recibos + serviços)
+      const idsSet = new Set<string>([
+        ...data.map(r => r.instalador_id),
+        ...servicosConcluidos.map(s => s.instalador_id).filter(Boolean) as string[]
+      ])
+      const allInstaladorIds = Array.from(idsSet)
+      
+      const { data: instaladores } = allInstaladorIds.length > 0
+        ? await supabase.from('usuarios').select('id, nome').in('id', allInstaladorIds)
+        : { data: [] }
 
-      const recibosFormatados: ReciboComInstalador[] = (data || []).map(r => ({
+      const instaladoresMap = new Map<string, string>(instaladores?.map(i => [i.id, i.nome] as [string, string]) || [])
+
+      const recibosFormatados: ReciboComInstalador[] = data.map(r => ({
         id: r.id,
         data_referencia: r.data_referencia,
         instalador_id: r.instalador_id,
@@ -191,6 +226,63 @@ export function PagamentosInstaladores() {
       }))
 
       setRecibos(recibosFormatados)
+
+      // --- Detecção de recibos faltantes ---
+      // Criar set de chaves existentes: "instalador_id|data_referencia"
+      const recibosExistentesSet = new Set(
+        data.map(r => `${r.instalador_id}|${r.data_referencia}`)
+      )
+
+      // Agrupar serviços por instalador + dia (fuso Brasília: -3h)
+      const grupos = new Map<string, ReciboFaltante>()
+      
+      for (const s of servicosConcluidos) {
+        if (!s.instalador_id || !s.data_conclusao) continue
+        
+        // Converter data_conclusao para fuso Brasília
+        const dtConclusao = new Date(s.data_conclusao)
+        const dtBrasilia = new Date(dtConclusao.getTime() - 3 * 60 * 60 * 1000)
+        const dataRef = dtBrasilia.toISOString().slice(0, 10)
+        
+        const chave = `${s.instalador_id}|${dataRef}`
+        
+        // Se já existe recibo, pular
+        if (recibosExistentesSet.has(chave)) continue
+        
+        if (!grupos.has(chave)) {
+          grupos.set(chave, {
+            instalador_id: s.instalador_id,
+            instalador_nome: instaladoresMap.get(s.instalador_id) || 'Desconhecido',
+            data: dataRef,
+            servicos: [],
+            totalMaoObra: 0,
+            totalReembolso: 0,
+            totalRecebidoCliente: 0,
+            totalGeral: 0
+          })
+        }
+        
+        const grupo = grupos.get(chave)!
+        const maoObra = Number(s.valor_mao_obra_instalador || 0)
+        const reembolso = Number(s.valor_reembolso_despesas || 0)
+        const recebidoCliente = Number(s.valor_recebido_cliente || 0)
+        
+        grupo.servicos.push({
+          id: s.id,
+          valor_mao_obra_instalador: maoObra,
+          valor_reembolso_despesas: reembolso,
+          valor_recebido_cliente: recebidoCliente
+        })
+        grupo.totalMaoObra += maoObra
+        grupo.totalReembolso += reembolso
+        grupo.totalRecebidoCliente += recebidoCliente
+        grupo.totalGeral = grupo.totalMaoObra + grupo.totalReembolso
+      }
+
+      // Ordenar por data desc
+      const faltantes = Array.from(grupos.values()).sort((a, b) => b.data.localeCompare(a.data))
+      setRecibosFaltantes(faltantes)
+
     } catch (error) {
       console.error('Erro ao carregar recibos:', error)
       toast({
@@ -200,6 +292,70 @@ export function PagamentosInstaladores() {
       })
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function gerarReciboFaltante(faltante: ReciboFaltante) {
+    if (!empresaId) return
+    const chave = `${faltante.data}|${faltante.instalador_id}`
+    setGerandoRecibo(chave)
+    
+    try {
+      const { error } = await supabase
+        .from('recibos_diarios')
+        .insert({
+          empresa_id: empresaId,
+          instalador_id: faltante.instalador_id,
+          data_referencia: faltante.data,
+          valor_mao_obra: faltante.totalMaoObra,
+          valor_reembolso: faltante.totalReembolso,
+          valor_total: faltante.totalGeral,
+          quantidade_servicos: faltante.servicos.length,
+          servicos_ids: faltante.servicos.map(s => s.id),
+          valor_recebido_cliente: faltante.totalRecebidoCliente,
+          status_pagamento: 'pendente'
+        })
+
+      if (error) throw error
+
+      toast({ title: 'Sucesso', description: `Recibo gerado para ${faltante.instalador_nome} em ${format(new Date(faltante.data + 'T12:00:00'), 'dd/MM/yyyy')}` })
+      carregarRecibos()
+    } catch (error) {
+      console.error('Erro ao gerar recibo:', error)
+      toast({ title: 'Erro', description: 'Não foi possível gerar o recibo', variant: 'destructive' })
+    } finally {
+      setGerandoRecibo(null)
+    }
+  }
+
+  async function gerarTodosRecibosFaltantes() {
+    if (!empresaId || recibosFaltantes.length === 0) return
+    setGerandoTodos(true)
+
+    try {
+      const inserts = recibosFaltantes.map(f => ({
+        empresa_id: empresaId,
+        instalador_id: f.instalador_id,
+        data_referencia: f.data,
+        valor_mao_obra: f.totalMaoObra,
+        valor_reembolso: f.totalReembolso,
+        valor_total: f.totalGeral,
+        quantidade_servicos: f.servicos.length,
+        servicos_ids: f.servicos.map(s => s.id),
+        valor_recebido_cliente: f.totalRecebidoCliente,
+        status_pagamento: 'pendente'
+      }))
+
+      const { error } = await supabase.from('recibos_diarios').insert(inserts)
+      if (error) throw error
+
+      toast({ title: 'Sucesso', description: `${inserts.length} recibo(s) gerado(s) com sucesso!` })
+      carregarRecibos()
+    } catch (error) {
+      console.error('Erro ao gerar recibos:', error)
+      toast({ title: 'Erro', description: 'Não foi possível gerar os recibos', variant: 'destructive' })
+    } finally {
+      setGerandoTodos(false)
     }
   }
 
@@ -694,6 +850,77 @@ export function PagamentosInstaladores() {
           </Button>
         </div>
       </div>
+
+      {/* Alerta de Recibos Faltantes */}
+      {!loading && recibosFaltantes.length > 0 && (
+        <div className="border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 rounded-lg shadow p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              <h3 className="font-semibold text-amber-800 dark:text-amber-300">
+                Recibos Não Gerados ({recibosFaltantes.length} dia{recibosFaltantes.length > 1 ? 's' : ''} sem recibo)
+              </h3>
+            </div>
+            <Button
+              size="sm"
+              onClick={gerarTodosRecibosFaltantes}
+              disabled={gerandoTodos}
+              className="gap-1"
+            >
+              {gerandoTodos ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              Gerar Todos
+            </Button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Instalador</TableHead>
+                  <TableHead>Data</TableHead>
+                  <TableHead className="text-center">Serviços</TableHead>
+                  <TableHead className="text-right">Mão de Obra</TableHead>
+                  <TableHead className="text-right">Reembolso</TableHead>
+                  <TableHead className="text-right">Total Est.</TableHead>
+                  <TableHead className="text-center">Ação</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {recibosFaltantes.map((f) => {
+                  const chave = `${f.data}|${f.instalador_id}`
+                  return (
+                    <TableRow key={chave}>
+                      <TableCell className="font-medium">{f.instalador_nome}</TableCell>
+                      <TableCell>{format(new Date(f.data + 'T12:00:00'), 'dd/MM/yyyy')}</TableCell>
+                      <TableCell className="text-center">{f.servicos.length}</TableCell>
+                      <TableCell className="text-right">R$ {f.totalMaoObra.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">R$ {f.totalReembolso.toFixed(2)}</TableCell>
+                      <TableCell className="text-right font-bold">R$ {f.totalGeral.toFixed(2)}</TableCell>
+                      <TableCell className="text-center">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => gerarReciboFaltante(f)}
+                          disabled={gerandoRecibo === chave || gerandoTodos}
+                        >
+                          {gerandoRecibo === chave ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <>
+                              <Plus className="h-4 w-4 mr-1" />
+                              Gerar
+                            </>
+                          )}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
 
       {/* Tabela */}
       <div className="bg-card rounded-lg shadow overflow-hidden">
