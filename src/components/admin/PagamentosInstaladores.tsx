@@ -199,10 +199,11 @@ export function PagamentosInstaladores() {
       const servicosConcluidos = servicosRes.data || []
 
       // Buscar nomes dos instaladores (de recibos + serviços)
-      const allInstaladorIds = [...new Set([
+      const idsSet = new Set<string>([
         ...data.map(r => r.instalador_id),
         ...servicosConcluidos.map(s => s.instalador_id).filter(Boolean) as string[]
-      ])]
+      ])
+      const allInstaladorIds = Array.from(idsSet)
       
       const { data: instaladores } = allInstaladorIds.length > 0
         ? await supabase.from('usuarios').select('id, nome').in('id', allInstaladorIds)
