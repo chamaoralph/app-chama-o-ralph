@@ -122,6 +122,12 @@ export function PagamentosInstaladores() {
   const [salvandoManual, setSalvandoManual] = useState(false)
   const [instaladoresAtivos, setInstaladoresAtivos] = useState<{id: string, nome: string}[]>([])
 
+  // Recibos faltantes
+  const [recibosFaltantes, setRecibosFaltantes] = useState<ReciboFaltante[]>([])
+  const [gerandoRecibo, setGerandoRecibo] = useState<string | null>(null) // data+instalador_id key
+  const [gerandoTodos, setGerandoTodos] = useState(false)
+  const [empresaId, setEmpresaId] = useState<string | null>(null)
+
   // Cálculos
   const totalPendente = recibos
     .filter(r => r.status_pagamento === 'pendente')
