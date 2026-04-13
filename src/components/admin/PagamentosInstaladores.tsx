@@ -850,6 +850,77 @@ export function PagamentosInstaladores() {
         </div>
       </div>
 
+      {/* Alerta de Recibos Faltantes */}
+      {!loading && recibosFaltantes.length > 0 && (
+        <div className="border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 rounded-lg shadow p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              <h3 className="font-semibold text-amber-800 dark:text-amber-300">
+                Recibos Não Gerados ({recibosFaltantes.length} dia{recibosFaltantes.length > 1 ? 's' : ''} sem recibo)
+              </h3>
+            </div>
+            <Button
+              size="sm"
+              onClick={gerarTodosRecibosFaltantes}
+              disabled={gerandoTodos}
+              className="gap-1"
+            >
+              {gerandoTodos ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              Gerar Todos
+            </Button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Instalador</TableHead>
+                  <TableHead>Data</TableHead>
+                  <TableHead className="text-center">Serviços</TableHead>
+                  <TableHead className="text-right">Mão de Obra</TableHead>
+                  <TableHead className="text-right">Reembolso</TableHead>
+                  <TableHead className="text-right">Total Est.</TableHead>
+                  <TableHead className="text-center">Ação</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {recibosFaltantes.map((f) => {
+                  const chave = `${f.data}|${f.instalador_id}`
+                  return (
+                    <TableRow key={chave}>
+                      <TableCell className="font-medium">{f.instalador_nome}</TableCell>
+                      <TableCell>{format(new Date(f.data + 'T12:00:00'), 'dd/MM/yyyy')}</TableCell>
+                      <TableCell className="text-center">{f.servicos.length}</TableCell>
+                      <TableCell className="text-right">R$ {f.totalMaoObra.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">R$ {f.totalReembolso.toFixed(2)}</TableCell>
+                      <TableCell className="text-right font-bold">R$ {f.totalGeral.toFixed(2)}</TableCell>
+                      <TableCell className="text-center">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => gerarReciboFaltante(f)}
+                          disabled={gerandoRecibo === chave || gerandoTodos}
+                        >
+                          {gerandoRecibo === chave ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <>
+                              <Plus className="h-4 w-4 mr-1" />
+                              Gerar
+                            </>
+                          )}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
+
       {/* Tabela */}
       <div className="bg-card rounded-lg shadow overflow-hidden">
         {loading ? (
