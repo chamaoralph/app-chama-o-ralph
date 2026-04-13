@@ -33,7 +33,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { toast } from '@/hooks/use-toast'
-import { Check, Upload, Eye, Clock, DollarSign, FileText, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Check, Upload, Eye, Clock, DollarSign, FileText, Pencil, Plus, Trash2, AlertTriangle, Loader2 } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -54,6 +54,22 @@ interface ReciboComInstalador {
   status_pagamento: string
   data_pagamento: string | null
   comprovante_pix_url: string | null
+}
+
+interface ReciboFaltante {
+  instalador_id: string
+  instalador_nome: string
+  data: string // yyyy-MM-dd
+  servicos: {
+    id: string
+    valor_mao_obra_instalador: number
+    valor_reembolso_despesas: number
+    valor_recebido_cliente: number
+  }[]
+  totalMaoObra: number
+  totalReembolso: number
+  totalRecebidoCliente: number
+  totalGeral: number
 }
 
 export function PagamentosInstaladores() {
