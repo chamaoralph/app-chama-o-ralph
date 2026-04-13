@@ -208,7 +208,7 @@ export function PagamentosInstaladores() {
         ? await supabase.from('usuarios').select('id, nome').in('id', allInstaladorIds)
         : { data: [] }
 
-      const instaladoresMap = new Map(instaladores?.map(i => [i.id, i.nome]) || [])
+      const instaladoresMap = new Map<string, string>(instaladores?.map(i => [i.id, i.nome] as [string, string]) || [])
 
       const recibosFormatados: ReciboComInstalador[] = data.map(r => ({
         id: r.id,
