@@ -897,21 +897,33 @@ export function PagamentosInstaladores() {
                       <TableCell className="text-right">R$ {f.totalReembolso.toFixed(2)}</TableCell>
                       <TableCell className="text-right font-bold">R$ {f.totalGeral.toFixed(2)}</TableCell>
                       <TableCell className="text-center">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => gerarReciboFaltante(f)}
-                          disabled={gerandoRecibo === chave || gerandoTodos}
-                        >
-                          {gerandoRecibo === chave ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <>
-                              <Plus className="h-4 w-4 mr-1" />
-                              Gerar
-                            </>
-                          )}
-                        </Button>
+                        <div className="flex items-center justify-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => gerarReciboFaltante(f)}
+                            disabled={gerandoRecibo === chave || gerandoTodos}
+                          >
+                            {gerandoRecibo === chave ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <>
+                                <Plus className="h-4 w-4 mr-1" />
+                                Gerar
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => setRecibosFaltantes(prev => prev.filter(item => `${item.data}|${item.instalador_id}` !== chave))}
+                            disabled={gerandoRecibo === chave || gerandoTodos}
+                            title="Ignorar este recibo faltante"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )
