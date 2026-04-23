@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Clock, User, MapPin, UserX } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock, User, MapPin, Trash2, UserX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useState, useEffect } from 'react'
 import { addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, format, isSameMonth, isSameDay, isWithinInterval } from 'date-fns'
@@ -6,6 +6,7 @@ import { ptBR } from 'date-fns/locale'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { supabase } from '@/integrations/supabase/client'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 
 interface Cotacao {
   id: string
@@ -48,6 +49,7 @@ interface CalendarioCotacoesMensalProps {
   cotacoes: Cotacao[]
   onAprovar: (id: string) => void
   onEditar: (cotacao: Cotacao) => void
+  onExcluir?: (id: string) => Promise<void> | void
 }
 
 // Função para extrair data sem problemas de timezone
@@ -77,7 +79,7 @@ const getStatusLabel = (status: string) => {
   return labels[status] || status
 }
 
-export function CalendarioCotacoesMensal({ cotacoes, onAprovar, onEditar }: CalendarioCotacoesMensalProps) {
+export function CalendarioCotacoesMensal({ cotacoes, onAprovar, onEditar, onExcluir }: CalendarioCotacoesMensalProps) {
   const [dataReferencia, setDataReferencia] = useState(new Date())
   const [cotacaoSelecionada, setCotacaoSelecionada] = useState<Cotacao | null>(null)
   const [diaSelecionado, setDiaSelecionado] = useState<{ dia: Date; cotacoes: Cotacao[]; indisponibilidades: Indisponibilidade[] } | null>(null)
@@ -422,6 +424,36 @@ export function CalendarioCotacoesMensal({ cotacoes, onAprovar, onEditar }: Cale
                     >
                       Editar
                     </Button>
+                    {onExcluir && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="destructive" size="icon" title="Excluir cotação">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Excluir esta cotação?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta ação não pode ser desfeita. A cotação e o serviço vinculado (se houver e ainda não estiver em andamento) serão removidos permanentemente.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={async () => {
+                                const id = cotacaoSelecionada.id
+                                setCotacaoSelecionada(null)
+                                await onExcluir(id)
+                              }}
+                              className="bg-red-600 hover:bg-red-700"
+                            >
+                              Excluir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
                     {cotacaoSelecionada.status === 'pendente' && (
                       <Button 
                         onClick={() => {

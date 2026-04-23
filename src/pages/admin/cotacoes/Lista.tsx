@@ -761,6 +761,7 @@ export default function ListaCotacoes() {
                   fetchCotacoes()
                 }}
                 onEditar={abrirEdicao}
+                onExcluir={excluirCotacao}
               />
             )}
 
@@ -774,6 +775,7 @@ export default function ListaCotacoes() {
                   fetchCotacoes()
                 }}
                 onEditar={abrirEdicao}
+                onExcluir={excluirCotacao}
               />
             )}
 
