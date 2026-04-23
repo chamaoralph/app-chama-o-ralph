@@ -1663,6 +1663,7 @@ export type Database = {
         Args: { _instalador_id: string; _tipos_servico: string[] }
         Returns: boolean
       }
+      normalizar_telefone_br: { Args: { p_telefone: string }; Returns: string }
       validate_signup_invitation: {
         Args: { p_email: string; p_token: string }
         Returns: {
