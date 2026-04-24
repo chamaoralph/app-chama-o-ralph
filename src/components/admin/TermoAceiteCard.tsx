@@ -180,6 +180,18 @@ export function TermoAceiteCard({ cotacao, sugestaoTamanho, sugestaoTipoParede }
           )}
 
           <div className="flex flex-wrap gap-2">
+            {aceito && (
+              termo.pdf_url ? (
+                <Button size="sm" onClick={() => window.open(termo.pdf_url!, "_blank")} className="bg-emerald-600 hover:bg-emerald-700">
+                  <FileDown className="mr-1 h-3 w-3" /> Ver PDF
+                </Button>
+              ) : (
+                <Button size="sm" onClick={gerarPdfAgora} disabled={gerandoPdf} className="bg-emerald-600 hover:bg-emerald-700">
+                  {gerandoPdf ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <FileDown className="mr-1 h-3 w-3" />}
+                  {gerandoPdf ? "Gerando..." : "Gerar PDF agora"}
+                </Button>
+              )
+            )}
             <Button size="sm" variant="outline" onClick={copiarLink}>
               <Copy className="mr-1 h-3 w-3" /> Copiar link
             </Button>
