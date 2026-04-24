@@ -567,7 +567,7 @@ export default function NovaCotacao() {
 
               <div className="flex gap-3">
                 <button type="button" onClick={() => navigate('/admin/cotacoes')} className="px-6 py-2 border rounded-md">Cancelar</button>
-                <button type="submit" disabled={loading} className="flex-1 bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700">{loading ? 'Salvando...' : 'Criar Cotação'}</button>
+                <button type="submit" disabled={loading || tvIndisponivel} className="flex-1 bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">{loading ? 'Salvando...' : tvIndisponivel ? 'Combinação indisponível' : 'Criar Cotação'}</button>
               </div>
             </form>
           </TabsContent>
