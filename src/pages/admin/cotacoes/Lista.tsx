@@ -18,6 +18,7 @@ import { CalendarioCotacoesSemanal } from '@/components/admin/CalendarioCotacoes
 import { CalendarioCotacoesMensal } from '@/components/admin/CalendarioCotacoesMensal'
 import { SelectorPrecoTV, type SelectorTVValues, type PrecoTVResult } from '@/components/admin/SelectorPrecoTV'
 import { ehInstalacaoTV } from '@/lib/precosTV'
+import { TermoAceiteCard } from '@/components/admin/TermoAceiteCard'
 
 type VisualizacaoTipo = 'lista' | 'semanal' | 'mensal'
 
