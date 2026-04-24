@@ -16,6 +16,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CalendarioCotacoesSemanal } from '@/components/admin/CalendarioCotacoesSemanal'
 import { CalendarioCotacoesMensal } from '@/components/admin/CalendarioCotacoesMensal'
+import { SelectorPrecoTV, type SelectorTVValues, type PrecoTVResult } from '@/components/admin/SelectorPrecoTV'
+import { ehInstalacaoTV } from '@/lib/precosTV'
 
 type VisualizacaoTipo = 'lista' | 'semanal' | 'mensal'
 
@@ -190,10 +192,18 @@ export default function ListaCotacoes() {
   const [showOutroInput, setShowOutroInput] = useState(false)
   const [visualizacao, setVisualizacao] = useState<VisualizacaoTipo>('lista')
   const [bloqueandoTelefone, setBloqueandoTelefone] = useState<string | null>(null)
+  const [empresaIdAtual, setEmpresaIdAtual] = useState<string | null>(null)
+  const [tvSelectoresEdit, setTvSelectoresEdit] = useState<SelectorTVValues>({ tamanho_tv: '', tipo_parede: '', cobertura: '' })
+  const [tvIndisponivelEdit, setTvIndisponivelEdit] = useState(false)
 
   useEffect(() => {
     fetchCotacoes()
     fetchTiposServico()
+    ;(async () => {
+      if (!user) return
+      const { data } = await supabase.from('usuarios').select('empresa_id').eq('id', user.id).maybeSingle()
+      if (data) setEmpresaIdAtual(data.empresa_id)
+    })()
   }, [user])
 
   async function fetchTiposServico() {
