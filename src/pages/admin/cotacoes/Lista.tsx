@@ -229,6 +229,27 @@ export default function ListaCotacoes() {
       if (error) throw error
       
       setCotacoes(data || [])
+
+      // Buscar clientes que já assinaram pelo menos 1 termo
+      const { data: termos } = await supabase
+        .from('termos_aceite')
+        .select('cotacao_id')
+        .eq('status', 'aceito')
+      
+      if (termos && termos.length > 0) {
+        const cotacaoIds = termos.map(t => t.cotacao_id)
+        const { data: cotacoesComTermo } = await supabase
+          .from('cotacoes')
+          .select('cliente_id')
+          .in('id', cotacaoIds)
+        
+        const clientesSet = new Set<string>(
+          (cotacoesComTermo || []).map(c => c.cliente_id).filter(Boolean)
+        )
+        setClientesComTermo(clientesSet)
+      } else {
+        setClientesComTermo(new Set())
+      }
     } catch (err) {
       console.error('Erro ao buscar cotações:', err)
       setError('Erro ao carregar cotações')
