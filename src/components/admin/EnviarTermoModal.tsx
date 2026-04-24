@@ -309,24 +309,66 @@ export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }
             </RadioGroup>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-3">
             {(modalidadesEnvio === "ambas" || modalidadesEnvio === "completa") && (
-              <div className="space-y-2">
-                <Label>Valor Completa (R$) — total</Label>
-                <Input type="number" step="0.01" value={valorCompleta} onChange={(e) => setValorCompleta(e.target.value)} placeholder="0,00" />
+              <div className="rounded-md border p-3 space-y-2">
+                <div className="text-sm font-semibold text-[#1e5a9e]">Modalidade Completa</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Subtotal (R$)</Label>
+                    <Input type="number" step="0.01" value={valorCompleta} onChange={(e) => setValorCompleta(e.target.value)} placeholder="0,00" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Desconto (R$)</Label>
+                    <Input type="number" step="0.01" min="0" value={descontoCompleta} onChange={(e) => setDescontoCompleta(e.target.value)} placeholder="0,00" />
+                  </div>
+                </div>
+                {descCompletaNum > 0 && (
+                  <div className="flex items-center justify-between rounded bg-[#e8f0fa] px-2 py-1.5 text-sm">
+                    <span className="text-foreground/70">Total a cobrar</span>
+                    <span className="font-bold text-[#1e5a9e]">
+                      {totalFinalCompleta.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
             {(modalidadesEnvio === "ambas" || modalidadesEnvio === "colaborativa") && (
-              <div className="space-y-2">
-                <Label>Valor Colaborativa (R$) — total</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={valorColaborativa}
-                  onChange={(e) => setValorColaborativa(e.target.value)}
-                  placeholder="0,00"
-                  disabled={colabInfo.indisponivel}
-                />
+              <div className="rounded-md border p-3 space-y-2">
+                <div className="text-sm font-semibold text-[#0f6e56]">Modalidade Colaborativa</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Subtotal (R$)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={valorColaborativa}
+                      onChange={(e) => setValorColaborativa(e.target.value)}
+                      placeholder="0,00"
+                      disabled={colabInfo.indisponivel}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Desconto (R$)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={descontoColaborativa}
+                      onChange={(e) => setDescontoColaborativa(e.target.value)}
+                      placeholder="0,00"
+                      disabled={colabInfo.indisponivel}
+                    />
+                  </div>
+                </div>
+                {descColabNum > 0 && !colabInfo.indisponivel && (
+                  <div className="flex items-center justify-between rounded bg-[#e1f5ee] px-2 py-1.5 text-sm">
+                    <span className="text-foreground/70">Total a cobrar</span>
+                    <span className="font-bold text-[#0f6e56]">
+                      {totalFinalColaborativa.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>
