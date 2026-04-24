@@ -264,9 +264,9 @@ export default function NovaCotacao() {
           tv_tamanho: tvItens[0]?.tamanho || null,
           tv_parede: tvItens[0]?.parede || null,
           tv_cobertura: tvItens[0]?.cobertura || null,
-          tvs_itens: isInstalacaoTV ? tvItens : null,
+          tvs_itens: isInstalacaoTV ? (tvItens as any) : null,
           status: 'pendente'
-        })
+        } as any)
 
       if (erroCotacao) throw erroCotacao
 
