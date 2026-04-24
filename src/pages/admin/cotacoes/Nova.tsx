@@ -262,6 +262,9 @@ export default function NovaCotacao() {
           observacoes: formData.observacoes,
           origem_suporte: formData.origem_suporte || null,
           custo_suporte: formData.custo_suporte ? parseFloat(formData.custo_suporte) : 0,
+          tv_tamanho: tvSelectores.tamanho_tv || null,
+          tv_parede: tvSelectores.tipo_parede || null,
+          tv_cobertura: tvSelectores.cobertura || null,
           status: 'pendente'
         })
 
