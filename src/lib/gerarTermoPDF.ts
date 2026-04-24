@@ -15,6 +15,8 @@ export interface TermoPDFData {
   modalidade_escolhida?: string | null;
   valor_completa?: number | null;
   valor_colaborativa?: number | null;
+  desconto_completa?: number | null;
+  desconto_colaborativa?: number | null;
   assinatura_base64?: string | null;
   aceito_em?: string | null;
   aceite_user_agent?: string | null;
