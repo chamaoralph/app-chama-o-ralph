@@ -42,7 +42,10 @@ export interface PrecoTV {
 
 export function ehInstalacaoTV(nome: string | undefined | null): boolean {
   if (!nome) return false;
-  return nome.toLowerCase().includes("instala") && nome.toLowerCase().includes("tv");
+  const n = nome.toLowerCase().trim();
+  // Aceita "TV", "Instalação de TV", "Instalar TV", etc.
+  // Match palavra "tv" isolada (não "tvm" ou similares)
+  return /(^|\s|de\s)tv($|\s|\b)/.test(n) || n === "tv";
 }
 
 export async function buscarPrecoTV(
