@@ -1339,8 +1339,7 @@ export default function ListaCotacoes() {
                   cliente_telefone: editForm.cliente_telefone,
                   cliente_endereco: editForm.endereco_completo,
                 }}
-                sugestaoTamanho={tvSelectoresEdit.tamanho_tv}
-                sugestaoTipoParede={tvSelectoresEdit.tipo_parede}
+                tvsItens={tvItensEdit}
               />
             </div>
           )}
