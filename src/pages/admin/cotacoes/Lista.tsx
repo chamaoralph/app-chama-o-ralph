@@ -1248,6 +1248,14 @@ export default function ListaCotacoes() {
                     />
                   </div>
                 )}
+                {ehInstalacaoTV(editForm.tipo_servico) && (
+                  <SelectorPrecoTV
+                    empresaId={empresaIdAtual}
+                    values={tvSelectoresEdit}
+                    onChange={setTvSelectoresEdit}
+                    onPrecoCalculado={handlePrecoCalculadoEdit}
+                  />
+                )}
                 <div className="col-span-2 space-y-2">
                   <Label>Descrição do Serviço (Detalhes)</Label>
                   <Textarea 
@@ -1309,8 +1317,8 @@ export default function ListaCotacoes() {
             <Button variant="outline" onClick={() => setCotacaoParaEditar(null)}>
               Cancelar
             </Button>
-            <Button onClick={salvarEdicao} disabled={editLoading}>
-              {editLoading ? 'Salvando...' : 'Salvar Alterações'}
+            <Button onClick={salvarEdicao} disabled={editLoading || tvIndisponivelEdit}>
+              {editLoading ? 'Salvando...' : tvIndisponivelEdit ? 'Combinação indisponível' : 'Salvar Alterações'}
             </Button>
           </DialogFooter>
         </DialogContent>
