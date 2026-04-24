@@ -506,6 +506,7 @@ export type Database = {
           tv_cobertura: string | null
           tv_parede: string | null
           tv_tamanho: string | null
+          tvs_itens: Json | null
           updated_at: string | null
           valor_estimado: number | null
           valor_material: number | null
@@ -529,6 +530,7 @@ export type Database = {
           tv_cobertura?: string | null
           tv_parede?: string | null
           tv_tamanho?: string | null
+          tvs_itens?: Json | null
           updated_at?: string | null
           valor_estimado?: number | null
           valor_material?: number | null
@@ -552,6 +554,7 @@ export type Database = {
           tv_cobertura?: string | null
           tv_parede?: string | null
           tv_tamanho?: string | null
+          tvs_itens?: Json | null
           updated_at?: string | null
           valor_estimado?: number | null
           valor_material?: number | null
@@ -1496,6 +1499,7 @@ export type Database = {
           tv_marca_modelo: string | null
           tv_polegadas: string | null
           tv_tipo: string | null
+          tvs_itens: Json | null
           updated_at: string
           valor_colaborativa: number | null
           valor_completa: number | null
@@ -1524,6 +1528,7 @@ export type Database = {
           tv_marca_modelo?: string | null
           tv_polegadas?: string | null
           tv_tipo?: string | null
+          tvs_itens?: Json | null
           updated_at?: string
           valor_colaborativa?: number | null
           valor_completa?: number | null
@@ -1552,6 +1557,7 @@ export type Database = {
           tv_marca_modelo?: string | null
           tv_polegadas?: string | null
           tv_tipo?: string | null
+          tvs_itens?: Json | null
           updated_at?: string
           valor_colaborativa?: number | null
           valor_completa?: number | null

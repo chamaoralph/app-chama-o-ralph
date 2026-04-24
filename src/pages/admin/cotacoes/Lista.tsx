@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CalendarioCotacoesSemanal } from '@/components/admin/CalendarioCotacoesSemanal'
 import { CalendarioCotacoesMensal } from '@/components/admin/CalendarioCotacoesMensal'
-import { SelectorPrecoTV, type SelectorTVValues, type PrecoTVResult } from '@/components/admin/SelectorPrecoTV'
+import { SelectorPrecoTV, type TVItem, type TotaisTV, novoItemTV } from '@/components/admin/SelectorPrecoTV'
 import { ehInstalacaoTV } from '@/lib/precosTV'
 import { TermoAceiteCard } from '@/components/admin/TermoAceiteCard'
 
@@ -194,7 +194,7 @@ export default function ListaCotacoes() {
   const [visualizacao, setVisualizacao] = useState<VisualizacaoTipo>('lista')
   const [bloqueandoTelefone, setBloqueandoTelefone] = useState<string | null>(null)
   const [empresaIdAtual, setEmpresaIdAtual] = useState<string | null>(null)
-  const [tvSelectoresEdit, setTvSelectoresEdit] = useState<SelectorTVValues>({ tamanho_tv: '', tipo_parede: '', cobertura: '' })
+  const [tvItensEdit, setTvItensEdit] = useState<TVItem[]>([novoItemTV()])
   const [tvIndisponivelEdit, setTvIndisponivelEdit] = useState(false)
 
   useEffect(() => {
@@ -285,24 +285,32 @@ export default function ListaCotacoes() {
       custo_suporte: (cotacao as any).custo_suporte?.toString() || ''
     })
     setShowOutroInput(!ehTipoCadastrado && !!tipoAtual)
-    setTvSelectoresEdit({
-      tamanho_tv: (cotacao as any).tv_tamanho || '',
-      tipo_parede: (cotacao as any).tv_parede || '',
-      cobertura: (cotacao as any).tv_cobertura || '',
-    })
+    // Carregar tvs_itens existente, ou construir a partir das colunas legadas
+    const tvsExistentes = (cotacao as any).tvs_itens as TVItem[] | null
+    if (Array.isArray(tvsExistentes) && tvsExistentes.length > 0) {
+      setTvItensEdit(tvsExistentes)
+    } else if ((cotacao as any).tv_tamanho) {
+      setTvItensEdit([{
+        ...novoItemTV(),
+        tamanho: (cotacao as any).tv_tamanho || '',
+        parede: (cotacao as any).tv_parede || '',
+        cobertura: (cotacao as any).tv_cobertura || '',
+      }])
+    } else {
+      setTvItensEdit([novoItemTV()])
+    }
     setTvIndisponivelEdit(false)
     setCotacaoParaEditar(cotacao)
   }
 
-  function handlePrecoCalculadoEdit(resultado: PrecoTVResult | null, indisponivel: boolean) {
+  function handleTotaisCalculadosEdit(totais: TotaisTV, indisponivel: boolean) {
     setTvIndisponivelEdit(indisponivel)
-    if (!resultado) return
     setEditForm(prev => ({
       ...prev,
-      valor_estimado: resultado.valorMaoObra ? resultado.valorMaoObra.toString() : '',
-      valor_material: resultado.origemSuporte === 'empresa' ? '' : (resultado.valorMaterial ? resultado.valorMaterial.toString() : ''),
-      origem_suporte: resultado.origemSuporte,
-      custo_suporte: resultado.custoSuporte ? resultado.custoSuporte.toString() : '',
+      valor_estimado: totais.totalMaoObra ? totais.totalMaoObra.toString() : '',
+      valor_material: totais.origemSuporte === 'empresa' ? '' : (totais.totalMaterial ? totais.totalMaterial.toString() : ''),
+      origem_suporte: totais.origemSuporte,
+      custo_suporte: totais.totalCustoSuporte ? totais.totalCustoSuporte.toString() : '',
     }))
   }
 
@@ -352,10 +360,11 @@ export default function ListaCotacoes() {
           observacoes: editForm.observacoes || null,
           origem_suporte: editForm.origem_suporte || null,
           custo_suporte: editForm.custo_suporte ? parseFloat(editForm.custo_suporte) : 0,
-          tv_tamanho: tvSelectoresEdit.tamanho_tv || null,
-          tv_parede: tvSelectoresEdit.tipo_parede || null,
-          tv_cobertura: tvSelectoresEdit.cobertura || null,
-        })
+          tv_tamanho: tvItensEdit[0]?.tamanho || null,
+          tv_parede: tvItensEdit[0]?.parede || null,
+          tv_cobertura: tvItensEdit[0]?.cobertura || null,
+          tvs_itens: tvItensEdit as any,
+        } as any)
         .eq('id', cotacaoParaEditar.id)
 
       if (erroCotacao) throw erroCotacao
@@ -1259,9 +1268,9 @@ export default function ListaCotacoes() {
                 {ehInstalacaoTV(editForm.tipo_servico) && (
                   <SelectorPrecoTV
                     empresaId={empresaIdAtual}
-                    values={tvSelectoresEdit}
-                    onChange={setTvSelectoresEdit}
-                    onPrecoCalculado={handlePrecoCalculadoEdit}
+                    items={tvItensEdit}
+                    onItemsChange={setTvItensEdit}
+                    onTotaisChange={handleTotaisCalculadosEdit}
                   />
                 )}
                 <div className="col-span-2 space-y-2">
@@ -1330,8 +1339,7 @@ export default function ListaCotacoes() {
                   cliente_telefone: editForm.cliente_telefone,
                   cliente_endereco: editForm.endereco_completo,
                 }}
-                sugestaoTamanho={tvSelectoresEdit.tamanho_tv}
-                sugestaoTipoParede={tvSelectoresEdit.tipo_parede}
+                tvsItens={tvItensEdit}
               />
             </div>
           )}

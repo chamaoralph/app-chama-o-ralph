@@ -88,6 +88,24 @@ export function colaborativaIndisponivel(
   return { indisponivel: false };
 }
 
+/**
+ * Valida uma lista de TVs contra as regras da modalidade Colaborativa.
+ * Se qualquer TV for incompatível, toda a cotação perde essa modalidade.
+ */
+export function colaborativaIndisponivelLista(
+  tvs: Array<{ tipo?: string | null; polegadas?: string | null }>,
+): { indisponivel: boolean; motivo?: string } {
+  if (!tvs || tvs.length === 0) return { indisponivel: false };
+  for (let i = 0; i < tvs.length; i++) {
+    const t = tvs[i];
+    const r = colaborativaIndisponivel(t.tipo, t.polegadas);
+    if (r.indisponivel) {
+      return { indisponivel: true, motivo: `TV ${i + 1}: ${r.motivo}` };
+    }
+  }
+  return { indisponivel: false };
+}
+
 export function gerarToken(): string {
   return crypto.randomUUID().split("-")[0];
 }

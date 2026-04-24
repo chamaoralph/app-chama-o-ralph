@@ -11,6 +11,7 @@ export interface TermoPDFData {
   tv_marca_modelo?: string | null;
   tv_polegadas?: string | null;
   tv_tipo?: string | null;
+  tvs_itens?: Array<{ marca_modelo?: string | null; polegadas?: string | null; tipo?: string | null }> | null;
   modalidade_escolhida?: string | null;
   valor_completa?: number | null;
   valor_colaborativa?: number | null;
@@ -101,11 +102,17 @@ export async function gerarTermoPDF(termo: TermoPDFData, empresaNome: string): P
   writeText(`Telefone: ${termo.cliente_telefone || "—"}`);
   writeText(`Endereço: ${termo.cliente_endereco || "—"}`);
 
-  // ====== SEÇÃO 2 — Equipamento ======
-  writeSectionTitle("2. EQUIPAMENTO");
-  writeText(`Marca/Modelo: ${termo.tv_marca_modelo || "—"}`);
-  writeText(`Polegadas: ${termo.tv_polegadas || "—"}`);
-  writeText(`Tipo: ${termo.tv_tipo || "—"}`);
+  // ====== SEÇÃO 2 — Equipamento(s) ======
+  const tvs = Array.isArray(termo.tvs_itens) && termo.tvs_itens.length > 0
+    ? termo.tvs_itens
+    : [{ marca_modelo: termo.tv_marca_modelo, polegadas: termo.tv_polegadas, tipo: termo.tv_tipo }];
+  writeSectionTitle(tvs.length > 1 ? `2. EQUIPAMENTOS (${tvs.length})` : "2. EQUIPAMENTO");
+  tvs.forEach((t, i) => {
+    if (tvs.length > 1) writeText(`TV ${i + 1}`, { bold: true, size: 10.5 });
+    writeText(`Marca/Modelo: ${t.marca_modelo || "—"}`);
+    writeText(`Polegadas: ${t.polegadas || "—"}`);
+    writeText(`Tipo: ${t.tipo || "—"}`);
+  });
 
   // ====== SEÇÃO 3 — Modalidade ======
   writeSectionTitle("3. MODALIDADE CONTRATADA");

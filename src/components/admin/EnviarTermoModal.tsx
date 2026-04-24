@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { TIPOS_TV, gerarToken, colaborativaIndisponivel } from "@/lib/termoTexto";
+import { TIPOS_TV, gerarToken, colaborativaIndisponivelLista } from "@/lib/termoTexto";
 import { buscarPrecoTV } from "@/lib/precosTV";
 import { Send, AlertTriangle } from "lucide-react";
+import type { TVItem } from "@/components/admin/SelectorPrecoTV";
 
 interface Props {
   open: boolean;
@@ -20,9 +21,7 @@ interface Props {
     cliente_telefone: string;
     cliente_endereco: string | null;
   };
-  // Sugestões pré-preenchidas (vindas dos selects de TV se já configurados)
-  sugestaoTamanho?: string; // ex: "55"
-  sugestaoTipoParede?: string;
+  tvsItens?: TVItem[];
   onEnviado?: () => void;
 }
 
@@ -34,39 +33,73 @@ const TAMANHO_PARA_POLEGADAS: Record<string, string> = {
   "85": "85",
 };
 
-export function EnviarTermoModal({ open, onClose, cotacao, sugestaoTamanho, sugestaoTipoParede, onEnviado }: Props) {
-  const [marcaModelo, setMarcaModelo] = useState("");
-  const [polegadas, setPolegadas] = useState("");
-  const [tipoTV, setTipoTV] = useState<string>("LED");
+interface TVFormItem {
+  // vem do item original
+  tamanho: string;
+  parede: string;
+  // preenchido pelo admin
+  polegadas: string;
+  tipo: string;
+  marca_modelo: string;
+}
+
+export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }: Props) {
+  const [itens, setItens] = useState<TVFormItem[]>([]);
   const [valorCompleta, setValorCompleta] = useState("");
   const [valorColaborativa, setValorColaborativa] = useState("");
   const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-    const polSugerido = sugestaoTamanho ? TAMANHO_PARA_POLEGADAS[sugestaoTamanho] || "" : "";
-    setPolegadas(polSugerido);
-    setMarcaModelo("");
-    setTipoTV("LED");
+    // Montar 1 item por TV da cotação (ou 1 único se não houver tvsItens)
+    const base = tvsItens && tvsItens.length > 0 ? tvsItens : [{ tamanho: "", parede: "" } as TVItem];
+    setItens(
+      base.map((t) => ({
+        tamanho: t.tamanho || "",
+        parede: t.parede || "",
+        polegadas: t.tamanho ? TAMANHO_PARA_POLEGADAS[t.tamanho] || "" : "",
+        tipo: "LED",
+        marca_modelo: "",
+      })),
+    );
     setValorCompleta("");
     setValorColaborativa("");
 
-    // Tenta pré-preencher valores via tabela de preços
-    if (sugestaoTamanho && sugestaoTipoParede) {
-      (async () => {
+    // Pré-preenche valores somando Completa e Colaborativa por item
+    (async () => {
+      let totalCompleta = 0;
+      let totalColab = 0;
+      let temColab = true;
+      for (const t of base) {
+        if (!t.tamanho || !t.parede) {
+          temColab = false;
+          continue;
+        }
         const [total, parcial] = await Promise.all([
-          buscarPrecoTV(cotacao.empresa_id, sugestaoTamanho, sugestaoTipoParede, "total"),
-          buscarPrecoTV(cotacao.empresa_id, sugestaoTamanho, sugestaoTipoParede, "parcial"),
+          buscarPrecoTV(cotacao.empresa_id, t.tamanho, t.parede, "total"),
+          buscarPrecoTV(cotacao.empresa_id, t.tamanho, t.parede, "parcial"),
         ]);
-        if (total?.disponivel && total.valor_mao_obra) setValorCompleta(String(total.valor_mao_obra));
-        if (parcial?.disponivel && parcial.valor_mao_obra) setValorColaborativa(String(parcial.valor_mao_obra));
-      })();
-    }
-  }, [open, sugestaoTamanho, sugestaoTipoParede, cotacao.empresa_id]);
+        if (total?.disponivel && total.valor_mao_obra) totalCompleta += Number(total.valor_mao_obra);
+        if (parcial?.disponivel && parcial.valor_mao_obra) {
+          totalColab += Number(parcial.valor_mao_obra);
+        } else {
+          temColab = false;
+        }
+      }
+      if (totalCompleta > 0) setValorCompleta(String(totalCompleta));
+      if (temColab && totalColab > 0) setValorColaborativa(String(totalColab));
+    })();
+  }, [open, tvsItens, cotacao.empresa_id]);
 
-  const colabInfo = colaborativaIndisponivel(tipoTV, polegadas);
+  function updateItem(idx: number, patch: Partial<TVFormItem>) {
+    setItens((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+  }
 
-  async function enviarTermo(reaproveitar = false) {
+  const colabInfo = colaborativaIndisponivelLista(
+    itens.map((i) => ({ tipo: i.tipo, polegadas: i.polegadas })),
+  );
+
+  async function enviarTermo() {
     if (!valorCompleta || parseFloat(valorCompleta) <= 0) {
       toast.error("Informe o valor da Modalidade Completa");
       return;
@@ -74,15 +107,31 @@ export function EnviarTermoModal({ open, onClose, cotacao, sugestaoTamanho, suge
     setEnviando(true);
     try {
       const token = gerarToken();
+
+      // Montar array tvs_itens para persistir (combina dados da cotação + dados preenchidos aqui)
+      const tvsParaSalvar = itens.map((it, idx) => {
+        const original = tvsItens?.[idx];
+        return {
+          ...(original || {}),
+          tamanho: it.tamanho,
+          parede: it.parede,
+          polegadas: it.polegadas,
+          tipo: it.tipo,
+          marca_modelo: it.marca_modelo,
+        };
+      });
+
+      const primeiro = itens[0];
       const { error } = await supabase.from("termos_aceite" as any).insert({
         empresa_id: cotacao.empresa_id,
         cotacao_id: cotacao.id,
         cliente_nome: cotacao.cliente_nome,
         cliente_telefone: cotacao.cliente_telefone,
         cliente_endereco: cotacao.cliente_endereco,
-        tv_marca_modelo: marcaModelo || null,
-        tv_polegadas: polegadas || null,
-        tv_tipo: tipoTV,
+        tv_marca_modelo: primeiro?.marca_modelo || null,
+        tv_polegadas: primeiro?.polegadas || null,
+        tv_tipo: primeiro?.tipo || null,
+        tvs_itens: tvsParaSalvar,
         valor_completa: parseFloat(valorCompleta),
         valor_colaborativa: valorColaborativa ? parseFloat(valorColaborativa) : null,
         token,
@@ -120,43 +169,58 @@ export function EnviarTermoModal({ open, onClose, cotacao, sugestaoTamanho, suge
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Send className="h-5 w-5" /> Enviar Termo de Aceite
           </DialogTitle>
           <DialogDescription>
-            Confirme os dados do equipamento e os valores das modalidades. Será gerado um link para o cliente assinar.
+            Confirme os dados dos equipamentos e os valores das modalidades. Será gerado um link para o cliente assinar.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
+          {itens.map((it, idx) => (
+            <div key={idx} className="rounded-md border p-3 space-y-3">
+              <div className="text-sm font-semibold">TV {idx + 1}</div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Polegadas</Label>
+                  <Input
+                    value={it.polegadas}
+                    onChange={(e) => updateItem(idx, { polegadas: e.target.value })}
+                    placeholder="55"
+                    inputMode="numeric"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Tipo de TV</Label>
+                  <Select value={it.tipo} onValueChange={(v) => updateItem(idx, { tipo: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {TIPOS_TV.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Marca / Modelo (opcional)</Label>
+                <Input
+                  value={it.marca_modelo}
+                  onChange={(e) => updateItem(idx, { marca_modelo: e.target.value })}
+                  placeholder="Ex: Samsung 55 QLED Q60"
+                />
+              </div>
+            </div>
+          ))}
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label>Polegadas</Label>
-              <Input value={polegadas} onChange={(e) => setPolegadas(e.target.value)} placeholder="55" inputMode="numeric" />
-            </div>
-            <div className="space-y-2">
-              <Label>Tipo de TV</Label>
-              <Select value={tipoTV} onValueChange={setTipoTV}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {TIPOS_TV.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Marca / Modelo (opcional)</Label>
-            <Input value={marcaModelo} onChange={(e) => setMarcaModelo(e.target.value)} placeholder="Ex: Samsung 55 QLED Q60" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Valor Completa (R$)</Label>
+              <Label>Valor Completa (R$) — total</Label>
               <Input type="number" step="0.01" value={valorCompleta} onChange={(e) => setValorCompleta(e.target.value)} placeholder="0,00" />
             </div>
             <div className="space-y-2">
-              <Label>Valor Colaborativa (R$)</Label>
+              <Label>Valor Colaborativa (R$) — total</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -177,7 +241,7 @@ export function EnviarTermoModal({ open, onClose, cotacao, sugestaoTamanho, suge
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={enviando}>Cancelar</Button>
-          <Button onClick={() => enviarTermo()} disabled={enviando} className="bg-emerald-600 hover:bg-emerald-700">
+          <Button onClick={enviarTermo} disabled={enviando} className="bg-emerald-600 hover:bg-emerald-700">
             {enviando ? "Enviando..." : "Gerar Link e Abrir WhatsApp"}
           </Button>
         </DialogFooter>
