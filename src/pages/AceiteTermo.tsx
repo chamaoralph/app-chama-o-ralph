@@ -253,6 +253,8 @@ export default function AceiteTermo() {
         modalidade_escolhida: t.modalidade_escolhida,
         valor_completa: t.valor_completa,
         valor_colaborativa: t.valor_colaborativa,
+        desconto_completa: t.desconto_completa ?? 0,
+        desconto_colaborativa: t.desconto_colaborativa ?? 0,
         assinatura_base64: t.assinatura_base64,
         aceito_em: t.aceito_em,
         aceite_user_agent: t.aceite_user_agent,
