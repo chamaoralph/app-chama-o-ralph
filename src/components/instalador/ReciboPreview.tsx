@@ -151,12 +151,14 @@ export function ReciboPreview({ instaladorNome, dataReferencia, servicos }: Reci
               <th style={styles.th}>Tipo</th>
               <th style={styles.thRight}>M. Obra</th>
               <th style={styles.thRight}>Reemb.</th>
+              <th style={styles.thRight}>Recebido</th>
               <th style={styles.thRight}>Total</th>
             </tr>
           </thead>
           <tbody>
             {servicos.map((servico) => {
               const total = servico.valor_mao_obra_instalador + servico.valor_reembolso_despesas
+              const recebido = servico.valor_recebido_cliente || 0
               return (
                 <tr key={servico.id}>
                   <td style={{ ...styles.td, fontWeight: '500' }}>{servico.codigo}</td>
@@ -164,6 +166,9 @@ export function ReciboPreview({ instaladorNome, dataReferencia, servicos }: Reci
                   <td style={styles.td}>{servico.tipo_servico.join(', ')}</td>
                   <td style={styles.tdRight}>R$ {servico.valor_mao_obra_instalador.toFixed(2)}</td>
                   <td style={styles.tdRight}>R$ {servico.valor_reembolso_despesas.toFixed(2)}</td>
+                  <td style={{ ...styles.tdRight, color: recebido > 0 ? '#ea580c' : '#9ca3af', fontWeight: recebido > 0 ? '600' : 'normal' }}>
+                    {recebido > 0 ? `R$ ${recebido.toFixed(2)}` : '—'}
+                  </td>
                   <td style={{ ...styles.tdRight, fontWeight: '500' }}>R$ {total.toFixed(2)}</td>
                 </tr>
               )
