@@ -52,6 +52,8 @@ export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }
   const [modalidadesEnvio, setModalidadesEnvio] = useState<"ambas" | "completa" | "colaborativa">("ambas");
   const [valorCompleta, setValorCompleta] = useState("");
   const [valorColaborativa, setValorColaborativa] = useState("");
+  const [descontoCompleta, setDescontoCompleta] = useState("");
+  const [descontoColaborativa, setDescontoColaborativa] = useState("");
   const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
