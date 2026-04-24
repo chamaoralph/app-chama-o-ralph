@@ -133,26 +133,51 @@ export async function gerarTermoPDF(termo: TermoPDFData, empresaNome: string): P
   // Breakdown por TV (apenas se mais de uma TV e tiver valores individuais)
   const campoItem = isCompleta ? "valor_completa_item" : "valor_colaborativa_item";
   const temBreakdown = tvs.length > 1 && tvs.some((t: any) => t[campoItem] != null);
-  if (temBreakdown) {
-    writeText("Detalhamento por equipamento:", { bold: true, size: 10 });
-    tvs.forEach((t: any, i) => {
-      const v = t[campoItem];
-      const rotulo = `TV ${i + 1}${t.polegadas ? ` · ${t.polegadas}"` : ""}${t.tipo ? ` ${t.tipo}` : ""}`;
+  const descontoModal = isCompleta ? (termo.desconto_completa ?? 0) : (termo.desconto_colaborativa ?? 0);
+  const temDesconto = descontoModal > 0;
+  const subtotalModal = (valorModal ?? 0) + descontoModal;
+
+  if (temBreakdown || temDesconto) {
+    if (temBreakdown) {
+      writeText("Detalhamento por equipamento:", { bold: true, size: 10 });
+      tvs.forEach((t: any, i) => {
+        const v = t[campoItem];
+        const rotulo = `TV ${i + 1}${t.polegadas ? ` · ${t.polegadas}"` : ""}${t.tipo ? ` ${t.tipo}` : ""}`;
+        checkPage(6);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        doc.text(rotulo, margin + 3, y);
+        doc.text(formatarMoeda(v), pageW - margin, y, { align: "right" });
+        y += 5;
+      });
+      checkPage(6);
+      doc.setDrawColor(180, 180, 180);
+      doc.line(margin + 3, y, pageW - margin, y);
+      y += 4;
+    }
+    if (temDesconto) {
       checkPage(6);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
-      doc.text(rotulo, margin + 3, y);
-      doc.text(formatarMoeda(v), pageW - margin, y, { align: "right" });
+      doc.setTextColor(60, 60, 60);
+      doc.text("Subtotal", margin + 3, y);
+      doc.text(formatarMoeda(subtotalModal), pageW - margin, y, { align: "right" });
       y += 5;
-    });
-    // linha divisora
+      checkPage(6);
+      doc.setTextColor(15, 110, 86);
+      doc.text("Desconto", margin + 3, y);
+      doc.text(`- ${formatarMoeda(descontoModal)}`, pageW - margin, y, { align: "right" });
+      y += 5;
+      doc.setTextColor(30, 30, 30);
+      checkPage(6);
+      doc.setDrawColor(180, 180, 180);
+      doc.line(margin + 3, y, pageW - margin, y);
+      y += 4;
+    }
     checkPage(6);
-    doc.setDrawColor(180, 180, 180);
-    doc.line(margin + 3, y, pageW - margin, y);
-    y += 4;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10.5);
-    doc.text("Total", margin + 3, y);
+    doc.text(temDesconto ? "Total a pagar" : "Total", margin + 3, y);
     doc.text(formatarMoeda(valorModal), pageW - margin, y, { align: "right" });
     y += 6;
   }
