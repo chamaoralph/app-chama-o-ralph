@@ -328,47 +328,47 @@ export default function AceiteTermo() {
               {termo.cliente_endereco && <div className="mt-1 text-sm text-muted-foreground">{termo.cliente_endereco}</div>}
             </Card>
 
-            <h2 className="text-base font-semibold">Escolha a modalidade</h2>
+            <h2 className="text-base font-semibold">
+              {modalidadeUnica ? "Confirme os detalhes da sua instalação" : "Escolha a modalidade"}
+            </h2>
 
             {/* Completa */}
-            <button
-              type="button"
-              onClick={() => setModalidade("completa")}
-              className={`w-full rounded-2xl border-2 p-4 text-left transition ${modalidade === "completa" ? "border-[#1e5a9e] bg-[#e8f0fa]" : "border-border bg-white hover:border-[#1e5a9e]/40"}`}
-            >
-              <div className="flex items-baseline justify-between">
-                <div className="text-lg font-semibold text-[#1e5a9e]">Completa</div>
-                <div className="text-xl font-bold text-[#1e5a9e]">{formatarMoeda(termo.valor_completa)}</div>
-              </div>
-              <ul className="mt-2 space-y-1 text-sm text-foreground/80">
-                <li>✓ Técnico + ajudante fazem tudo</li>
-                <li>✓ Quebrou? Empresa cobre o conserto ou troca por equivalente</li>
-                <li>✓ Qualquer TV, sem restrição</li>
-              </ul>
-            </button>
+            {mostrarCompleta && (
+              <button
+                type="button"
+                onClick={() => setModalidade("completa")}
+                className={`w-full rounded-2xl border-2 p-4 text-left transition ${modalidade === "completa" ? "border-[#1e5a9e] bg-[#e8f0fa]" : "border-border bg-white hover:border-[#1e5a9e]/40"}`}
+              >
+                <div className="flex items-baseline justify-between">
+                  <div className="text-lg font-semibold text-[#1e5a9e]">Completa</div>
+                  <div className="text-xl font-bold text-[#1e5a9e]">{formatarMoeda(termo.valor_completa)}</div>
+                </div>
+                <ul className="mt-2 space-y-1 text-sm text-foreground/80">
+                  <li>✓ Técnico + ajudante fazem tudo</li>
+                  <li>✓ Quebrou? Empresa cobre o conserto ou troca por equivalente</li>
+                  <li>✓ Qualquer TV, sem restrição</li>
+                </ul>
+              </button>
+            )}
 
             {/* Colaborativa */}
-            <button
-              type="button"
-              disabled={colabInfo.indisponivel || termo.valor_colaborativa == null}
-              onClick={() => setModalidade("colaborativa")}
-              className={`w-full rounded-2xl border-2 p-4 text-left transition ${modalidade === "colaborativa" ? "border-[#0f6e56] bg-[#e1f5ee]" : "border-border bg-white hover:border-[#0f6e56]/40"} ${colabInfo.indisponivel || termo.valor_colaborativa == null ? "cursor-not-allowed opacity-50" : ""}`}
-            >
-              <div className="flex items-baseline justify-between">
-                <div className="text-lg font-semibold text-[#0f6e56]">Colaborativa</div>
-                <div className="text-xl font-bold text-[#0f6e56]">{formatarMoeda(termo.valor_colaborativa)}</div>
-              </div>
-              <ul className="mt-2 space-y-1 text-sm text-foreground/80">
-                <li>✓ Você ajuda a encaixar a TV (~30 seg)</li>
-                <li>✓ Quebrou? Empresa cobre 50% do conserto (até R$ 1.000)</li>
-                <li>✓ Apenas TVs até 55", exceto OLED e The Frame</li>
-              </ul>
-              {colabInfo.indisponivel && (
-                <div className="mt-2 rounded-md bg-amber-100 p-2 text-xs text-amber-900">
-                  Não disponível: {colabInfo.motivo}
+            {mostrarColaborativa && (
+              <button
+                type="button"
+                onClick={() => setModalidade("colaborativa")}
+                className={`w-full rounded-2xl border-2 p-4 text-left transition ${modalidade === "colaborativa" ? "border-[#0f6e56] bg-[#e1f5ee]" : "border-border bg-white hover:border-[#0f6e56]/40"}`}
+              >
+                <div className="flex items-baseline justify-between">
+                  <div className="text-lg font-semibold text-[#0f6e56]">Colaborativa</div>
+                  <div className="text-xl font-bold text-[#0f6e56]">{formatarMoeda(termo.valor_colaborativa)}</div>
                 </div>
-              )}
-            </button>
+                <ul className="mt-2 space-y-1 text-sm text-foreground/80">
+                  <li>✓ Você ajuda a encaixar a TV (~30 seg)</li>
+                  <li>✓ Quebrou? Empresa cobre 50% do conserto (até R$ 1.000)</li>
+                  <li>✓ Apenas TVs até 55", exceto OLED e The Frame</li>
+                </ul>
+              </button>
+            )}
 
             <Button
               className="mt-4 h-12 w-full bg-emerald-600 text-base hover:bg-emerald-700"
