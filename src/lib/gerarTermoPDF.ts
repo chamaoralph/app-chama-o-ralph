@@ -128,6 +128,33 @@ export async function gerarTermoPDF(termo: TermoPDFData, empresaNome: string): P
   y += 6;
   doc.setTextColor(30, 30, 30);
 
+  // Breakdown por TV (apenas se mais de uma TV e tiver valores individuais)
+  const campoItem = isCompleta ? "valor_completa_item" : "valor_colaborativa_item";
+  const temBreakdown = tvs.length > 1 && tvs.some((t: any) => t[campoItem] != null);
+  if (temBreakdown) {
+    writeText("Detalhamento por equipamento:", { bold: true, size: 10 });
+    tvs.forEach((t: any, i) => {
+      const v = t[campoItem];
+      const rotulo = `TV ${i + 1}${t.polegadas ? ` · ${t.polegadas}"` : ""}${t.tipo ? ` ${t.tipo}` : ""}`;
+      checkPage(6);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.text(rotulo, margin + 3, y);
+      doc.text(formatarMoeda(v), pageW - margin, y, { align: "right" });
+      y += 5;
+    });
+    // linha divisora
+    checkPage(6);
+    doc.setDrawColor(180, 180, 180);
+    doc.line(margin + 3, y, pageW - margin, y);
+    y += 4;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10.5);
+    doc.text("Total", margin + 3, y);
+    doc.text(formatarMoeda(valorModal), pageW - margin, y, { align: "right" });
+    y += 6;
+  }
+
   writeText("Coberturas desta modalidade:", { bold: true, size: 10 });
   const coberturas = isCompleta ? COBERTURA_COMPLETA : COBERTURA_COLABORATIVA;
   for (const item of coberturas) writeText(`• ${item}`, { size: 10 });
