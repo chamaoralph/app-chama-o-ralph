@@ -982,6 +982,59 @@ export type Database = {
           },
         ]
       }
+      precos_instalacao_tv: {
+        Row: {
+          cobertura: string
+          created_at: string
+          disponivel: boolean
+          empresa_id: string
+          id: string
+          tamanho_tv: string
+          tipo_parede: string
+          tipo_suporte: string
+          updated_at: string
+          valor_mao_obra: number | null
+          valor_parafusos: number | null
+          valor_suporte: number | null
+        }
+        Insert: {
+          cobertura: string
+          created_at?: string
+          disponivel?: boolean
+          empresa_id: string
+          id?: string
+          tamanho_tv: string
+          tipo_parede: string
+          tipo_suporte?: string
+          updated_at?: string
+          valor_mao_obra?: number | null
+          valor_parafusos?: number | null
+          valor_suporte?: number | null
+        }
+        Update: {
+          cobertura?: string
+          created_at?: string
+          disponivel?: boolean
+          empresa_id?: string
+          id?: string
+          tamanho_tv?: string
+          tipo_parede?: string
+          tipo_suporte?: string
+          updated_at?: string
+          valor_mao_obra?: number | null
+          valor_parafusos?: number | null
+          valor_suporte?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "precos_instalacao_tv_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       progresso_visualizacao: {
         Row: {
           conteudo_id: string
