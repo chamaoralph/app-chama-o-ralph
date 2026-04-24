@@ -1011,26 +1011,45 @@ export default function ListaCotacoes() {
                                   >
                                     Aprovar
                                   </Button>
-                                  <Button
-                                    onClick={() => {
-                                      if (confirm('Aprovar SEM exigir termo? O serviço será liberado imediatamente para os instaladores.')) {
-                                        supabase
-                                          .from('cotacoes')
-                                          .update({ status: 'aprovada' })
-                                          .eq('id', cotacao.id)
-                                          .then(() => {
-                                            toast({ title: "Cotação aprovada sem termo!" })
-                                            fetchCotacoes()
-                                          })
-                                      }
-                                    }}
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-green-700 border-green-300 hover:bg-green-50"
-                                    title="Aprovar sem exigir termo assinado"
-                                  >
-                                    Aprovar sem termo
-                                  </Button>
+                                  {(() => {
+                                    const clienteTemTermo = clientesComTermo.has(cotacao.cliente_id)
+                                    const btn = (
+                                      <Button
+                                        onClick={() => {
+                                          if (!clienteTemTermo) return
+                                          if (confirm('Aprovar SEM exigir termo? O serviço será liberado imediatamente para os instaladores.')) {
+                                            supabase
+                                              .from('cotacoes')
+                                              .update({ status: 'aprovada' })
+                                              .eq('id', cotacao.id)
+                                              .then(() => {
+                                                toast({ title: "Cotação aprovada sem termo!" })
+                                                fetchCotacoes()
+                                              })
+                                          }
+                                        }}
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={!clienteTemTermo}
+                                        className="text-green-700 border-green-300 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                      >
+                                        Aprovar sem termo
+                                      </Button>
+                                    )
+                                    if (clienteTemTermo) return btn
+                                    return (
+                                      <TooltipProvider>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <span tabIndex={0}>{btn}</span>
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            Disponível apenas para clientes antigos que já assinaram pelo menos 1 termo.
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    )
+                                  })()}
                                   <Button
                                     onClick={() => setCotacaoParaNaoGerou(cotacao.id)}
                                     size="sm"
