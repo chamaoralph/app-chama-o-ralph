@@ -1,70 +1,62 @@
 ## Objetivo
 
-Permitir que o admin aplique um desconto ao enviar o termo, com exibição clara de **Subtotal → Desconto → Total** tanto na tela de aceite do cliente quanto no PDF gerado.
+Garantir que **nenhum serviço apareça para os instaladores enquanto o cliente não assinar o termo**. Hoje, ao aprovar a cotação, o serviço é criado imediatamente com status `disponivel`, ficando visível na lista de "Serviços Disponíveis".
 
-Hoje o admin até consegue editar o valor total manualmente, mas:
-- Não fica registrado que houve desconto (cliente não vê a diferença).
-- O rateio proporcional "esconde" o desconto nos valores individuais por TV.
+## Novo fluxo
 
-## Como vai funcionar
+1. Admin clica **"Aprovar"** numa cotação pendente.
+2. Em vez de virar `aprovada` direto, a cotação vai para o novo status **`termo_pendente`** (badge laranja "Aguardando Termo").
+3. Nenhum serviço é criado ainda — instaladores não veem nada.
+4. Admin envia o termo pelo card já existente (`TermoAceiteCard`).
+5. Quando o cliente assina (em `/aceite/:token`), a edge function `aprovar-cotacao-via-termo` é chamada e muda o status da cotação para `aprovada` — só então o trigger `criar_servico_ao_confirmar` cria o serviço com status `disponivel`, e ele aparece para os instaladores.
+6. Se o admin quiser pular o termo (cenário antigo), continua podendo "Aprovar diretamente" via uma ação secundária.
 
-No modal **"Enviar Termo de Aceite"**:
+## Mudanças
 
-1. Abaixo dos campos "Valor Completa" e "Valor Colaborativa" (que passam a ser rotulados como **Subtotal**, calculados automaticamente a partir da tabela de preços — somatório dos itens), adicionar dois novos campos opcionais:
-   - **Desconto Completa (R$)**
-   - **Desconto Colaborativa (R$)**
-2. Mostrar em tempo real o **Total Final** de cada modalidade (Subtotal − Desconto), em destaque.
-3. Validações:
-   - Desconto não pode ser maior que o subtotal.
-   - Desconto não pode ser negativo.
-   - Se o admin preferir continuar editando o total direto (como hoje), o desconto fica 0 e o comportamento atual se mantém.
+### 1. Banco (migration)
 
-Os valores individuais por TV **permanecem os do catálogo** (subtotais originais, sem rateio), e o desconto aparece como uma **linha separada** no detalhamento.
+- Atualizar o constraint `cotacoes_status_check` para incluir `'termo_pendente'`:
+  ```
+  ALTER TABLE cotacoes DROP CONSTRAINT cotacoes_status_check;
+  ALTER TABLE cotacoes ADD CONSTRAINT cotacoes_status_check
+    CHECK (status IN ('pendente','termo_pendente','aprovada','perdida','sem_resposta','nao_gerou'));
+  ```
+- Nenhuma alteração no trigger `criar_servico_ao_confirmar` — ele já só dispara quando muda para `aprovada`, então o serviço continuará sendo criado no momento certo (após assinatura).
 
-## Exibição para o cliente (AceiteTermo)
+### 2. `src/pages/admin/cotacoes/Lista.tsx`
 
-Quando houver desconto, o card da modalidade passa a mostrar:
+- Renomear o botão verde **"Aprovar"** (linhas ~971-989) para **"Aprovar e Enviar Termo"**: ao clicar, atualiza `status` para `'termo_pendente'` (em vez de `'aprovada'`), abre a edição da cotação ou mantém o usuário na lista exibindo um toast com instrução para enviar o termo via card de edição.
+- Adicionar opção secundária (menu/dropdown ou botão pequeno) **"Aprovar sem termo"** que mantém o comportamento antigo (`status: 'aprovada'`) para casos excepcionais.
+- Atualizar `getStatusBadge` (linha 666) adicionando a entrada `termo_pendente: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Aguardando Termo' }`.
+- Mostrar os botões "Reprovar" e o ciclo completo também quando status for `termo_pendente`.
+- Replicar o mesmo comportamento nos handlers `onAprovar` dos calendários `CalendarioCotacoesSemanal` e `CalendarioCotacoesMensal` (linhas ~799 e ~813).
 
-```text
-TV 1 · 55" LED Samsung ............. R$ 250,00
-TV 2 · 65" OLED LG ................. R$ 320,00
-─────────────────────────────────────────────
-Subtotal ........................... R$ 570,00
-Desconto ........................  − R$  70,00
-Total a pagar ...................... R$ 500,00
-```
+### 3. `src/components/admin/CalendarioCotacoesSemanal.tsx` e `CalendarioCotacoesMensal.tsx`
 
-Se não houver desconto, mantém o layout atual (só Total).
+- Aceitar/exibir o novo status `termo_pendente` com a mesma cor da badge (cards laranja).
 
-## Exibição no PDF (gerarTermoPDF)
+### 4. `src/components/admin/TermoAceiteCard.tsx`
 
-A seção "3. MODALIDADE CONTRATADA" passa a incluir, quando aplicável:
-- Detalhamento por equipamento (subtotais já existentes).
-- Linha **Subtotal**.
-- Linha **Desconto aplicado**.
-- Linha **Total final** (em negrito).
+- Quando o termo é aceito (estado já existente do componente), exibir um aviso "Termo assinado — cotação aprovada automaticamente" (apenas informativo; a aprovação acontece pela edge function).
+- Quando o termo ainda está pendente, deixar claro: "Aguardando assinatura — o serviço só aparecerá para os instaladores após o cliente assinar".
 
-## Mudanças técnicas
+### 5. Edge function `aprovar-cotacao-via-termo`
 
-### Banco (migration)
-Adicionar duas colunas em `termos_aceite`:
-- `desconto_completa numeric default 0`
-- `desconto_colaborativa numeric default 0`
+- Já faz exatamente o que precisamos: muda `cotacoes.status` de qualquer valor para `'aprovada'` quando o termo é aceito, o que dispara o trigger e cria o serviço. Nenhuma alteração necessária.
 
-(Os campos existentes `valor_completa` / `valor_colaborativa` passam a representar o **total final** cobrado — o subtotal é derivado da soma dos `valor_*_item` em `tvs_itens`. Isso mantém compatibilidade com termos já enviados.)
+### 6. Filtros e telas relacionadas
 
-### Código
-- `src/components/admin/EnviarTermoModal.tsx`
-  - Novos estados `descontoCompleta` / `descontoColaborativa`.
-  - Remover rateio pro-rata nos itens — manter os valores originais do catálogo em `valor_completa_item` / `valor_colaborativa_item`.
-  - Salvar `valor_completa = subtotal − desconto` e `desconto_completa` (idem para colaborativa).
-  - UI com resumo "Subtotal / Desconto / Total".
-- `src/pages/AceiteTermo.tsx`
-  - Ler `desconto_completa` / `desconto_colaborativa`.
-  - Renderizar linhas Subtotal, Desconto e Total no card de cada modalidade quando houver desconto.
-- `src/lib/gerarTermoPDF.ts`
-  - Incluir linhas de Subtotal, Desconto e Total final na seção de modalidade contratada quando houver desconto.
+- Onde houver filtros por status na Lista de Cotações (filtros existentes), adicionar a opção "Aguardando Termo".
 
-## Fora do escopo
-- Desconto percentual (só valor em R$ nesta versão).
-- Desconto por item individual (só por modalidade, no total).
+## Observações
+
+- Cotações com status `aprovada` antigas continuam funcionando normalmente (já têm serviço criado).
+- A página de Aprovações de serviços (`/admin/aprovacoes`) e a lista de Serviços Disponíveis para instaladores não precisam mudar — elas operam sobre `servicos`, e o serviço só será criado quando o termo for assinado.
+
+## Arquivos afetados
+
+- Nova migration SQL (constraint).
+- `src/pages/admin/cotacoes/Lista.tsx`
+- `src/components/admin/CalendarioCotacoesSemanal.tsx`
+- `src/components/admin/CalendarioCotacoesMensal.tsx`
+- `src/components/admin/TermoAceiteCard.tsx`
