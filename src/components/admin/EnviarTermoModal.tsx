@@ -228,24 +228,55 @@ export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }
             </div>
           ))}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Valor Completa (R$) — total</Label>
-              <Input type="number" step="0.01" value={valorCompleta} onChange={(e) => setValorCompleta(e.target.value)} placeholder="0,00" />
-            </div>
-            <div className="space-y-2">
-              <Label>Valor Colaborativa (R$) — total</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={valorColaborativa}
-                onChange={(e) => setValorColaborativa(e.target.value)}
-                placeholder="0,00"
-                disabled={colabInfo.indisponivel}
-              />
-            </div>
+          <div className="rounded-md border p-3 space-y-2">
+            <Label className="text-sm font-semibold">Modalidades a enviar</Label>
+            <RadioGroup
+              value={modalidadesEnvio}
+              onValueChange={(v) => setModalidadesEnvio(v as "ambas" | "completa" | "colaborativa")}
+              className="space-y-1"
+            >
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="ambas" id="m-ambas" />
+                <Label htmlFor="m-ambas" className="font-normal cursor-pointer">Ambas (cliente escolhe)</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="completa" id="m-completa" />
+                <Label htmlFor="m-completa" className="font-normal cursor-pointer">Apenas Completa</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="colaborativa" id="m-colaborativa" disabled={colabInfo.indisponivel} />
+                <Label
+                  htmlFor="m-colaborativa"
+                  className={`font-normal cursor-pointer ${colabInfo.indisponivel ? "opacity-50 cursor-not-allowed" : ""}`}
+                >
+                  Apenas Colaborativa
+                </Label>
+              </div>
+            </RadioGroup>
           </div>
-          {colabInfo.indisponivel && (
+
+          <div className="grid grid-cols-2 gap-3">
+            {(modalidadesEnvio === "ambas" || modalidadesEnvio === "completa") && (
+              <div className="space-y-2">
+                <Label>Valor Completa (R$) — total</Label>
+                <Input type="number" step="0.01" value={valorCompleta} onChange={(e) => setValorCompleta(e.target.value)} placeholder="0,00" />
+              </div>
+            )}
+            {(modalidadesEnvio === "ambas" || modalidadesEnvio === "colaborativa") && (
+              <div className="space-y-2">
+                <Label>Valor Colaborativa (R$) — total</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={valorColaborativa}
+                  onChange={(e) => setValorColaborativa(e.target.value)}
+                  placeholder="0,00"
+                  disabled={colabInfo.indisponivel}
+                />
+              </div>
+            )}
+          </div>
+          {colabInfo.indisponivel && modalidadesEnvio !== "completa" && (
             <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{colabInfo.motivo} A modalidade Colaborativa ficará oculta para o cliente.</span>
