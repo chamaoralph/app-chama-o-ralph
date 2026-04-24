@@ -59,6 +59,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/instalar" element={<Instalar />} />
+            <Route path="/aceite/:token" element={<Suspense><AceiteTermo /></Suspense>} />
 
             {/* Admin Routes */}
             <Route
