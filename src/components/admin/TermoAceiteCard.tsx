@@ -53,6 +53,28 @@ export function TermoAceiteCard({ cotacao, sugestaoTamanho, sugestaoTipoParede }
   const [termo, setTermo] = useState<Termo | null>(null);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [gerandoPdf, setGerandoPdf] = useState(false);
+
+  async function gerarPdfAgora() {
+    if (!termo) return;
+    setGerandoPdf(true);
+    try {
+      const { data: emp } = await supabase
+        .from("empresas")
+        .select("nome")
+        .eq("id", cotacao.empresa_id)
+        .maybeSingle();
+      const empresaNome = (emp as any)?.nome || "Empresa";
+      const url = await gerarESalvarTermoPDF(supabase, termo as any, cotacao.empresa_id, empresaNome);
+      setTermo({ ...termo, pdf_url: url });
+      toast.success("PDF gerado!");
+      window.open(url, "_blank");
+    } catch (e: any) {
+      toast.error("Erro ao gerar PDF: " + (e?.message || ""));
+    } finally {
+      setGerandoPdf(false);
+    }
+  }
 
   const fetchTermo = useCallback(async () => {
     setLoading(true);
