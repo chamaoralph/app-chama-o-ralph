@@ -1463,6 +1463,108 @@ export type Database = {
           },
         ]
       }
+      termos_aceite: {
+        Row: {
+          aceite_data_hora: string | null
+          aceite_user_agent: string | null
+          aceito_em: string | null
+          assinatura_base64: string | null
+          cliente_cpf: string | null
+          cliente_endereco: string | null
+          cliente_nome: string
+          cliente_telefone: string | null
+          cotacao_id: string
+          cpf_aceite: string | null
+          created_at: string
+          empresa_id: string
+          enviado_em: string
+          id: string
+          modalidade_escolhida: string | null
+          nome_aceite: string | null
+          pdf_url: string | null
+          status: string
+          token: string
+          tv_marca_modelo: string | null
+          tv_polegadas: string | null
+          tv_tipo: string | null
+          updated_at: string
+          valor_colaborativa: number | null
+          valor_completa: number | null
+          visualizado_em: string | null
+        }
+        Insert: {
+          aceite_data_hora?: string | null
+          aceite_user_agent?: string | null
+          aceito_em?: string | null
+          assinatura_base64?: string | null
+          cliente_cpf?: string | null
+          cliente_endereco?: string | null
+          cliente_nome: string
+          cliente_telefone?: string | null
+          cotacao_id: string
+          cpf_aceite?: string | null
+          created_at?: string
+          empresa_id: string
+          enviado_em?: string
+          id?: string
+          modalidade_escolhida?: string | null
+          nome_aceite?: string | null
+          pdf_url?: string | null
+          status?: string
+          token: string
+          tv_marca_modelo?: string | null
+          tv_polegadas?: string | null
+          tv_tipo?: string | null
+          updated_at?: string
+          valor_colaborativa?: number | null
+          valor_completa?: number | null
+          visualizado_em?: string | null
+        }
+        Update: {
+          aceite_data_hora?: string | null
+          aceite_user_agent?: string | null
+          aceito_em?: string | null
+          assinatura_base64?: string | null
+          cliente_cpf?: string | null
+          cliente_endereco?: string | null
+          cliente_nome?: string
+          cliente_telefone?: string | null
+          cotacao_id?: string
+          cpf_aceite?: string | null
+          created_at?: string
+          empresa_id?: string
+          enviado_em?: string
+          id?: string
+          modalidade_escolhida?: string | null
+          nome_aceite?: string | null
+          pdf_url?: string | null
+          status?: string
+          token?: string
+          tv_marca_modelo?: string | null
+          tv_polegadas?: string | null
+          tv_tipo?: string | null
+          updated_at?: string
+          valor_colaborativa?: number | null
+          valor_completa?: number | null
+          visualizado_em?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "termos_aceite_cotacao_id_fkey"
+            columns: ["cotacao_id"]
+            isOneToOne: false
+            referencedRelation: "cotacoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "termos_aceite_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tipos_servico: {
         Row: {
           ativo: boolean | null

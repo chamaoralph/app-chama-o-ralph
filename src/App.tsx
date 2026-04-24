@@ -45,6 +45,7 @@ const InstaladorResultado = lazy(() => import('./pages/instalador/ResultadoQuest
 const InstaladorCertificados = lazy(() => import('./pages/instalador/MeusCertificados'));
 const InstaladorArtigoDetalhe = lazy(() => import('./pages/instalador/ArtigoDetalhe'));
 const InstaladorTreinamentoDetalhe = lazy(() => import('./pages/instalador/TreinamentoDetalhe'));
+const AceiteTermo = lazy(() => import('./pages/AceiteTermo'));
 
 const queryClient = new QueryClient();
 
@@ -58,6 +59,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/instalar" element={<Instalar />} />
+            <Route path="/aceite/:token" element={<Suspense><AceiteTermo /></Suspense>} />
 
             {/* Admin Routes */}
             <Route

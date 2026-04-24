@@ -18,6 +18,7 @@ import { CalendarioCotacoesSemanal } from '@/components/admin/CalendarioCotacoes
 import { CalendarioCotacoesMensal } from '@/components/admin/CalendarioCotacoesMensal'
 import { SelectorPrecoTV, type SelectorTVValues, type PrecoTVResult } from '@/components/admin/SelectorPrecoTV'
 import { ehInstalacaoTV } from '@/lib/precosTV'
+import { TermoAceiteCard } from '@/components/admin/TermoAceiteCard'
 
 type VisualizacaoTipo = 'lista' | 'semanal' | 'mensal'
 
@@ -1309,8 +1310,24 @@ export default function ListaCotacoes() {
                     )}
                   </div>
                 </div>
-              </div>
             </div>
+          </div>
+
+          {cotacaoParaEditar && ehInstalacaoTV(editForm.tipo_servico) && (
+            <div className="mt-4">
+              <TermoAceiteCard
+                cotacao={{
+                  id: cotacaoParaEditar.id,
+                  empresa_id: empresaIdAtual || '',
+                  cliente_nome: editForm.cliente_nome,
+                  cliente_telefone: editForm.cliente_telefone,
+                  cliente_endereco: editForm.endereco_completo,
+                }}
+                sugestaoTamanho={tvSelectoresEdit.tamanho_tv}
+                sugestaoTipoParede={tvSelectoresEdit.tipo_parede}
+              />
+            </div>
+          )}
           </div>
 
           <DialogFooter>
