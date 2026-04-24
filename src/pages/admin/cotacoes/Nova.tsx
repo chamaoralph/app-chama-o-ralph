@@ -479,6 +479,14 @@ export default function NovaCotacao() {
                   />
                 </div>
               )}
+              {isInstalacaoTV && (
+                <SelectorPrecoTV
+                  empresaId={empresaId}
+                  values={tvSelectores}
+                  onChange={setTvSelectores}
+                  onPrecoCalculado={handlePrecoCalculado}
+                />
+              )}
               <div className="col-span-2">
                 <label className="block text-sm font-medium mb-2">Descrição do Serviço</label>
                 <textarea 
