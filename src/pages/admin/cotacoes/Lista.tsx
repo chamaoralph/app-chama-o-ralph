@@ -666,6 +666,7 @@ export default function ListaCotacoes() {
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { bg: string; text: string; label: string }> = {
       pendente: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Pendente' },
+      termo_pendente: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Aguardando Termo' },
       aprovada: { bg: 'bg-green-100', text: 'text-green-800', label: 'Aprovada' },
       perdida: { bg: 'bg-red-100', text: 'text-red-800', label: 'Perdida' },
       sem_resposta: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Sem Resposta' },
