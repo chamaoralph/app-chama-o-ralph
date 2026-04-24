@@ -103,8 +103,19 @@ export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }
   );
 
   async function enviarTermo() {
-    if (!valorCompleta || parseFloat(valorCompleta) <= 0) {
+    const enviarCompleta = modalidadesEnvio === "ambas" || modalidadesEnvio === "completa";
+    const enviarColaborativa = modalidadesEnvio === "ambas" || modalidadesEnvio === "colaborativa";
+
+    if (enviarCompleta && (!valorCompleta || parseFloat(valorCompleta) <= 0)) {
       toast.error("Informe o valor da Modalidade Completa");
+      return;
+    }
+    if (enviarColaborativa && (!valorColaborativa || parseFloat(valorColaborativa) <= 0)) {
+      toast.error("Informe o valor da Modalidade Colaborativa");
+      return;
+    }
+    if (modalidadesEnvio === "colaborativa" && colabInfo.indisponivel) {
+      toast.error("Colaborativa indisponível: " + colabInfo.motivo);
       return;
     }
     setEnviando(true);
@@ -135,8 +146,8 @@ export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }
         tv_polegadas: primeiro?.polegadas || null,
         tv_tipo: primeiro?.tipo || null,
         tvs_itens: tvsParaSalvar,
-        valor_completa: parseFloat(valorCompleta),
-        valor_colaborativa: valorColaborativa ? parseFloat(valorColaborativa) : null,
+        valor_completa: enviarCompleta ? parseFloat(valorCompleta) : null,
+        valor_colaborativa: enviarColaborativa ? parseFloat(valorColaborativa) : null,
         token,
         status: "pendente",
       });
