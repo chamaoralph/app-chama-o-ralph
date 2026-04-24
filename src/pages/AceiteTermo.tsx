@@ -232,6 +232,7 @@ export default function AceiteTermo() {
         tv_marca_modelo: t.tv_marca_modelo,
         tv_polegadas: t.tv_polegadas,
         tv_tipo: t.tv_tipo,
+        tvs_itens: (t as any).tvs_itens ?? null,
         modalidade_escolhida: t.modalidade_escolhida,
         valor_completa: t.valor_completa,
         valor_colaborativa: t.valor_colaborativa,

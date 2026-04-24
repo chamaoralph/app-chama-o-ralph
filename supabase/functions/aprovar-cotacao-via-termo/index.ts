@@ -71,43 +71,90 @@ Deno.serve(async (req) => {
     const novaCobertura =
       termo.modalidade_escolhida === "completa" ? "total" : "parcial";
 
-    // 4. Buscar preço (se tiver dados da calculadora)
+    // 4. Calcular preço
     let updatePayload: Record<string, unknown> = {
       status: "aprovada",
       tv_cobertura: novaCobertura,
     };
 
-    if (cotacao.tv_tamanho && cotacao.tv_parede) {
-      const { data: preco } = await supabase
+    // Helper: busca preço p/ um item
+    const buscarPreco = async (tamanho: string, parede: string) => {
+      const { data } = await supabase
         .from("precos_instalacao_tv")
         .select("*")
         .eq("empresa_id", cotacao.empresa_id)
-        .eq("tamanho_tv", cotacao.tv_tamanho)
-        .eq("tipo_parede", cotacao.tv_parede)
+        .eq("tamanho_tv", tamanho)
+        .eq("tipo_parede", parede)
         .eq("cobertura", novaCobertura)
         .maybeSingle();
+      return data;
+    };
 
-      if (preco && preco.disponivel && preco.valor_mao_obra != null) {
-        updatePayload.valor_estimado = preco.valor_mao_obra;
-        updatePayload.valor_material = preco.valor_parafusos ?? 0;
+    const itens: any[] = Array.isArray(cotacao.tvs_itens) && cotacao.tvs_itens.length > 0
+      ? cotacao.tvs_itens
+      : (cotacao.tv_tamanho && cotacao.tv_parede
+          ? [{ tamanho: cotacao.tv_tamanho, parede: cotacao.tv_parede }]
+          : []);
 
-        if (preco.tipo_suporte === "incluso") {
-          updatePayload.origem_suporte = "empresa";
-          updatePayload.custo_suporte = 0;
-        } else if (preco.tipo_suporte === "valor") {
-          updatePayload.origem_suporte = "empresa";
-          updatePayload.custo_suporte = preco.valor_suporte ?? 0;
+    if (itens.length > 0) {
+      let totalMaoObra = 0;
+      let totalMaterial = 0;
+      let totalSuporte = 0;
+      let origemSuporteAgregada: "empresa" | "instalador" = "instalador";
+      const itensAtualizados: any[] = [];
+      let algumSemPreco = false;
+
+      for (const item of itens) {
+        const preco = await buscarPreco(item.tamanho, item.parede);
+        if (preco && preco.disponivel && preco.valor_mao_obra != null) {
+          const mo = Number(preco.valor_mao_obra) || 0;
+          const mat = Number(preco.valor_parafusos ?? 0) || 0;
+          let origem: "empresa" | "instalador" = "instalador";
+          let custoSup = 0;
+          if (preco.tipo_suporte === "incluso") {
+            origem = "empresa";
+            custoSup = 0;
+          } else if (preco.tipo_suporte === "valor") {
+            origem = "empresa";
+            custoSup = Number(preco.valor_suporte ?? 0) || 0;
+          } else {
+            origem = "instalador";
+            custoSup = 0;
+          }
+          totalMaoObra += mo;
+          totalMaterial += mat;
+          totalSuporte += custoSup;
+          if (origem === "empresa") origemSuporteAgregada = "empresa";
+          itensAtualizados.push({
+            ...item,
+            cobertura: novaCobertura,
+            valor_mao_obra: mo,
+            valor_material: mat,
+            origem_suporte: origem,
+            custo_suporte: custoSup,
+          });
         } else {
-          updatePayload.origem_suporte = "instalador";
-          updatePayload.custo_suporte = 0;
+          algumSemPreco = true;
+          itensAtualizados.push({ ...item, cobertura: novaCobertura });
         }
+      }
+
+      if (!algumSemPreco) {
+        updatePayload.valor_estimado = totalMaoObra;
+        updatePayload.valor_material = totalMaterial;
+        updatePayload.origem_suporte = origemSuporteAgregada;
+        updatePayload.custo_suporte = totalSuporte;
       } else {
-        // Sem preço cadastrado: usa valor escolhido no termo como fallback
+        // Fallback: usa valor do termo
         const valor =
           termo.modalidade_escolhida === "completa"
             ? termo.valor_completa
             : termo.valor_colaborativa;
         if (valor != null) updatePayload.valor_estimado = valor;
+      }
+
+      if (Array.isArray(cotacao.tvs_itens) && cotacao.tvs_itens.length > 0) {
+        updatePayload.tvs_itens = itensAtualizados;
       }
     } else {
       // Sem dados de calculadora: usa valor do termo
