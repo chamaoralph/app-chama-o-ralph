@@ -1,79 +1,65 @@
 
 
-# Termo de Aceite Digital — Envio por WhatsApp e Assinatura Online
+# Sincronização Automática: Aceite do Cliente → Cotação Aprovada
 
 ## Objetivo
-Permitir que o admin envie um termo de aceite por WhatsApp direto da cotação. O cliente abre o link no celular, escolhe a modalidade (Completa ou Colaborativa), lê o termo, assina com o dedo e o aceite fica registrado no sistema.
+Quando o cliente assina o termo no `/aceite/:token` e escolhe uma modalidade, o sistema deve **automaticamente**:
+1. Atualizar a **cobertura** da cotação na "📺 Calculadora de Instalação de TV" (Total se Completa, Parcial se Colaborativa)
+2. Recalcular **valor estimado** + **valor mão de obra** com base no novo preço
+3. Mudar o **status da cotação para "aprovada"** — disparando a trigger existente que cria o serviço
 
 ## Como funciona
 
-### 1. Botão "Enviar Termo" na cotação (modal de edição)
-Aparece **só para cotações de Instalação de TV** que já têm cliente, telefone e ao menos um valor preenchido. Estados:
-- **Nunca enviado** → "📋 Enviar Termo" (verde)
-- **Pendente / Visualizado** → "⏳ Termo Pendente — Reenviar" (âmbar)
-- **Aceito** → "✅ Termo Aceito" (verde claro, abre painel de detalhes)
+### Fluxo atual
+- Cliente abre link → escolhe modalidade → assina → `termos_aceite.status = 'aceito'` ✅
+- A cotação **não muda nada** ❌
 
-### 2. Modal "Enviar Termo"
-Como a cotação não tem ainda campos de TV/CPF, o admin preenche um pequeno form antes de enviar:
-- **Marca/Modelo da TV** (texto livre, opcional)
-- **Polegadas** (número — pré-preenchido a partir do tamanho_tv da cotação se houver: ex "55")
-- **Tipo de TV** (LED / QLED / OLED / The Frame / Outro) — define se Colaborativa fica disponível
-- **Valor Modalidade Completa** (R$) — pré-preenchido com valor da cobertura "Total" da tabela de preços
-- **Valor Modalidade Colaborativa** (R$) — pré-preenchido com valor da cobertura "Parcial"
+### Novo fluxo
+Após salvar o aceite (etapa 3 da página pública), uma **edge function** `aprovar-cotacao-via-termo` é chamada com o token. Ela:
 
-Ao confirmar:
-1. Cria registro em `termos_aceite` com token curto (8 chars)
-2. Abre WhatsApp em nova aba com mensagem pronta + link `https://chamaoralph.lovable.app/aceite/{token}`
-3. Toast "Link gerado e WhatsApp aberto"
+1. Lê o termo aceito (`termos_aceite` por token), valida que `status='aceito'`
+2. Pega a cotação vinculada (`cotacao_id`)
+3. Mapeia modalidade escolhida → cobertura:
+   - `completa` → cobertura **total**
+   - `colaborativa` → cobertura **parcial**
+4. Busca preço em `precos_instalacao_tv` usando `tamanho_tv`, `tipo_parede` (já salvos na cotação) + nova cobertura
+5. Atualiza a cotação:
+   - `valor_estimado` = `valor_mao_obra` da tabela
+   - `valor_material` = `valor_parafusos`
+   - `origem_suporte` + `custo_suporte` conforme `tipo_suporte`
+   - `status` = `'aprovada'`
+6. A trigger `criar_servico_ao_confirmar` (já existe) detecta status mudando para `aprovada` e cria o serviço automaticamente
+7. A trigger `sincronizar_servico_ao_editar_cotacao` mantém os valores em sincronia
 
-### 3. Página pública `/aceite/:token` (sem login, mobile-first)
-Stepper de 4 etapas:
+### Por quê edge function (e não direto do front)
+O cliente que assina é **anônimo (anon)** e não tem permissão de UPDATE em `cotacoes`. A edge function roda com `service_role` e faz a aprovação com segurança, validando antes que o token existe e está aceito.
 
-**Etapa 1 — Modalidade**
-Dois cards lado a lado (Completa azul / Colaborativa verde) com valor e principais coberturas. Se TV for OLED, The Frame ou >55", o card Colaborativa fica desabilitado com aviso.
+### Onde ler a cobertura/parede para o cálculo
+Hoje a cotação **não armazena** `tamanho_tv`, `tipo_parede`, `cobertura` — esses selectores ficam só em estado local da edição. Para a sincronização funcionar de forma confiável, vamos adicionar 3 colunas opcionais em `cotacoes`:
+- `tv_tamanho` (text)
+- `tv_parede` (text)
+- `tv_cobertura` (text)
 
-**Etapa 2 — Termo**
-Texto completo do termo (hardcoded conforme fornecido), com scroll. Botão "Continuar" só habilita ao rolar até o fim. Indicador "↓ Role para ler" animado some no final.
+Salvas quando o admin usa a calculadora ao criar/editar a cotação. A edge function lê esses campos para recalcular após a escolha da modalidade.
 
-**Etapa 3 — Assinatura**
-- CPF (máscara 000.000.000-00, input `tel`)
-- Nome completo
-- Canvas de assinatura (`touch-action: none`, "Assine com o dedo aqui", botão Limpar)
-- Checkbox de declaração
-- Botão "Aceitar e Assinar" só habilita com tudo preenchido
-
-**Etapa 4 — Confirmação**
-Tela verde de sucesso, resumo (nome, CPF, modalidade, ID, data/hora), preview da assinatura, botão "Salvar como PDF" (`window.print()`).
-
-Ao acessar: se `status='aceito'` mostra resumo do aceite. Se inválido, tela de erro. Ao abrir pendente, atualiza para `visualizado`.
-
-### 4. Painel "Termo de Aceite" no modal da cotação
-Card abaixo do botão mostrando: status, datas (enviado/visualizado/aceito), modalidade escolhida, preview da assinatura, e botões "Reenviar", "Copiar link", "Ver PDF".
+### Painel admin
+O `TermoAceiteCard` continua mostrando status. Quando a cotação for aprovada via aceite, o usuário verá no modal a cotação como "Aprovada" e o serviço já criado em Serviços.
 
 ## Mudanças
 
 ### Banco (1 migration)
-- Tabela `termos_aceite` (campos do prompt: cotacao_id, dados cliente snapshot, dados TV, valor_completa, valor_colaborativa, modalidade_escolhida, dados do aceite, token único, status, timestamps)
-- RLS:
-  - Admin da empresa: ALL nos termos da própria empresa
-  - **anon**: SELECT e UPDATE somente quando filtra por `token` (necessário para o cliente assinar sem login). Bloqueio de INSERT/DELETE para anon. Campos sensíveis ficam protegidos pela natureza do token aleatório.
-- Índices em `token` e `cotacao_id`
+- Adicionar `tv_tamanho`, `tv_parede`, `tv_cobertura` em `cotacoes` (nullable)
 
-### Código
-- **Nova rota pública** `/aceite/:token` em `src/App.tsx` (fora do `ProtectedRoute`)
-- **Nova página** `src/pages/AceiteTermo.tsx` (mobile-first, stepper, canvas de assinatura)
-- **Novo componente** `src/components/admin/EnviarTermoModal.tsx` (form com dados da TV + valores)
-- **Novo componente** `src/components/admin/TermoAceiteCard.tsx` (painel de status no modal de edição)
-- **Novo arquivo** `src/lib/termoTexto.ts` (texto completo do termo como constante)
-- **Editar** `src/pages/admin/cotacoes/Lista.tsx`: integrar botão "Enviar Termo" e card de status no Dialog de edição quando `ehInstalacaoTV(tipo_servico)` for true
+### Edge function nova
+- `supabase/functions/aprovar-cotacao-via-termo/index.ts` — recebe `{ token }`, valida, recalcula preço, atualiza cotação para `aprovada`. Pública (verify_jwt = false) porque é chamada pelo cliente anônimo.
+
+### Frontend
+- `src/pages/AceiteTermo.tsx`: após `confirmarAceite` salvar com sucesso, chama a edge function com o token. Mostra mensagem "Pedido confirmado" no sucesso.
+- `src/pages/admin/cotacoes/Lista.tsx` e `src/pages/admin/cotacoes/Nova.tsx`: ao salvar a cotação com a calculadora preenchida, persistir `tv_tamanho`, `tv_parede`, `tv_cobertura`.
 
 ## Detalhes técnicos
-- Token: `crypto.randomUUID().split('-')[0]` (8 chars) — colisão improvável, fácil de digitar
-- Assinatura: `<canvas>` com handlers `pointerdown/move/up`, exporta `toDataURL('image/png')` salvo como `assinatura_base64` (texto)
-- Telefone WhatsApp: normaliza com `replace(/\D/g,'')` e prefixa `55` se faltar
-- IP do aceite: omitido (frontend não tem acesso confiável); registramos só `user_agent` e timestamp
-- PDF: `window.print()` com CSS `@media print` na página de confirmação (sem dependências novas)
-- Validação Colaborativa indisponível: `tipo === 'OLED' || tipo === 'The Frame' || polegadas > 55`
-- Inputs com `font-size: 16px` (anti-zoom iOS)
-- Sem alterações no fluxo das cotações que não são de TV
+- A trigger `criar_servico_ao_confirmar` cria o serviço quando `status` vira `aprovada` — nada a alterar nela
+- Se a nova combinação (parede + nova cobertura) for ND, a edge function ainda aprova a cotação mas mantém os valores originais e retorna aviso (cliente já assinou, não bloqueamos)
+- Idempotente: se a cotação já está `aprovada`, a função não faz nada e retorna sucesso
+- Sem mudanças no comportamento visual da página de aceite além da chamada extra após salvar
 
