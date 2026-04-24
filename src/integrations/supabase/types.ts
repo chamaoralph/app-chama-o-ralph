@@ -503,6 +503,9 @@ export type Database = {
           origem_suporte: string | null
           status: string
           tipo_servico: string[] | null
+          tv_cobertura: string | null
+          tv_parede: string | null
+          tv_tamanho: string | null
           updated_at: string | null
           valor_estimado: number | null
           valor_material: number | null
@@ -523,6 +526,9 @@ export type Database = {
           origem_suporte?: string | null
           status?: string
           tipo_servico?: string[] | null
+          tv_cobertura?: string | null
+          tv_parede?: string | null
+          tv_tamanho?: string | null
           updated_at?: string | null
           valor_estimado?: number | null
           valor_material?: number | null
@@ -543,6 +549,9 @@ export type Database = {
           origem_suporte?: string | null
           status?: string
           tipo_servico?: string[] | null
+          tv_cobertura?: string | null
+          tv_parede?: string | null
+          tv_tamanho?: string | null
           updated_at?: string | null
           valor_estimado?: number | null
           valor_material?: number | null

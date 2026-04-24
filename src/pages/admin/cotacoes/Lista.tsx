@@ -285,7 +285,11 @@ export default function ListaCotacoes() {
       custo_suporte: (cotacao as any).custo_suporte?.toString() || ''
     })
     setShowOutroInput(!ehTipoCadastrado && !!tipoAtual)
-    setTvSelectoresEdit({ tamanho_tv: '', tipo_parede: '', cobertura: '' })
+    setTvSelectoresEdit({
+      tamanho_tv: (cotacao as any).tv_tamanho || '',
+      tipo_parede: (cotacao as any).tv_parede || '',
+      cobertura: (cotacao as any).tv_cobertura || '',
+    })
     setTvIndisponivelEdit(false)
     setCotacaoParaEditar(cotacao)
   }
@@ -348,6 +352,9 @@ export default function ListaCotacoes() {
           observacoes: editForm.observacoes || null,
           origem_suporte: editForm.origem_suporte || null,
           custo_suporte: editForm.custo_suporte ? parseFloat(editForm.custo_suporte) : 0,
+          tv_tamanho: tvSelectoresEdit.tamanho_tv || null,
+          tv_parede: tvSelectoresEdit.tipo_parede || null,
+          tv_cobertura: tvSelectoresEdit.cobertura || null,
         })
         .eq('id', cotacaoParaEditar.id)
 

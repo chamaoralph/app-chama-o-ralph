@@ -174,6 +174,14 @@ export default function AceiteTermo() {
         .eq("token", termo.token);
       if (error) throw error;
       setTermo({ ...termo, modalidade_escolhida: modalidade, nome_aceite: nome.trim(), cpf_aceite: cpf, assinatura_base64: dataUrl, aceito_em: agora, status: "aceito" });
+      // Aprova a cotação automaticamente (recalcula valores conforme modalidade)
+      try {
+        await supabase.functions.invoke("aprovar-cotacao-via-termo", {
+          body: { token: termo.token },
+        });
+      } catch (e) {
+        console.warn("Falha ao aprovar cotação automaticamente:", e);
+      }
       setEtapa(4);
     } catch (e) {
       alert("Erro ao salvar aceite. Tente novamente.");
