@@ -798,8 +798,8 @@ export default function ListaCotacoes() {
               <CalendarioCotacoesSemanal
                 cotacoes={cotacoes}
                 onAprovar={async (id) => {
-                  await supabase.from('cotacoes').update({ status: 'aprovada' }).eq('id', id)
-                  toast({ title: '✅ Cotação aprovada!' })
+                  await supabase.from('cotacoes').update({ status: 'termo_pendente' }).eq('id', id)
+                  toast({ title: '✅ Cotação aprovada!', description: 'Envie o termo de aceite ao cliente para liberar o serviço.' })
                   fetchCotacoes()
                 }}
                 onEditar={abrirEdicao}
@@ -812,8 +812,8 @@ export default function ListaCotacoes() {
               <CalendarioCotacoesMensal
                 cotacoes={cotacoes}
                 onAprovar={async (id) => {
-                  await supabase.from('cotacoes').update({ status: 'aprovada' }).eq('id', id)
-                  toast({ title: '✅ Cotação aprovada!' })
+                  await supabase.from('cotacoes').update({ status: 'termo_pendente' }).eq('id', id)
+                  toast({ title: '✅ Cotação aprovada!', description: 'Envie o termo de aceite ao cliente para liberar o serviço.' })
                   fetchCotacoes()
                 }}
                 onEditar={abrirEdicao}
