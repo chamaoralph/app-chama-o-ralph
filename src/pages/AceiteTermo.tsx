@@ -54,6 +54,8 @@ export default function AceiteTermo() {
   const [aceitouTermo, setAceitouTermo] = useState(false);
   const [assinou, setAssinou] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  const [gerandoPdf, setGerandoPdf] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingRef = useRef(false);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
