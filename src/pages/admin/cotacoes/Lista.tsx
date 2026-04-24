@@ -155,6 +155,7 @@ export default function ListaCotacoes() {
   const { user } = useAuth()
   const { toast } = useToast()
   const [cotacoes, setCotacoes] = useState<Cotacao[]>([])
+  const [clientesComTermo, setClientesComTermo] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [cotacaoParaExcluir, setCotacaoParaExcluir] = useState<string | null>(null)
