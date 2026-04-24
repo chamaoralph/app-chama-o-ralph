@@ -1,65 +1,90 @@
 
 
-# Sincronização Automática: Aceite do Cliente → Cotação Aprovada
+# PDF Completo do Termo Assinado
 
 ## Objetivo
-Quando o cliente assina o termo no `/aceite/:token` e escolhe uma modalidade, o sistema deve **automaticamente**:
-1. Atualizar a **cobertura** da cotação na "📺 Calculadora de Instalação de TV" (Total se Completa, Parcial se Colaborativa)
-2. Recalcular **valor estimado** + **valor mão de obra** com base no novo preço
-3. Mudar o **status da cotação para "aprovada"** — disparando a trigger existente que cria o serviço
+Quando o cliente conclui a assinatura no `/aceite/:token`, gerar **automaticamente um PDF completo e profissional** com todos os dados do termo (cliente, equipamento, modalidade escolhida, valor, texto integral do termo, assinatura e dados de auditoria). O PDF fica disponível para download imediato pelo cliente e acessível no painel admin como prova/garantia jurídica.
 
 ## Como funciona
 
-### Fluxo atual
-- Cliente abre link → escolhe modalidade → assina → `termos_aceite.status = 'aceito'` ✅
-- A cotação **não muda nada** ❌
+### Fluxo do cliente (página pública)
+Hoje a Etapa 4 mostra "Termo aceito!" com um botão "Salvar / Imprimir" que usa `window.print()`. Vamos substituir isso por:
+1. Botão **"📄 Baixar PDF do Termo Assinado"** (verde, destaque)
+2. Ao clicar, gera o PDF no navegador (sem servidor) com `jsPDF` e dispara o download
+3. Mensagem complementar: "Guarde este documento — ele é sua garantia"
+4. O PDF é gerado **uma vez** ao abrir a Etapa 4 (auto), salvo no Storage e a URL fica vinculada ao termo. O botão também permite re-download a qualquer momento abrindo o link.
 
-### Novo fluxo
-Após salvar o aceite (etapa 3 da página pública), uma **edge function** `aprovar-cotacao-via-termo` é chamada com o token. Ela:
+### Fluxo no admin
+No `TermoAceiteCard` (modal de edição da cotação), quando o termo está aceito:
+- Botão **"📄 Ver PDF"** que abre o PDF salvo no Storage em nova aba
+- Se por algum motivo o PDF ainda não foi gerado, botão "Gerar PDF agora" que cria sob demanda
 
-1. Lê o termo aceito (`termos_aceite` por token), valida que `status='aceito'`
-2. Pega a cotação vinculada (`cotacao_id`)
-3. Mapeia modalidade escolhida → cobertura:
-   - `completa` → cobertura **total**
-   - `colaborativa` → cobertura **parcial**
-4. Busca preço em `precos_instalacao_tv` usando `tamanho_tv`, `tipo_parede` (já salvos na cotação) + nova cobertura
-5. Atualiza a cotação:
-   - `valor_estimado` = `valor_mao_obra` da tabela
-   - `valor_material` = `valor_parafusos`
-   - `origem_suporte` + `custo_suporte` conforme `tipo_suporte`
-   - `status` = `'aprovada'`
-6. A trigger `criar_servico_ao_confirmar` (já existe) detecta status mudando para `aprovada` e cria o serviço automaticamente
-7. A trigger `sincronizar_servico_ao_editar_cotacao` mantém os valores em sincronia
+### Conteúdo do PDF (1-2 páginas A4)
 
-### Por quê edge function (e não direto do front)
-O cliente que assina é **anônimo (anon)** e não tem permissão de UPDATE em `cotacoes`. A edge function roda com `service_role` e faz a aprovação com segurança, validando antes que o token existe e está aceito.
+**Cabeçalho**
+- Nome da empresa (buscado em `empresas`)
+- Título: "Termo de Instalação de TV — Aceite Digital"
+- ID do aceite + data/hora
 
-### Onde ler a cobertura/parede para o cálculo
-Hoje a cotação **não armazena** `tamanho_tv`, `tipo_parede`, `cobertura` — esses selectores ficam só em estado local da edição. Para a sincronização funcionar de forma confiável, vamos adicionar 3 colunas opcionais em `cotacoes`:
-- `tv_tamanho` (text)
-- `tv_parede` (text)
-- `tv_cobertura` (text)
+**Seção 1 — Dados do Cliente**
+- Nome, CPF, telefone, endereço
 
-Salvas quando o admin usa a calculadora ao criar/editar a cotação. A edge function lê esses campos para recalcular após a escolha da modalidade.
+**Seção 2 — Equipamento**
+- Marca/Modelo, Polegadas, Tipo (LED/QLED/OLED/The Frame)
 
-### Painel admin
-O `TermoAceiteCard` continua mostrando status. Quando a cotação for aprovada via aceite, o usuário verá no modal a cotação como "Aprovada" e o serviço já criado em Serviços.
+**Seção 3 — Modalidade Contratada**
+- Nome da modalidade (Completa ou Colaborativa)
+- Valor em destaque
+- Resumo das coberturas dessa modalidade
+
+**Seção 4 — Termo Completo**
+- Todas as 7 seções do texto (mesmo conteúdo de `TERMO_SECOES`)
+
+**Seção 5 — Aceite e Assinatura**
+- Texto do aceite (`TERMO_ACEITE_TEXTO`)
+- Imagem da assinatura (do `assinatura_base64`)
+- Linha "Assinado por: {nome} — CPF {cpf}"
+- Data/hora do aceite
+- User-agent (rodapé pequeno, prova técnica)
+- Validade conforme MP 2.200-2/2001
+
+**Rodapé em todas as páginas**
+- Empresa + ID do termo + paginação ("Página X de Y")
+
+### Onde o PDF fica salvo
+Novo bucket público no Storage: `termos-assinados`. Path: `{empresa_id}/{termo_id}.pdf`. URL pública salva em `termos_aceite.pdf_url` (coluna que **já existe**).
+
+### Quando o PDF é gerado
+Após a chamada bem-sucedida da edge function `aprovar-cotacao-via-termo`, o front:
+1. Gera o PDF localmente com jsPDF (rápido, sem custo de função)
+2. Faz upload no bucket `termos-assinados` via cliente Supabase (anon — política permite escrever quando linha do termo está em status `aceito`)
+3. Atualiza `termos_aceite.pdf_url`
 
 ## Mudanças
 
 ### Banco (1 migration)
-- Adicionar `tv_tamanho`, `tv_parede`, `tv_cobertura` em `cotacoes` (nullable)
+- Criar bucket `termos-assinados` (público)
+- Política de Storage: anon pode INSERT/UPDATE em `termos-assinados/{empresa_id}/...` apenas quando o token está aceito (validação simplificada: permitir INSERT por anon no bucket; arquivo é nomeado pelo termo_id que vem do registro autenticado por token); admins da empresa fazem ALL nos arquivos da própria empresa
+- (Coluna `pdf_url` já existe em `termos_aceite`, nada a alterar)
 
-### Edge function nova
-- `supabase/functions/aprovar-cotacao-via-termo/index.ts` — recebe `{ token }`, valida, recalcula preço, atualiza cotação para `aprovada`. Pública (verify_jwt = false) porque é chamada pelo cliente anônimo.
+### Dependências
+- `jspdf` — geração de PDF no cliente (sem precisar de servidor)
 
 ### Frontend
-- `src/pages/AceiteTermo.tsx`: após `confirmarAceite` salvar com sucesso, chama a edge function com o token. Mostra mensagem "Pedido confirmado" no sucesso.
-- `src/pages/admin/cotacoes/Lista.tsx` e `src/pages/admin/cotacoes/Nova.tsx`: ao salvar a cotação com a calculadora preenchida, persistir `tv_tamanho`, `tv_parede`, `tv_cobertura`.
+- **Novo arquivo** `src/lib/gerarTermoPDF.ts`: função `gerarTermoPDF(termo, empresa)` que retorna `Blob` do PDF usando `jsPDF`. Lida com quebras de página, embed da assinatura, formatação A4.
+- **Editar** `src/pages/AceiteTermo.tsx`:
+  - Após confirmar aceite, chamar `gerarTermoPDF`, fazer upload no bucket, atualizar `pdf_url`
+  - Etapa 4: substituir "Salvar / Imprimir" por botão "📄 Baixar PDF do Termo Assinado" que abre `pdf_url` (ou regera se ainda não existir)
+- **Editar** `src/components/admin/TermoAceiteCard.tsx`:
+  - Quando aceito: botão "Ver PDF" abre `pdf_url` em nova aba
+  - Se `pdf_url` ausente: botão "Gerar PDF agora" que executa a mesma rotina
 
 ## Detalhes técnicos
-- A trigger `criar_servico_ao_confirmar` cria o serviço quando `status` vira `aprovada` — nada a alterar nela
-- Se a nova combinação (parede + nova cobertura) for ND, a edge function ainda aprova a cotação mas mantém os valores originais e retorna aviso (cliente já assinou, não bloqueamos)
-- Idempotente: se a cotação já está `aprovada`, a função não faz nada e retorna sucesso
-- Sem mudanças no comportamento visual da página de aceite além da chamada extra após salvar
+- jsPDF roda 100% no navegador, sem custo de servidor
+- Assinatura é embutida como imagem PNG (já está em base64 no estado)
+- Layout A4 com margens de 18mm, fonte Helvetica, tamanho 10-11pt para corpo
+- O texto do termo (`TERMO_SECOES`) é a única fonte de verdade — mesmo conteúdo que o cliente leu na Etapa 2
+- Idempotente: se `pdf_url` já existe, não regera (a menos que admin force)
+- Arquivo nomeado: `termo-{cliente_nome_slug}-{id_curto}.pdf` no download
+- Bucket público para evitar lag de signed URLs (mesmo padrão de `fotos-servicos` já em uso no projeto)
 
