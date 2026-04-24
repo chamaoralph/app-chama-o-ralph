@@ -127,6 +127,14 @@ export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }
     itens.map((i) => ({ tipo: i.tipo, polegadas: i.polegadas })),
   );
 
+  // Subtotais derivados da tabela de preços (soma por item)
+  const subtotalCompleta = itens.reduce((s, it) => s + (it.valor_completa_item ?? 0), 0);
+  const subtotalColaborativa = itens.reduce((s, it) => s + (it.valor_colaborativa_item ?? 0), 0);
+  const descCompletaNum = parseFloat(descontoCompleta) || 0;
+  const descColabNum = parseFloat(descontoColaborativa) || 0;
+  const totalFinalCompleta = Math.max(0, (parseFloat(valorCompleta) || 0) - descCompletaNum);
+  const totalFinalColaborativa = Math.max(0, (parseFloat(valorColaborativa) || 0) - descColabNum);
+
   async function enviarTermo() {
     const enviarCompleta = modalidadesEnvio === "ambas" || modalidadesEnvio === "completa";
     const enviarColaborativa = modalidadesEnvio === "ambas" || modalidadesEnvio === "colaborativa";
@@ -139,6 +147,22 @@ export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }
       toast.error("Informe o valor da Modalidade Colaborativa");
       return;
     }
+    if (enviarCompleta && descCompletaNum < 0) {
+      toast.error("Desconto da Completa não pode ser negativo");
+      return;
+    }
+    if (enviarColaborativa && descColabNum < 0) {
+      toast.error("Desconto da Colaborativa não pode ser negativo");
+      return;
+    }
+    if (enviarCompleta && descCompletaNum > parseFloat(valorCompleta)) {
+      toast.error("Desconto da Completa não pode ser maior que o subtotal");
+      return;
+    }
+    if (enviarColaborativa && descColabNum > parseFloat(valorColaborativa)) {
+      toast.error("Desconto da Colaborativa não pode ser maior que o subtotal");
+      return;
+    }
     if (modalidadesEnvio === "colaborativa" && colabInfo.indisponivel) {
       toast.error("Colaborativa indisponível: " + colabInfo.motivo);
       return;
@@ -147,23 +171,9 @@ export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }
     try {
       const token = gerarToken();
 
-      // Rateio proporcional caso admin tenha editado os totais
-      const totalCompletaInput = enviarCompleta ? parseFloat(valorCompleta) : 0;
-      const totalColabInput = enviarColaborativa ? parseFloat(valorColaborativa) : 0;
-      const somaCompletaItens = itens.reduce((s, it) => s + (it.valor_completa_item ?? 0), 0);
-      const somaColabItens = itens.reduce((s, it) => s + (it.valor_colaborativa_item ?? 0), 0);
-      const fatorCompleta = somaCompletaItens > 0 ? totalCompletaInput / somaCompletaItens : 0;
-      const fatorColab = somaColabItens > 0 ? totalColabInput / somaColabItens : 0;
-
-      // Montar array tvs_itens para persistir (combina dados da cotação + dados preenchidos aqui)
+      // Mantém valores individuais do catálogo (sem rateio) — desconto é linha separada
       const tvsParaSalvar = itens.map((it, idx) => {
         const original = tvsItens?.[idx];
-        const vCompletaItem = enviarCompleta && it.valor_completa_item != null && fatorCompleta > 0
-          ? Math.round(it.valor_completa_item * fatorCompleta * 100) / 100
-          : null;
-        const vColabItem = enviarColaborativa && it.valor_colaborativa_item != null && fatorColab > 0
-          ? Math.round(it.valor_colaborativa_item * fatorColab * 100) / 100
-          : null;
         return {
           ...(original || {}),
           tamanho: it.tamanho,
@@ -171,8 +181,8 @@ export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }
           polegadas: it.polegadas,
           tipo: it.tipo,
           marca_modelo: it.marca_modelo,
-          valor_completa_item: vCompletaItem,
-          valor_colaborativa_item: vColabItem,
+          valor_completa_item: enviarCompleta ? it.valor_completa_item : null,
+          valor_colaborativa_item: enviarColaborativa ? it.valor_colaborativa_item : null,
         };
       });
 
@@ -187,8 +197,11 @@ export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }
         tv_polegadas: primeiro?.polegadas || null,
         tv_tipo: primeiro?.tipo || null,
         tvs_itens: tvsParaSalvar,
-        valor_completa: enviarCompleta ? parseFloat(valorCompleta) : null,
-        valor_colaborativa: enviarColaborativa ? parseFloat(valorColaborativa) : null,
+        // valor_completa/colaborativa = TOTAL FINAL (subtotal - desconto)
+        valor_completa: enviarCompleta ? totalFinalCompleta : null,
+        valor_colaborativa: enviarColaborativa ? totalFinalColaborativa : null,
+        desconto_completa: enviarCompleta ? descCompletaNum : 0,
+        desconto_colaborativa: enviarColaborativa ? descColabNum : 0,
         token,
         status: "pendente",
       });
