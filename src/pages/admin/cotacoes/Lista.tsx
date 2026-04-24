@@ -19,6 +19,7 @@ import { CalendarioCotacoesMensal } from '@/components/admin/CalendarioCotacoesM
 import { SelectorPrecoTV, type TVItem, type TotaisTV, novoItemTV } from '@/components/admin/SelectorPrecoTV'
 import { ehInstalacaoTV } from '@/lib/precosTV'
 import { TermoAceiteCard } from '@/components/admin/TermoAceiteCard'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 type VisualizacaoTipo = 'lista' | 'semanal' | 'mensal'
 
@@ -154,6 +155,7 @@ export default function ListaCotacoes() {
   const { user } = useAuth()
   const { toast } = useToast()
   const [cotacoes, setCotacoes] = useState<Cotacao[]>([])
+  const [clientesComTermo, setClientesComTermo] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [cotacaoParaExcluir, setCotacaoParaExcluir] = useState<string | null>(null)
@@ -227,6 +229,27 @@ export default function ListaCotacoes() {
       if (error) throw error
       
       setCotacoes(data || [])
+
+      // Buscar clientes que já assinaram pelo menos 1 termo
+      const { data: termos } = await supabase
+        .from('termos_aceite')
+        .select('cotacao_id')
+        .eq('status', 'aceito')
+      
+      if (termos && termos.length > 0) {
+        const cotacaoIds = termos.map(t => t.cotacao_id)
+        const { data: cotacoesComTermo } = await supabase
+          .from('cotacoes')
+          .select('cliente_id')
+          .in('id', cotacaoIds)
+        
+        const clientesSet = new Set<string>(
+          (cotacoesComTermo || []).map(c => c.cliente_id).filter(Boolean)
+        )
+        setClientesComTermo(clientesSet)
+      } else {
+        setClientesComTermo(new Set())
+      }
     } catch (err) {
       console.error('Erro ao buscar cotações:', err)
       setError('Erro ao carregar cotações')
@@ -988,26 +1011,45 @@ export default function ListaCotacoes() {
                                   >
                                     Aprovar
                                   </Button>
-                                  <Button
-                                    onClick={() => {
-                                      if (confirm('Aprovar SEM exigir termo? O serviço será liberado imediatamente para os instaladores.')) {
-                                        supabase
-                                          .from('cotacoes')
-                                          .update({ status: 'aprovada' })
-                                          .eq('id', cotacao.id)
-                                          .then(() => {
-                                            toast({ title: "Cotação aprovada sem termo!" })
-                                            fetchCotacoes()
-                                          })
-                                      }
-                                    }}
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-green-700 border-green-300 hover:bg-green-50"
-                                    title="Aprovar sem exigir termo assinado"
-                                  >
-                                    Aprovar sem termo
-                                  </Button>
+                                  {(() => {
+                                    const clienteTemTermo = clientesComTermo.has(cotacao.cliente_id)
+                                    const btn = (
+                                      <Button
+                                        onClick={() => {
+                                          if (!clienteTemTermo) return
+                                          if (confirm('Aprovar SEM exigir termo? O serviço será liberado imediatamente para os instaladores.')) {
+                                            supabase
+                                              .from('cotacoes')
+                                              .update({ status: 'aprovada' })
+                                              .eq('id', cotacao.id)
+                                              .then(() => {
+                                                toast({ title: "Cotação aprovada sem termo!" })
+                                                fetchCotacoes()
+                                              })
+                                          }
+                                        }}
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={!clienteTemTermo}
+                                        className="text-green-700 border-green-300 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                      >
+                                        Aprovar sem termo
+                                      </Button>
+                                    )
+                                    if (clienteTemTermo) return btn
+                                    return (
+                                      <TooltipProvider>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <span tabIndex={0}>{btn}</span>
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            Disponível apenas para clientes antigos que já assinaram pelo menos 1 termo.
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    )
+                                  })()}
                                   <Button
                                     onClick={() => setCotacaoParaNaoGerou(cotacao.id)}
                                     size="sm"
