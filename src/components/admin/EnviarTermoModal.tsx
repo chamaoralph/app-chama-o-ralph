@@ -65,6 +65,8 @@ export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }
         polegadas: t.tamanho ? TAMANHO_PARA_POLEGADAS[t.tamanho] || "" : "",
         tipo: "LED",
         marca_modelo: "",
+        valor_completa_item: null,
+        valor_colaborativa_item: null,
       })),
     );
     setValorCompleta("");
@@ -76,24 +78,40 @@ export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }
       let totalCompleta = 0;
       let totalColab = 0;
       let temColab = true;
+      const valoresPorItem: Array<{ c: number | null; p: number | null }> = [];
       for (const t of base) {
         if (!t.tamanho || !t.parede) {
           temColab = false;
+          valoresPorItem.push({ c: null, p: null });
           continue;
         }
         const [total, parcial] = await Promise.all([
           buscarPrecoTV(cotacao.empresa_id, t.tamanho, t.parede, "total"),
           buscarPrecoTV(cotacao.empresa_id, t.tamanho, t.parede, "parcial"),
         ]);
-        if (total?.disponivel && total.valor_mao_obra) totalCompleta += Number(total.valor_mao_obra);
+        let vc: number | null = null;
+        let vp: number | null = null;
+        if (total?.disponivel && total.valor_mao_obra) {
+          vc = Number(total.valor_mao_obra);
+          totalCompleta += vc;
+        }
         if (parcial?.disponivel && parcial.valor_mao_obra) {
-          totalColab += Number(parcial.valor_mao_obra);
+          vp = Number(parcial.valor_mao_obra);
+          totalColab += vp;
         } else {
           temColab = false;
         }
+        valoresPorItem.push({ c: vc, p: vp });
       }
       if (totalCompleta > 0) setValorCompleta(String(totalCompleta));
       if (temColab && totalColab > 0) setValorColaborativa(String(totalColab));
+      setItens((prev) =>
+        prev.map((it, i) => ({
+          ...it,
+          valor_completa_item: valoresPorItem[i]?.c ?? null,
+          valor_colaborativa_item: valoresPorItem[i]?.p ?? null,
+        })),
+      );
     })();
   }, [open, tvsItens, cotacao.empresa_id]);
 
