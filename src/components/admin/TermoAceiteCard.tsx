@@ -7,6 +7,7 @@ import { CheckCircle2, Clock, Send, Copy, RefreshCw, Eye, FileDown, Loader2 } fr
 import { toast } from "sonner";
 import { EnviarTermoModal } from "./EnviarTermoModal";
 import { gerarESalvarTermoPDF } from "@/lib/gerarTermoPDF";
+import type { TVItem } from "./SelectorPrecoTV";
 
 interface Props {
   cotacao: {
@@ -16,8 +17,7 @@ interface Props {
     cliente_telefone: string;
     cliente_endereco: string | null;
   };
-  sugestaoTamanho?: string;
-  sugestaoTipoParede?: string;
+  tvsItens?: TVItem[];
 }
 
 interface Termo {
@@ -49,7 +49,7 @@ function fmtData(s: string | null) {
   return new Date(s).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
-export function TermoAceiteCard({ cotacao, sugestaoTamanho, sugestaoTipoParede }: Props) {
+export function TermoAceiteCard({ cotacao, tvsItens }: Props) {
   const [termo, setTermo] = useState<Termo | null>(null);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -126,8 +126,7 @@ export function TermoAceiteCard({ cotacao, sugestaoTamanho, sugestaoTipoParede }
           open={modalOpen}
           onClose={() => setModalOpen(false)}
           cotacao={cotacao}
-          sugestaoTamanho={sugestaoTamanho}
-          sugestaoTipoParede={sugestaoTipoParede}
+          tvsItens={tvsItens}
           onEnviado={fetchTermo}
         />
       </>
@@ -210,8 +209,7 @@ export function TermoAceiteCard({ cotacao, sugestaoTamanho, sugestaoTipoParede }
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         cotacao={cotacao}
-        sugestaoTamanho={sugestaoTamanho}
-        sugestaoTipoParede={sugestaoTipoParede}
+        tvsItens={tvsItens}
         onEnviado={fetchTermo}
       />
     </>
