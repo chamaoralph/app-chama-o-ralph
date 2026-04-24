@@ -107,6 +107,21 @@ export default function AceiteTermo() {
     ? colaborativaIndisponivelLista(tvsLista)
     : colaborativaIndisponivel(termo?.tv_tipo, termo?.tv_polegadas);
 
+  const mostrarCompleta = termo?.valor_completa != null;
+  const mostrarColaborativa = termo?.valor_colaborativa != null && !colabInfo.indisponivel;
+  const modalidadeUnica = mostrarCompleta && !mostrarColaborativa
+    ? "completa"
+    : !mostrarCompleta && mostrarColaborativa
+    ? "colaborativa"
+    : null;
+
+  // Pré-seleciona automaticamente quando só uma modalidade foi enviada
+  useEffect(() => {
+    if (modalidadeUnica && !modalidade && termo?.status !== "aceito") {
+      setModalidade(modalidadeUnica as any);
+    }
+  }, [modalidadeUnica, modalidade, termo?.status]);
+
   // Scroll do termo
   function handleScroll(e: React.UIEvent<HTMLDivElement>) {
     const el = e.currentTarget;
