@@ -111,13 +111,18 @@ export function TermoAceiteCard({ cotacao, tvsItens }: Props) {
   if (!termo) {
     return (
       <>
-        <Card className="border-dashed">
-          <CardContent className="flex items-center justify-between p-4">
+        <Card className="border-dashed border-orange-300 bg-orange-50/50">
+          <CardContent className="flex items-center justify-between p-4 gap-3">
             <div>
               <div className="font-medium">Termo de Aceite Digital</div>
-              <div className="text-sm text-muted-foreground">Envie o termo por WhatsApp para o cliente assinar.</div>
+              <div className="text-sm text-muted-foreground">
+                Envie o termo por WhatsApp para o cliente assinar.
+              </div>
+              <div className="mt-1 text-xs text-orange-700 font-medium">
+                ⚠️ O serviço só será liberado para os instaladores depois que o cliente assinar o termo.
+              </div>
             </div>
-            <Button onClick={() => setModalOpen(true)} className="bg-emerald-600 hover:bg-emerald-700">
+            <Button onClick={() => setModalOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 shrink-0">
               <Send className="mr-2 h-4 w-4" /> Enviar Termo
             </Button>
           </CardContent>
