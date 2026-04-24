@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Search, X, Loader2 } from 'lucide-react'
 import { normalizarTelefone } from '@/lib/utils'
-import { SelectorPrecoTV, type SelectorTVValues, type PrecoTVResult } from '@/components/admin/SelectorPrecoTV'
+import { SelectorPrecoTV, type TVItem, type TotaisTV, novoItemTV } from '@/components/admin/SelectorPrecoTV'
 import { ehInstalacaoTV } from '@/lib/precosTV'
 
 interface TipoServico {
@@ -28,7 +28,7 @@ export default function NovaCotacao() {
   const [clienteEncontrado, setClienteEncontrado] = useState(false)
   const [buscandoCliente, setBuscandoCliente] = useState(false)
   const [empresaId, setEmpresaId] = useState<string | null>(null)
-  const [tvSelectores, setTvSelectores] = useState<SelectorTVValues>({ tamanho_tv: '', tipo_parede: '', cobertura: '' })
+  const [tvItens, setTvItens] = useState<TVItem[]>([novoItemTV()])
   const [tvIndisponivel, setTvIndisponivel] = useState(false)
   
   const [formData, setFormData] = useState({
@@ -75,15 +75,14 @@ export default function NovaCotacao() {
 
   const isInstalacaoTV = ehInstalacaoTV(formData.tipo_servico)
 
-  function handlePrecoCalculado(resultado: PrecoTVResult | null, indisponivel: boolean) {
+  function handleTotaisCalculados(totais: TotaisTV, indisponivel: boolean) {
     setTvIndisponivel(indisponivel)
-    if (!resultado) return
     setFormData(prev => ({
       ...prev,
-      valor_mao_obra: resultado.valorMaoObra ? resultado.valorMaoObra.toString() : '',
-      valor_material: resultado.origemSuporte === 'empresa' ? '' : (resultado.valorMaterial ? resultado.valorMaterial.toString() : ''),
-      origem_suporte: resultado.origemSuporte,
-      custo_suporte: resultado.custoSuporte ? resultado.custoSuporte.toString() : '',
+      valor_mao_obra: totais.totalMaoObra ? totais.totalMaoObra.toString() : '',
+      valor_material: totais.origemSuporte === 'empresa' ? '' : (totais.totalMaterial ? totais.totalMaterial.toString() : ''),
+      origem_suporte: totais.origemSuporte,
+      custo_suporte: totais.totalCustoSuporte ? totais.totalCustoSuporte.toString() : '',
     }))
   }
 
@@ -262,9 +261,10 @@ export default function NovaCotacao() {
           observacoes: formData.observacoes,
           origem_suporte: formData.origem_suporte || null,
           custo_suporte: formData.custo_suporte ? parseFloat(formData.custo_suporte) : 0,
-          tv_tamanho: tvSelectores.tamanho_tv || null,
-          tv_parede: tvSelectores.tipo_parede || null,
-          tv_cobertura: tvSelectores.cobertura || null,
+          tv_tamanho: tvItens[0]?.tamanho || null,
+          tv_parede: tvItens[0]?.parede || null,
+          tv_cobertura: tvItens[0]?.cobertura || null,
+          tvs_itens: isInstalacaoTV ? tvItens : null,
           status: 'pendente'
         })
 
@@ -485,9 +485,9 @@ export default function NovaCotacao() {
               {isInstalacaoTV && (
                 <SelectorPrecoTV
                   empresaId={empresaId}
-                  values={tvSelectores}
-                  onChange={setTvSelectores}
-                  onPrecoCalculado={handlePrecoCalculado}
+                  items={tvItens}
+                  onItemsChange={setTvItens}
+                  onTotaisChange={handleTotaisCalculados}
                 />
               )}
               <div className="col-span-2">
