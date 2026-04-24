@@ -3,9 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Clock, Send, Copy, RefreshCw, Eye } from "lucide-react";
+import { CheckCircle2, Clock, Send, Copy, RefreshCw, Eye, FileDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { EnviarTermoModal } from "./EnviarTermoModal";
+import { gerarESalvarTermoPDF } from "@/lib/gerarTermoPDF";
 
 interface Props {
   cotacao: {
@@ -30,6 +31,17 @@ interface Termo {
   nome_aceite: string | null;
   cpf_aceite: string | null;
   assinatura_base64: string | null;
+  pdf_url: string | null;
+  cliente_nome: string;
+  cliente_telefone: string | null;
+  cliente_endereco: string | null;
+  tv_marca_modelo: string | null;
+  tv_polegadas: string | null;
+  tv_tipo: string | null;
+  valor_completa: number | null;
+  valor_colaborativa: number | null;
+  aceite_user_agent: string | null;
+  empresa_id: string;
 }
 
 function fmtData(s: string | null) {
@@ -41,6 +53,28 @@ export function TermoAceiteCard({ cotacao, sugestaoTamanho, sugestaoTipoParede }
   const [termo, setTermo] = useState<Termo | null>(null);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [gerandoPdf, setGerandoPdf] = useState(false);
+
+  async function gerarPdfAgora() {
+    if (!termo) return;
+    setGerandoPdf(true);
+    try {
+      const { data: emp } = await supabase
+        .from("empresas")
+        .select("nome")
+        .eq("id", cotacao.empresa_id)
+        .maybeSingle();
+      const empresaNome = (emp as any)?.nome || "Empresa";
+      const url = await gerarESalvarTermoPDF(supabase, termo as any, cotacao.empresa_id, empresaNome);
+      setTermo({ ...termo, pdf_url: url });
+      toast.success("PDF gerado!");
+      window.open(url, "_blank");
+    } catch (e: any) {
+      toast.error("Erro ao gerar PDF: " + (e?.message || ""));
+    } finally {
+      setGerandoPdf(false);
+    }
+  }
 
   const fetchTermo = useCallback(async () => {
     setLoading(true);
@@ -146,6 +180,18 @@ export function TermoAceiteCard({ cotacao, sugestaoTamanho, sugestaoTipoParede }
           )}
 
           <div className="flex flex-wrap gap-2">
+            {aceito && (
+              termo.pdf_url ? (
+                <Button size="sm" onClick={() => window.open(termo.pdf_url!, "_blank")} className="bg-emerald-600 hover:bg-emerald-700">
+                  <FileDown className="mr-1 h-3 w-3" /> Ver PDF
+                </Button>
+              ) : (
+                <Button size="sm" onClick={gerarPdfAgora} disabled={gerandoPdf} className="bg-emerald-600 hover:bg-emerald-700">
+                  {gerandoPdf ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <FileDown className="mr-1 h-3 w-3" />}
+                  {gerandoPdf ? "Gerando..." : "Gerar PDF agora"}
+                </Button>
+              )
+            )}
             <Button size="sm" variant="outline" onClick={copiarLink}>
               <Copy className="mr-1 h-3 w-3" /> Copiar link
             </Button>

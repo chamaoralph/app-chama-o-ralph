@@ -13,7 +13,8 @@ import {
   formatarCPF,
   formatarMoeda,
 } from "@/lib/termoTexto";
-import { CheckCircle2, FileText, PenLine, ShieldCheck, AlertTriangle, Printer, ChevronDown } from "lucide-react";
+import { CheckCircle2, FileText, PenLine, ShieldCheck, AlertTriangle, Download, ChevronDown, Loader2 } from "lucide-react";
+import { gerarESalvarTermoPDF } from "@/lib/gerarTermoPDF";
 
 type Etapa = 1 | 2 | 3 | 4;
 
@@ -23,7 +24,9 @@ interface Termo {
   status: string;
   enviado_em: string;
   aceito_em: string | null;
+  empresa_id: string;
   cliente_nome: string;
+  cliente_telefone: string | null;
   cliente_endereco: string | null;
   tv_marca_modelo: string | null;
   tv_polegadas: string | null;
@@ -34,6 +37,8 @@ interface Termo {
   nome_aceite: string | null;
   cpf_aceite: string | null;
   assinatura_base64: string | null;
+  aceite_user_agent: string | null;
+  pdf_url: string | null;
 }
 
 export default function AceiteTermo() {
@@ -49,6 +54,8 @@ export default function AceiteTermo() {
   const [aceitouTermo, setAceitouTermo] = useState(false);
   const [assinou, setAssinou] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  const [gerandoPdf, setGerandoPdf] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingRef = useRef(false);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
@@ -72,6 +79,7 @@ export default function AceiteTermo() {
       } else {
         const t = data as any as Termo;
         setTermo(t);
+        setPdfUrl(t.pdf_url || null);
         if (t.status === "aceito") {
           setEtapa(4);
           setModalidade((t.modalidade_escolhida as any) || null);
@@ -183,12 +191,51 @@ export default function AceiteTermo() {
         console.warn("Falha ao aprovar cotação automaticamente:", e);
       }
       setEtapa(4);
+      // Gera o PDF do termo assinado em background
+      void gerarPdfTermo({ ...termo, modalidade_escolhida: modalidade, nome_aceite: nome.trim(), cpf_aceite: cpf, assinatura_base64: dataUrl, aceito_em: agora });
     } catch (e) {
       alert("Erro ao salvar aceite. Tente novamente.");
     } finally {
       setSalvando(false);
     }
   }, [termo, modalidade, nome, cpf]);
+
+  const gerarPdfTermo = useCallback(async (termoAtualizado?: Termo) => {
+    const t = termoAtualizado || termo;
+    if (!t) return;
+    setGerandoPdf(true);
+    try {
+      // Busca nome da empresa
+      const { data: emp } = await supabase
+        .from("empresas")
+        .select("nome")
+        .eq("id", t.empresa_id)
+        .maybeSingle();
+      const empresaNome = (emp as any)?.nome || "Empresa";
+      const url = await gerarESalvarTermoPDF(supabase, {
+        id: t.id,
+        cliente_nome: t.cliente_nome,
+        cliente_telefone: t.cliente_telefone,
+        cliente_endereco: t.cliente_endereco,
+        cpf_aceite: t.cpf_aceite,
+        nome_aceite: t.nome_aceite,
+        tv_marca_modelo: t.tv_marca_modelo,
+        tv_polegadas: t.tv_polegadas,
+        tv_tipo: t.tv_tipo,
+        modalidade_escolhida: t.modalidade_escolhida,
+        valor_completa: t.valor_completa,
+        valor_colaborativa: t.valor_colaborativa,
+        assinatura_base64: t.assinatura_base64,
+        aceito_em: t.aceito_em,
+        aceite_user_agent: t.aceite_user_agent,
+      }, t.empresa_id, empresaNome);
+      setPdfUrl(url);
+    } catch (e) {
+      console.warn("Falha ao gerar PDF:", e);
+    } finally {
+      setGerandoPdf(false);
+    }
+  }, [termo]);
 
   if (loading) {
     return <div className="flex min-h-screen items-center justify-center bg-[#f6f5f0]"><div className="text-muted-foreground">Carregando...</div></div>;
@@ -417,9 +464,28 @@ export default function AceiteTermo() {
               )}
             </Card>
 
-            <Button onClick={() => window.print()} variant="outline" className="h-12 w-full no-print">
-              <Printer className="mr-2 h-4 w-4" /> Salvar / Imprimir
+            <Button
+              onClick={async () => {
+                if (pdfUrl) {
+                  window.open(pdfUrl, "_blank");
+                } else {
+                  await gerarPdfTermo();
+                }
+              }}
+              disabled={gerandoPdf}
+              className="h-12 w-full bg-emerald-600 text-base hover:bg-emerald-700 no-print"
+            >
+              {gerandoPdf ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Gerando PDF...</>
+              ) : pdfUrl ? (
+                <><Download className="mr-2 h-4 w-4" /> Baixar PDF do Termo Assinado</>
+              ) : (
+                <><Download className="mr-2 h-4 w-4" /> Gerar PDF do Termo</>
+              )}
             </Button>
+            <p className="text-center text-xs text-muted-foreground no-print">
+              💚 Guarde este documento — ele é sua garantia.
+            </p>
           </div>
         )}
       </main>
