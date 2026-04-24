@@ -79,6 +79,7 @@ export default function AceiteTermo() {
       } else {
         const t = data as any as Termo;
         setTermo(t);
+        setPdfUrl(t.pdf_url || null);
         if (t.status === "aceito") {
           setEtapa(4);
           setModalidade((t.modalidade_escolhida as any) || null);
