@@ -34,6 +34,8 @@ interface Termo {
   tv_tipo: string | null;
   valor_completa: number | null;
   valor_colaborativa: number | null;
+  desconto_completa?: number | null;
+  desconto_colaborativa?: number | null;
   modalidade_escolhida: string | null;
   nome_aceite: string | null;
   cpf_aceite: string | null;
