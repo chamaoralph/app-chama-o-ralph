@@ -52,6 +52,8 @@ export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }
   const [modalidadesEnvio, setModalidadesEnvio] = useState<"ambas" | "completa" | "colaborativa">("ambas");
   const [valorCompleta, setValorCompleta] = useState("");
   const [valorColaborativa, setValorColaborativa] = useState("");
+  const [descontoCompleta, setDescontoCompleta] = useState("");
+  const [descontoColaborativa, setDescontoColaborativa] = useState("");
   const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
@@ -71,6 +73,8 @@ export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }
     );
     setValorCompleta("");
     setValorColaborativa("");
+    setDescontoCompleta("");
+    setDescontoColaborativa("");
     setModalidadesEnvio("ambas");
 
     // Pré-preenche valores somando Completa e Colaborativa por item
@@ -123,6 +127,14 @@ export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }
     itens.map((i) => ({ tipo: i.tipo, polegadas: i.polegadas })),
   );
 
+  // Subtotais derivados da tabela de preços (soma por item)
+  const subtotalCompleta = itens.reduce((s, it) => s + (it.valor_completa_item ?? 0), 0);
+  const subtotalColaborativa = itens.reduce((s, it) => s + (it.valor_colaborativa_item ?? 0), 0);
+  const descCompletaNum = parseFloat(descontoCompleta) || 0;
+  const descColabNum = parseFloat(descontoColaborativa) || 0;
+  const totalFinalCompleta = Math.max(0, (parseFloat(valorCompleta) || 0) - descCompletaNum);
+  const totalFinalColaborativa = Math.max(0, (parseFloat(valorColaborativa) || 0) - descColabNum);
+
   async function enviarTermo() {
     const enviarCompleta = modalidadesEnvio === "ambas" || modalidadesEnvio === "completa";
     const enviarColaborativa = modalidadesEnvio === "ambas" || modalidadesEnvio === "colaborativa";
@@ -135,6 +147,22 @@ export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }
       toast.error("Informe o valor da Modalidade Colaborativa");
       return;
     }
+    if (enviarCompleta && descCompletaNum < 0) {
+      toast.error("Desconto da Completa não pode ser negativo");
+      return;
+    }
+    if (enviarColaborativa && descColabNum < 0) {
+      toast.error("Desconto da Colaborativa não pode ser negativo");
+      return;
+    }
+    if (enviarCompleta && descCompletaNum > parseFloat(valorCompleta)) {
+      toast.error("Desconto da Completa não pode ser maior que o subtotal");
+      return;
+    }
+    if (enviarColaborativa && descColabNum > parseFloat(valorColaborativa)) {
+      toast.error("Desconto da Colaborativa não pode ser maior que o subtotal");
+      return;
+    }
     if (modalidadesEnvio === "colaborativa" && colabInfo.indisponivel) {
       toast.error("Colaborativa indisponível: " + colabInfo.motivo);
       return;
@@ -143,23 +171,9 @@ export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }
     try {
       const token = gerarToken();
 
-      // Rateio proporcional caso admin tenha editado os totais
-      const totalCompletaInput = enviarCompleta ? parseFloat(valorCompleta) : 0;
-      const totalColabInput = enviarColaborativa ? parseFloat(valorColaborativa) : 0;
-      const somaCompletaItens = itens.reduce((s, it) => s + (it.valor_completa_item ?? 0), 0);
-      const somaColabItens = itens.reduce((s, it) => s + (it.valor_colaborativa_item ?? 0), 0);
-      const fatorCompleta = somaCompletaItens > 0 ? totalCompletaInput / somaCompletaItens : 0;
-      const fatorColab = somaColabItens > 0 ? totalColabInput / somaColabItens : 0;
-
-      // Montar array tvs_itens para persistir (combina dados da cotação + dados preenchidos aqui)
+      // Mantém valores individuais do catálogo (sem rateio) — desconto é linha separada
       const tvsParaSalvar = itens.map((it, idx) => {
         const original = tvsItens?.[idx];
-        const vCompletaItem = enviarCompleta && it.valor_completa_item != null && fatorCompleta > 0
-          ? Math.round(it.valor_completa_item * fatorCompleta * 100) / 100
-          : null;
-        const vColabItem = enviarColaborativa && it.valor_colaborativa_item != null && fatorColab > 0
-          ? Math.round(it.valor_colaborativa_item * fatorColab * 100) / 100
-          : null;
         return {
           ...(original || {}),
           tamanho: it.tamanho,
@@ -167,8 +181,8 @@ export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }
           polegadas: it.polegadas,
           tipo: it.tipo,
           marca_modelo: it.marca_modelo,
-          valor_completa_item: vCompletaItem,
-          valor_colaborativa_item: vColabItem,
+          valor_completa_item: enviarCompleta ? it.valor_completa_item : null,
+          valor_colaborativa_item: enviarColaborativa ? it.valor_colaborativa_item : null,
         };
       });
 
@@ -183,8 +197,11 @@ export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }
         tv_polegadas: primeiro?.polegadas || null,
         tv_tipo: primeiro?.tipo || null,
         tvs_itens: tvsParaSalvar,
-        valor_completa: enviarCompleta ? parseFloat(valorCompleta) : null,
-        valor_colaborativa: enviarColaborativa ? parseFloat(valorColaborativa) : null,
+        // valor_completa/colaborativa = TOTAL FINAL (subtotal - desconto)
+        valor_completa: enviarCompleta ? totalFinalCompleta : null,
+        valor_colaborativa: enviarColaborativa ? totalFinalColaborativa : null,
+        desconto_completa: enviarCompleta ? descCompletaNum : 0,
+        desconto_colaborativa: enviarColaborativa ? descColabNum : 0,
         token,
         status: "pendente",
       });
@@ -292,24 +309,66 @@ export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }
             </RadioGroup>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-3">
             {(modalidadesEnvio === "ambas" || modalidadesEnvio === "completa") && (
-              <div className="space-y-2">
-                <Label>Valor Completa (R$) — total</Label>
-                <Input type="number" step="0.01" value={valorCompleta} onChange={(e) => setValorCompleta(e.target.value)} placeholder="0,00" />
+              <div className="rounded-md border p-3 space-y-2">
+                <div className="text-sm font-semibold text-[#1e5a9e]">Modalidade Completa</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Subtotal (R$)</Label>
+                    <Input type="number" step="0.01" value={valorCompleta} onChange={(e) => setValorCompleta(e.target.value)} placeholder="0,00" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Desconto (R$)</Label>
+                    <Input type="number" step="0.01" min="0" value={descontoCompleta} onChange={(e) => setDescontoCompleta(e.target.value)} placeholder="0,00" />
+                  </div>
+                </div>
+                {descCompletaNum > 0 && (
+                  <div className="flex items-center justify-between rounded bg-[#e8f0fa] px-2 py-1.5 text-sm">
+                    <span className="text-foreground/70">Total a cobrar</span>
+                    <span className="font-bold text-[#1e5a9e]">
+                      {totalFinalCompleta.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
             {(modalidadesEnvio === "ambas" || modalidadesEnvio === "colaborativa") && (
-              <div className="space-y-2">
-                <Label>Valor Colaborativa (R$) — total</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={valorColaborativa}
-                  onChange={(e) => setValorColaborativa(e.target.value)}
-                  placeholder="0,00"
-                  disabled={colabInfo.indisponivel}
-                />
+              <div className="rounded-md border p-3 space-y-2">
+                <div className="text-sm font-semibold text-[#0f6e56]">Modalidade Colaborativa</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Subtotal (R$)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={valorColaborativa}
+                      onChange={(e) => setValorColaborativa(e.target.value)}
+                      placeholder="0,00"
+                      disabled={colabInfo.indisponivel}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Desconto (R$)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={descontoColaborativa}
+                      onChange={(e) => setDescontoColaborativa(e.target.value)}
+                      placeholder="0,00"
+                      disabled={colabInfo.indisponivel}
+                    />
+                  </div>
+                </div>
+                {descColabNum > 0 && !colabInfo.indisponivel && (
+                  <div className="flex items-center justify-between rounded bg-[#e1f5ee] px-2 py-1.5 text-sm">
+                    <span className="text-foreground/70">Total a cobrar</span>
+                    <span className="font-bold text-[#0f6e56]">
+                      {totalFinalColaborativa.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>

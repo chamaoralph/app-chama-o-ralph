@@ -1488,6 +1488,8 @@ export type Database = {
           cotacao_id: string
           cpf_aceite: string | null
           created_at: string
+          desconto_colaborativa: number
+          desconto_completa: number
           empresa_id: string
           enviado_em: string
           id: string
@@ -1517,6 +1519,8 @@ export type Database = {
           cotacao_id: string
           cpf_aceite?: string | null
           created_at?: string
+          desconto_colaborativa?: number
+          desconto_completa?: number
           empresa_id: string
           enviado_em?: string
           id?: string
@@ -1546,6 +1550,8 @@ export type Database = {
           cotacao_id?: string
           cpf_aceite?: string | null
           created_at?: string
+          desconto_colaborativa?: number
+          desconto_completa?: number
           empresa_id?: string
           enviado_em?: string
           id?: string
