@@ -16,6 +16,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CalendarioCotacoesSemanal } from '@/components/admin/CalendarioCotacoesSemanal'
 import { CalendarioCotacoesMensal } from '@/components/admin/CalendarioCotacoesMensal'
+import { SelectorPrecoTV, type SelectorTVValues, type PrecoTVResult } from '@/components/admin/SelectorPrecoTV'
+import { ehInstalacaoTV } from '@/lib/precosTV'
 
 type VisualizacaoTipo = 'lista' | 'semanal' | 'mensal'
 
@@ -190,10 +192,18 @@ export default function ListaCotacoes() {
   const [showOutroInput, setShowOutroInput] = useState(false)
   const [visualizacao, setVisualizacao] = useState<VisualizacaoTipo>('lista')
   const [bloqueandoTelefone, setBloqueandoTelefone] = useState<string | null>(null)
+  const [empresaIdAtual, setEmpresaIdAtual] = useState<string | null>(null)
+  const [tvSelectoresEdit, setTvSelectoresEdit] = useState<SelectorTVValues>({ tamanho_tv: '', tipo_parede: '', cobertura: '' })
+  const [tvIndisponivelEdit, setTvIndisponivelEdit] = useState(false)
 
   useEffect(() => {
     fetchCotacoes()
     fetchTiposServico()
+    ;(async () => {
+      if (!user) return
+      const { data } = await supabase.from('usuarios').select('empresa_id').eq('id', user.id).maybeSingle()
+      if (data) setEmpresaIdAtual(data.empresa_id)
+    })()
   }, [user])
 
   async function fetchTiposServico() {
@@ -274,7 +284,21 @@ export default function ListaCotacoes() {
       custo_suporte: (cotacao as any).custo_suporte?.toString() || ''
     })
     setShowOutroInput(!ehTipoCadastrado && !!tipoAtual)
+    setTvSelectoresEdit({ tamanho_tv: '', tipo_parede: '', cobertura: '' })
+    setTvIndisponivelEdit(false)
     setCotacaoParaEditar(cotacao)
+  }
+
+  function handlePrecoCalculadoEdit(resultado: PrecoTVResult | null, indisponivel: boolean) {
+    setTvIndisponivelEdit(indisponivel)
+    if (!resultado) return
+    setEditForm(prev => ({
+      ...prev,
+      valor_estimado: resultado.valorMaoObra ? resultado.valorMaoObra.toString() : '',
+      valor_material: resultado.origemSuporte === 'empresa' ? '' : (resultado.valorMaterial ? resultado.valorMaterial.toString() : ''),
+      origem_suporte: resultado.origemSuporte,
+      custo_suporte: resultado.custoSuporte ? resultado.custoSuporte.toString() : '',
+    }))
   }
 
   async function salvarEdicao() {
@@ -1224,6 +1248,14 @@ export default function ListaCotacoes() {
                     />
                   </div>
                 )}
+                {ehInstalacaoTV(editForm.tipo_servico) && (
+                  <SelectorPrecoTV
+                    empresaId={empresaIdAtual}
+                    values={tvSelectoresEdit}
+                    onChange={setTvSelectoresEdit}
+                    onPrecoCalculado={handlePrecoCalculadoEdit}
+                  />
+                )}
                 <div className="col-span-2 space-y-2">
                   <Label>Descrição do Serviço (Detalhes)</Label>
                   <Textarea 
@@ -1285,8 +1317,8 @@ export default function ListaCotacoes() {
             <Button variant="outline" onClick={() => setCotacaoParaEditar(null)}>
               Cancelar
             </Button>
-            <Button onClick={salvarEdicao} disabled={editLoading}>
-              {editLoading ? 'Salvando...' : 'Salvar Alterações'}
+            <Button onClick={salvarEdicao} disabled={editLoading || tvIndisponivelEdit}>
+              {editLoading ? 'Salvando...' : tvIndisponivelEdit ? 'Combinação indisponível' : 'Salvar Alterações'}
             </Button>
           </DialogFooter>
         </DialogContent>

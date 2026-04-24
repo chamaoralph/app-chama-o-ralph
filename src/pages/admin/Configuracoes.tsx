@@ -6,6 +6,7 @@ import { Plus, Pencil, Trash2, GripVertical, Users, Percent } from 'lucide-react
 import { RFMConfigCard } from '@/components/admin/RFMConfigCard'
 import { TelefonesBloqueadosCard } from '@/components/admin/TelefonesBloqueadosCard'
 import { BackupStorageCard } from '@/components/admin/BackupStorageCard'
+import { TabelaPrecosTVCard } from '@/components/admin/TabelaPrecosTVCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -410,6 +411,11 @@ export default function Configuracoes() {
             </p>
           </CardContent>
         </Card>
+
+        {/* Tabela de Preços TV */}
+        <div className="mt-6">
+          <TabelaPrecosTVCard />
+        </div>
 
         {/* Critérios RFM */}
         <div className="mt-6">
