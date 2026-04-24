@@ -1,62 +1,43 @@
-## Objetivo
+## Diagnóstico
 
-Garantir que **nenhum serviço apareça para os instaladores enquanto o cliente não assinar o termo**. Hoje, ao aprovar a cotação, o serviço é criado imediatamente com status `disponivel`, ficando visível na lista de "Serviços Disponíveis".
+Os serviços **SRV-2026-246** e **SRV-2026-255** foram criados com todos os valores zerados porque as cotações de origem foram aprovadas sem ter `valor_estimado` preenchido (e com `tvs_itens` contendo um item "em branco" — sem tamanho/parede/cobertura).
 
-## Novo fluxo
+Quando isso acontece, a trigger `criar_servico_ao_confirmar` calcula `valor_total = 0`, `valor_mao_obra_instalador = 0`, `valor_reembolso = 0`.
 
-1. Admin clica **"Aprovar"** numa cotação pendente.
-2. Em vez de virar `aprovada` direto, a cotação vai para o novo status **`termo_pendente`** (badge laranja "Aguardando Termo").
-3. Nenhum serviço é criado ainda — instaladores não veem nada.
-4. Admin envia o termo pelo card já existente (`TermoAceiteCard`).
-5. Quando o cliente assina (em `/aceite/:token`), a edge function `aprovar-cotacao-via-termo` é chamada e muda o status da cotação para `aprovada` — só então o trigger `criar_servico_ao_confirmar` cria o serviço com status `disponivel`, e ele aparece para os instaladores.
-6. Se o admin quiser pular o termo (cenário antigo), continua podendo "Aprovar diretamente" via uma ação secundária.
+Provável causa: a cotação foi aprovada (botão **Aprovar** ou **Aprovar sem termo**) antes de o admin escolher tamanho/parede no seletor de TV — o `SelectorPrecoTV` mantém um item vazio inicial e o "valor estimado" não foi calculado.
 
-## Mudanças
+## Correções
 
-### 1. Banco (migration)
+### 1. Corrigir os 2 serviços já existentes
+Reabrir o fluxo: o admin precisa abrir cada cotação, preencher tamanho/parede da TV (gerando o valor) e salvar. A trigger `sincronizar_servico_ao_editar_cotacao` recalculará `valor_total`, `valor_mao_obra_instalador` e `valor_reembolso_despesas` no serviço automaticamente.
 
-- Atualizar o constraint `cotacoes_status_check` para incluir `'termo_pendente'`:
-  ```
-  ALTER TABLE cotacoes DROP CONSTRAINT cotacoes_status_check;
-  ALTER TABLE cotacoes ADD CONSTRAINT cotacoes_status_check
-    CHECK (status IN ('pendente','termo_pendente','aprovada','perdida','sem_resposta','nao_gerou'));
-  ```
-- Nenhuma alteração no trigger `criar_servico_ao_confirmar` — ele já só dispara quando muda para `aprovada`, então o serviço continuará sendo criado no momento certo (após assinatura).
+Para evitar trabalho manual, vou:
+- Listar para você os dados conhecidos das duas cotações (descrições já indicam os tamanhos: SRV-255 → TV 32" alvenaria, SRV-246 → estante/quadro alvenaria) para você confirmar/editar.
+- Após você confirmar tamanhos/valores, atualizo as cotações via migração de dados, o que dispara a sincronização do serviço.
 
-### 2. `src/pages/admin/cotacoes/Lista.tsx`
+### 2. Prevenir o problema (validação na aprovação)
+Em `src/pages/admin/cotacoes/Lista.tsx`, nos dois botões **Aprovar** e **Aprovar sem termo**:
 
-- Renomear o botão verde **"Aprovar"** (linhas ~971-989) para **"Aprovar e Enviar Termo"**: ao clicar, atualiza `status` para `'termo_pendente'` (em vez de `'aprovada'`), abre a edição da cotação ou mantém o usuário na lista exibindo um toast com instrução para enviar o termo via card de edição.
-- Adicionar opção secundária (menu/dropdown ou botão pequeno) **"Aprovar sem termo"** que mantém o comportamento antigo (`status: 'aprovada'`) para casos excepcionais.
-- Atualizar `getStatusBadge` (linha 666) adicionando a entrada `termo_pendente: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Aguardando Termo' }`.
-- Mostrar os botões "Reprovar" e o ciclo completo também quando status for `termo_pendente`.
-- Replicar o mesmo comportamento nos handlers `onAprovar` dos calendários `CalendarioCotacoesSemanal` e `CalendarioCotacoesMensal` (linhas ~799 e ~813).
+- Antes de fazer o `update`, validar:
+  - `cotacao.valor_estimado > 0`, **ou**
+  - `cotacao.tvs_itens` contém pelo menos um item com `tamanho`, `parede` e `valor_mao_obra > 0`.
+- Se não passar, exibir toast de erro: *"Preencha o tamanho/parede da TV (ou um valor estimado) antes de aprovar. Use o botão Editar."*
+- Botões ficam **desabilitados** com tooltip equivalente quando a cotação não tiver valor.
 
-### 3. `src/components/admin/CalendarioCotacoesSemanal.tsx` e `CalendarioCotacoesMensal.tsx`
-
-- Aceitar/exibir o novo status `termo_pendente` com a mesma cor da badge (cards laranja).
-
-### 4. `src/components/admin/TermoAceiteCard.tsx`
-
-- Quando o termo é aceito (estado já existente do componente), exibir um aviso "Termo assinado — cotação aprovada automaticamente" (apenas informativo; a aprovação acontece pela edge function).
-- Quando o termo ainda está pendente, deixar claro: "Aguardando assinatura — o serviço só aparecerá para os instaladores após o cliente assinar".
-
-### 5. Edge function `aprovar-cotacao-via-termo`
-
-- Já faz exatamente o que precisamos: muda `cotacoes.status` de qualquer valor para `'aprovada'` quando o termo é aceito, o que dispara o trigger e cria o serviço. Nenhuma alteração necessária.
-
-### 6. Filtros e telas relacionadas
-
-- Onde houver filtros por status na Lista de Cotações (filtros existentes), adicionar a opção "Aguardando Termo".
-
-## Observações
-
-- Cotações com status `aprovada` antigas continuam funcionando normalmente (já têm serviço criado).
-- A página de Aprovações de serviços (`/admin/aprovacoes`) e a lista de Serviços Disponíveis para instaladores não precisam mudar — elas operam sobre `servicos`, e o serviço só será criado quando o termo for assinado.
+### 3. Reforço no banco (defesa em profundidade)
+Adicionar verificação na trigger `criar_servico_ao_confirmar`: se `valor_estimado IS NULL OR valor_estimado <= 0`, lançar `RAISE EXCEPTION 'Cotação sem valor estimado — preencha antes de aprovar.'`. Isso impede que qualquer outro caminho (ex: edge function de aceite de termo, importação) crie serviços zerados silenciosamente.
 
 ## Arquivos afetados
 
-- Nova migration SQL (constraint).
-- `src/pages/admin/cotacoes/Lista.tsx`
-- `src/components/admin/CalendarioCotacoesSemanal.tsx`
-- `src/components/admin/CalendarioCotacoesMensal.tsx`
-- `src/components/admin/TermoAceiteCard.tsx`
+- `src/pages/admin/cotacoes/Lista.tsx` — validação nos botões de aprovação
+- Nova migração SQL — atualizar trigger `criar_servico_ao_confirmar` com guarda de valor
+- Atualização de dados (via insert tool) das cotações `327d1b39…` e `b529a3bf…` após você confirmar os valores corretos
+
+## Pergunta antes de implementar
+
+Quais valores devo lançar nessas duas cotações para destravar os serviços?
+
+- **SRV-2026-246** (descrição: *"Uma estante e um quadro em parede de alvenaria"*) — não é instalação de TV. Qual `valor_estimado` (mão de obra) e `valor_material`?
+- **SRV-2026-255** (descrição: *"TV 32'' em alvenaria — Levar nosso suporte"*) — devo aplicar a tabela de preços (TV 32", alvenaria, suporte da empresa) ou um valor manual?
+
+Me passe os valores e eu já implemento tudo (correção + prevenção) na próxima etapa.
