@@ -19,6 +19,7 @@ import { CalendarioCotacoesMensal } from '@/components/admin/CalendarioCotacoesM
 import { SelectorPrecoTV, type TVItem, type TotaisTV, novoItemTV } from '@/components/admin/SelectorPrecoTV'
 import { ehInstalacaoTV } from '@/lib/precosTV'
 import { TermoAceiteCard } from '@/components/admin/TermoAceiteCard'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 type VisualizacaoTipo = 'lista' | 'semanal' | 'mensal'
 
