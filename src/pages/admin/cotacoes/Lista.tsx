@@ -284,7 +284,21 @@ export default function ListaCotacoes() {
       custo_suporte: (cotacao as any).custo_suporte?.toString() || ''
     })
     setShowOutroInput(!ehTipoCadastrado && !!tipoAtual)
+    setTvSelectoresEdit({ tamanho_tv: '', tipo_parede: '', cobertura: '' })
+    setTvIndisponivelEdit(false)
     setCotacaoParaEditar(cotacao)
+  }
+
+  function handlePrecoCalculadoEdit(resultado: PrecoTVResult | null, indisponivel: boolean) {
+    setTvIndisponivelEdit(indisponivel)
+    if (!resultado) return
+    setEditForm(prev => ({
+      ...prev,
+      valor_estimado: resultado.valorMaoObra ? resultado.valorMaoObra.toString() : '',
+      valor_material: resultado.origemSuporte === 'empresa' ? '' : (resultado.valorMaterial ? resultado.valorMaterial.toString() : ''),
+      origem_suporte: resultado.origemSuporte,
+      custo_suporte: resultado.custoSuporte ? resultado.custoSuporte.toString() : '',
+    }))
   }
 
   async function salvarEdicao() {
