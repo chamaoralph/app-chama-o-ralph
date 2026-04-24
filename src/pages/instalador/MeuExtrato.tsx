@@ -369,12 +369,14 @@ export default function MeuExtrato() {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Mão de Obra</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Reembolso</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Recebido</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {servicosFiltrados.map((servico) => {
                       const total = servico.valor_mao_obra_instalador + servico.valor_reembolso_despesas
+                      const recebido = servico.valor_recebido_cliente || 0
                       return (
                         <tr key={servico.id} className="hover:bg-gray-50">
                           <td className="px-4 py-3 text-sm">
@@ -390,6 +392,13 @@ export default function MeuExtrato() {
                           <td className="px-4 py-3 text-sm text-right">
                             R$ {servico.valor_reembolso_despesas.toFixed(2)}
                           </td>
+                          <td className="px-4 py-3 text-sm text-right">
+                            {recebido > 0 ? (
+                              <span className="text-orange-600 font-medium">R$ {recebido.toFixed(2)}</span>
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )}
+                          </td>
                           <td className="px-4 py-3 text-sm text-right font-bold">
                             R$ {total.toFixed(2)}
                           </td>
@@ -398,18 +407,36 @@ export default function MeuExtrato() {
                     })}
                   </tbody>
                   <tfoot className="bg-gray-50">
-                    <tr>
-                      <td colSpan={5} className="px-4 py-3 text-sm font-bold text-right">TOTAL:</td>
-                      <td className="px-4 py-3 text-sm font-bold text-right">
-                        R$ {servicosFiltrados.reduce((s, srv) => s + srv.valor_mao_obra_instalador, 0).toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3 text-sm font-bold text-right">
-                        R$ {servicosFiltrados.reduce((s, srv) => s + srv.valor_reembolso_despesas, 0).toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3 text-sm font-bold text-right text-green-600">
-                        R$ {servicosFiltrados.reduce((s, srv) => s + srv.valor_mao_obra_instalador + srv.valor_reembolso_despesas, 0).toFixed(2)}
-                      </td>
-                    </tr>
+                    {(() => {
+                      const totalMO = servicosFiltrados.reduce((s, srv) => s + srv.valor_mao_obra_instalador, 0)
+                      const totalReemb = servicosFiltrados.reduce((s, srv) => s + srv.valor_reembolso_despesas, 0)
+                      const totalRecebido = servicosFiltrados.reduce((s, srv) => s + (srv.valor_recebido_cliente || 0), 0)
+                      const totalBruto = totalMO + totalReemb
+                      const saldo = totalBruto - totalRecebido
+                      return (
+                        <>
+                          <tr>
+                            <td colSpan={5} className="px-4 py-3 text-sm font-bold text-right">TOTAL:</td>
+                            <td className="px-4 py-3 text-sm font-bold text-right">R$ {totalMO.toFixed(2)}</td>
+                            <td className="px-4 py-3 text-sm font-bold text-right">R$ {totalReemb.toFixed(2)}</td>
+                            <td className="px-4 py-3 text-sm font-bold text-right text-orange-600">
+                              R$ {totalRecebido.toFixed(2)}
+                            </td>
+                            <td className="px-4 py-3 text-sm font-bold text-right">R$ {totalBruto.toFixed(2)}</td>
+                          </tr>
+                          {totalRecebido > 0 && (
+                            <tr className="border-t-2 border-gray-300">
+                              <td colSpan={8} className="px-4 py-3 text-sm font-bold text-right">
+                                {saldo >= 0 ? 'EMPRESA DEVE PAGAR:' : 'INSTALADOR DEVE DEVOLVER:'}
+                              </td>
+                              <td colSpan={2} className={`px-4 py-3 text-base font-bold text-right ${saldo >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                R$ {Math.abs(saldo).toFixed(2)}
+                              </td>
+                            </tr>
+                          )}
+                        </>
+                      )
+                    })()}
                   </tfoot>
                 </table>
               </div>
