@@ -343,6 +343,22 @@ export default function AceiteTermo() {
                   <div className="text-lg font-semibold text-[#1e5a9e]">Completa</div>
                   <div className="text-xl font-bold text-[#1e5a9e]">{formatarMoeda(termo.valor_completa)}</div>
                 </div>
+                {tvsLista.length > 1 && tvsLista.some((t: any) => t.valor_completa_item != null) && (
+                  <div className="mt-3 space-y-1 rounded-lg bg-white/60 p-2 text-sm">
+                    {tvsLista.map((t: any, i) => (
+                      <div key={i} className="flex justify-between">
+                        <span className="text-foreground/70">
+                          TV {i + 1}{t.polegadas ? ` · ${t.polegadas}"` : ""}{t.tipo ? ` ${t.tipo}` : ""}
+                        </span>
+                        <span className="font-medium">{formatarMoeda(t.valor_completa_item)}</span>
+                      </div>
+                    ))}
+                    <div className="mt-1 flex justify-between border-t pt-1 font-semibold text-[#1e5a9e]">
+                      <span>Total</span>
+                      <span>{formatarMoeda(termo.valor_completa)}</span>
+                    </div>
+                  </div>
+                )}
                 <ul className="mt-2 space-y-1 text-sm text-foreground/80">
                   <li>✓ Técnico + ajudante fazem tudo</li>
                   <li>✓ Quebrou? Empresa cobre o conserto ou troca por equivalente</li>
@@ -362,6 +378,22 @@ export default function AceiteTermo() {
                   <div className="text-lg font-semibold text-[#0f6e56]">Colaborativa</div>
                   <div className="text-xl font-bold text-[#0f6e56]">{formatarMoeda(termo.valor_colaborativa)}</div>
                 </div>
+                {tvsLista.length > 1 && tvsLista.some((t: any) => t.valor_colaborativa_item != null) && (
+                  <div className="mt-3 space-y-1 rounded-lg bg-white/60 p-2 text-sm">
+                    {tvsLista.map((t: any, i) => (
+                      <div key={i} className="flex justify-between">
+                        <span className="text-foreground/70">
+                          TV {i + 1}{t.polegadas ? ` · ${t.polegadas}"` : ""}{t.tipo ? ` ${t.tipo}` : ""}
+                        </span>
+                        <span className="font-medium">{formatarMoeda(t.valor_colaborativa_item)}</span>
+                      </div>
+                    ))}
+                    <div className="mt-1 flex justify-between border-t pt-1 font-semibold text-[#0f6e56]">
+                      <span>Total</span>
+                      <span>{formatarMoeda(termo.valor_colaborativa)}</span>
+                    </div>
+                  </div>
+                )}
                 <ul className="mt-2 space-y-1 text-sm text-foreground/80">
                   <li>✓ Você ajuda a encaixar a TV (~30 seg)</li>
                   <li>✓ Quebrou? Empresa cobre 50% do conserto (até R$ 1.000)</li>

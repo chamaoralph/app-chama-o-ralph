@@ -42,6 +42,9 @@ interface TVFormItem {
   polegadas: string;
   tipo: string;
   marca_modelo: string;
+  // valores individuais pré-calculados
+  valor_completa_item: number | null;
+  valor_colaborativa_item: number | null;
 }
 
 export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }: Props) {
@@ -62,6 +65,8 @@ export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }
         polegadas: t.tamanho ? TAMANHO_PARA_POLEGADAS[t.tamanho] || "" : "",
         tipo: "LED",
         marca_modelo: "",
+        valor_completa_item: null,
+        valor_colaborativa_item: null,
       })),
     );
     setValorCompleta("");
@@ -73,24 +78,40 @@ export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }
       let totalCompleta = 0;
       let totalColab = 0;
       let temColab = true;
+      const valoresPorItem: Array<{ c: number | null; p: number | null }> = [];
       for (const t of base) {
         if (!t.tamanho || !t.parede) {
           temColab = false;
+          valoresPorItem.push({ c: null, p: null });
           continue;
         }
         const [total, parcial] = await Promise.all([
           buscarPrecoTV(cotacao.empresa_id, t.tamanho, t.parede, "total"),
           buscarPrecoTV(cotacao.empresa_id, t.tamanho, t.parede, "parcial"),
         ]);
-        if (total?.disponivel && total.valor_mao_obra) totalCompleta += Number(total.valor_mao_obra);
+        let vc: number | null = null;
+        let vp: number | null = null;
+        if (total?.disponivel && total.valor_mao_obra) {
+          vc = Number(total.valor_mao_obra);
+          totalCompleta += vc;
+        }
         if (parcial?.disponivel && parcial.valor_mao_obra) {
-          totalColab += Number(parcial.valor_mao_obra);
+          vp = Number(parcial.valor_mao_obra);
+          totalColab += vp;
         } else {
           temColab = false;
         }
+        valoresPorItem.push({ c: vc, p: vp });
       }
       if (totalCompleta > 0) setValorCompleta(String(totalCompleta));
       if (temColab && totalColab > 0) setValorColaborativa(String(totalColab));
+      setItens((prev) =>
+        prev.map((it, i) => ({
+          ...it,
+          valor_completa_item: valoresPorItem[i]?.c ?? null,
+          valor_colaborativa_item: valoresPorItem[i]?.p ?? null,
+        })),
+      );
     })();
   }, [open, tvsItens, cotacao.empresa_id]);
 
@@ -122,9 +143,23 @@ export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }
     try {
       const token = gerarToken();
 
+      // Rateio proporcional caso admin tenha editado os totais
+      const totalCompletaInput = enviarCompleta ? parseFloat(valorCompleta) : 0;
+      const totalColabInput = enviarColaborativa ? parseFloat(valorColaborativa) : 0;
+      const somaCompletaItens = itens.reduce((s, it) => s + (it.valor_completa_item ?? 0), 0);
+      const somaColabItens = itens.reduce((s, it) => s + (it.valor_colaborativa_item ?? 0), 0);
+      const fatorCompleta = somaCompletaItens > 0 ? totalCompletaInput / somaCompletaItens : 0;
+      const fatorColab = somaColabItens > 0 ? totalColabInput / somaColabItens : 0;
+
       // Montar array tvs_itens para persistir (combina dados da cotação + dados preenchidos aqui)
       const tvsParaSalvar = itens.map((it, idx) => {
         const original = tvsItens?.[idx];
+        const vCompletaItem = enviarCompleta && it.valor_completa_item != null && fatorCompleta > 0
+          ? Math.round(it.valor_completa_item * fatorCompleta * 100) / 100
+          : null;
+        const vColabItem = enviarColaborativa && it.valor_colaborativa_item != null && fatorColab > 0
+          ? Math.round(it.valor_colaborativa_item * fatorColab * 100) / 100
+          : null;
         return {
           ...(original || {}),
           tamanho: it.tamanho,
@@ -132,6 +167,8 @@ export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }
           polegadas: it.polegadas,
           tipo: it.tipo,
           marca_modelo: it.marca_modelo,
+          valor_completa_item: vCompletaItem,
+          valor_colaborativa_item: vColabItem,
         };
       });
 
