@@ -111,13 +111,18 @@ export function TermoAceiteCard({ cotacao, tvsItens }: Props) {
   if (!termo) {
     return (
       <>
-        <Card className="border-dashed">
-          <CardContent className="flex items-center justify-between p-4">
+        <Card className="border-dashed border-orange-300 bg-orange-50/50">
+          <CardContent className="flex items-center justify-between p-4 gap-3">
             <div>
               <div className="font-medium">Termo de Aceite Digital</div>
-              <div className="text-sm text-muted-foreground">Envie o termo por WhatsApp para o cliente assinar.</div>
+              <div className="text-sm text-muted-foreground">
+                Envie o termo por WhatsApp para o cliente assinar.
+              </div>
+              <div className="mt-1 text-xs text-orange-700 font-medium">
+                ⚠️ O serviço só será liberado para os instaladores depois que o cliente assinar o termo.
+              </div>
             </div>
-            <Button onClick={() => setModalOpen(true)} className="bg-emerald-600 hover:bg-emerald-700">
+            <Button onClick={() => setModalOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 shrink-0">
               <Send className="mr-2 h-4 w-4" /> Enviar Termo
             </Button>
           </CardContent>
@@ -164,6 +169,16 @@ export function TermoAceiteCard({ cotacao, tvsItens }: Props) {
             <div><span className="text-muted-foreground">Aceito:</span> {fmtData(termo.aceito_em)}</div>
             <div><span className="text-muted-foreground">Modalidade:</span> {termo.modalidade_escolhida ? (termo.modalidade_escolhida === "completa" ? "Completa" : "Colaborativa") : "—"}</div>
           </div>
+
+          {aceito ? (
+            <div className="rounded-md bg-emerald-100 px-3 py-2 text-xs text-emerald-800 font-medium">
+              ✅ Termo assinado — cotação aprovada e serviço liberado para os instaladores.
+            </div>
+          ) : (
+            <div className="rounded-md bg-amber-100 px-3 py-2 text-xs text-amber-800 font-medium">
+              ⏳ Aguardando assinatura — o serviço só aparecerá para os instaladores depois que o cliente assinar.
+            </div>
+          )}
 
           {aceito && (
             <div className="space-y-2 rounded-md border bg-background p-3">

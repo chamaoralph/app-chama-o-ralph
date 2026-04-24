@@ -62,6 +62,7 @@ function parseDataServico(dataStr: string): Date {
 const getStatusColor = (status: string) => {
   const colors: Record<string, string> = {
     pendente: 'bg-yellow-100 border-yellow-300 text-yellow-800',
+    termo_pendente: 'bg-orange-100 border-orange-300 text-orange-800',
     aprovada: 'bg-green-100 border-green-300 text-green-800',
     perdida: 'bg-red-100 border-red-300 text-red-800',
     nao_gerou: 'bg-orange-100 border-orange-300 text-orange-800',
@@ -72,6 +73,7 @@ const getStatusColor = (status: string) => {
 const getStatusLabel = (status: string) => {
   const labels: Record<string, string> = {
     pendente: 'Pendente',
+    termo_pendente: 'Aguardando Termo',
     aprovada: 'Aprovada',
     perdida: 'Perdida',
     nao_gerou: 'Não Gerou',
