@@ -3,9 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Clock, Send, Copy, RefreshCw, Eye } from "lucide-react";
+import { CheckCircle2, Clock, Send, Copy, RefreshCw, Eye, FileDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { EnviarTermoModal } from "./EnviarTermoModal";
+import { gerarESalvarTermoPDF } from "@/lib/gerarTermoPDF";
 
 interface Props {
   cotacao: {
