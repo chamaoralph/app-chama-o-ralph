@@ -1,75 +1,79 @@
 
 
-# Tabela de Preços de Instalação de TV — Cotações Inteligentes
+# Termo de Aceite Digital — Envio por WhatsApp e Assinatura Online
 
 ## Objetivo
-Transformar a criação de cotações de "Instalação de TV" num fluxo guiado por seleções (Tamanho da TV → Tipo de parede → Cobertura). O sistema calcula automaticamente Mão de Obra + Material (parafusos) + Suporte. A tabela de preços fica editável em **Configurações**, então qualquer ajuste futuro reflete em todas as próximas cotações.
+Permitir que o admin envie um termo de aceite por WhatsApp direto da cotação. O cliente abre o link no celular, escolhe a modalidade (Completa ou Colaborativa), lê o termo, assina com o dedo e o aceite fica registrado no sistema.
 
 ## Como funciona
 
-### 1. Nova aba em Configurações: "Tabela de Preços TV"
-Uma tabela editável (igual à imagem que você enviou) com:
+### 1. Botão "Enviar Termo" na cotação (modal de edição)
+Aparece **só para cotações de Instalação de TV** que já têm cliente, telefone e ao menos um valor preenchido. Estados:
+- **Nunca enviado** → "📋 Enviar Termo" (verde)
+- **Pendente / Visualizado** → "⏳ Termo Pendente — Reenviar" (âmbar)
+- **Aceito** → "✅ Termo Aceito" (verde claro, abre painel de detalhes)
 
-- **Linhas** = Tamanho da TV (até 39", 40-55", 58-65", 70-75", 85")
-- **Colunas** = Tipo de parede (Painel de madeira, Alvenaria, Drywall, Teto)
-- **Para cada combinação**, 4 valores editáveis:
-  - Mão de obra — Cobertura Parcial (ou ND)
-  - Mão de obra — Cobertura Total (ou ND)
-  - Parafusos (R$ ou em branco)
-  - Suporte (R$, "Incluso" ou "Não fornecemos")
+### 2. Modal "Enviar Termo"
+Como a cotação não tem ainda campos de TV/CPF, o admin preenche um pequeno form antes de enviar:
+- **Marca/Modelo da TV** (texto livre, opcional)
+- **Polegadas** (número — pré-preenchido a partir do tamanho_tv da cotação se houver: ex "55")
+- **Tipo de TV** (LED / QLED / OLED / The Frame / Outro) — define se Colaborativa fica disponível
+- **Valor Modalidade Completa** (R$) — pré-preenchido com valor da cobertura "Total" da tabela de preços
+- **Valor Modalidade Colaborativa** (R$) — pré-preenchido com valor da cobertura "Parcial"
 
-Cada célula é um input. Clica, muda o valor, salva. Pronto — vale para as próximas cotações.
+Ao confirmar:
+1. Cria registro em `termos_aceite` com token curto (8 chars)
+2. Abre WhatsApp em nova aba com mensagem pronta + link `https://chamaoralph.lovable.app/aceite/{token}`
+3. Toast "Link gerado e WhatsApp aberto"
 
-### 2. Nova Cotação (e Editar Cotação) — Modo "Instalação de TV"
-Quando o tipo de serviço selecionado for **"Instalação de TV"**, aparecem 3 selects extras:
+### 3. Página pública `/aceite/:token` (sem login, mobile-first)
+Stepper de 4 etapas:
 
-1. **Tamanho da TV** → até 39" / 40-55" / 58-65" / 70-75" / 85"
-2. **Tipo de parede** → Painel de madeira / Alvenaria / Drywall / Teto
-3. **Cobertura** → Parcial / Total
+**Etapa 1 — Modalidade**
+Dois cards lado a lado (Completa azul / Colaborativa verde) com valor e principais coberturas. Se TV for OLED, The Frame ou >55", o card Colaborativa fica desabilitado com aviso.
 
-Conforme você seleciona, o sistema:
-- Busca a célula correspondente na tabela de preços
-- Auto-preenche **Valor Mão de Obra**
-- Auto-preenche **Valor Material** (parafusos, se houver)
-- Define **origem do suporte** + **custo do suporte** automaticamente:
-  - "Incluso" → empresa fornece, custo = R$ 0
-  - Valor numérico (ex: R$ 79) → empresa fornece, custo = R$ 79
-  - "Não fornecemos" → instalador fornece (você digita o valor depois)
-- Mostra um aviso se a combinação for **ND** (não disponível) e bloqueia o salvamento
+**Etapa 2 — Termo**
+Texto completo do termo (hardcoded conforme fornecido), com scroll. Botão "Continuar" só habilita ao rolar até o fim. Indicador "↓ Role para ler" animado some no final.
 
-Os campos de valor continuam editáveis caso queira ajustar manualmente.
+**Etapa 3 — Assinatura**
+- CPF (máscara 000.000.000-00, input `tel`)
+- Nome completo
+- Canvas de assinatura (`touch-action: none`, "Assine com o dedo aqui", botão Limpar)
+- Checkbox de declaração
+- Botão "Aceitar e Assinar" só habilita com tudo preenchido
 
-Otimizado para **mobile** (selects grandes, fluxo vertical) — você consegue criar uma cotação completa na rua em poucos toques.
+**Etapa 4 — Confirmação**
+Tela verde de sucesso, resumo (nome, CPF, modalidade, ID, data/hora), preview da assinatura, botão "Salvar como PDF" (`window.print()`).
 
-### 3. Onde os valores ficam guardados
-Tabela nova `precos_instalacao_tv` no banco, com uma linha por combinação (tamanho × parede × cobertura), contendo: valor de mão de obra, valor de parafusos, valor do suporte e indicador de suporte ("incluso" / "valor" / "nao_fornecemos" / "nd"). Cada empresa tem sua própria tabela (RLS por `empresa_id`). Migration inicial popula com os valores exatos da imagem que você enviou.
+Ao acessar: se `status='aceito'` mostra resumo do aceite. Se inválido, tela de erro. Ao abrir pendente, atualiza para `visualizado`.
+
+### 4. Painel "Termo de Aceite" no modal da cotação
+Card abaixo do botão mostrando: status, datas (enviado/visualizado/aceito), modalidade escolhida, preview da assinatura, e botões "Reenviar", "Copiar link", "Ver PDF".
 
 ## Mudanças
 
-### Banco de dados (1 migration)
-- Criar tabela `precos_instalacao_tv` (empresa_id, tamanho_tv, tipo_parede, cobertura, valor_mao_obra, valor_parafusos, valor_suporte, tipo_suporte)
-- RLS: admins gerenciam tudo da empresa; usuários da empresa podem ler
-- Seed automático com a tabela da imagem para a empresa atual
+### Banco (1 migration)
+- Tabela `termos_aceite` (campos do prompt: cotacao_id, dados cliente snapshot, dados TV, valor_completa, valor_colaborativa, modalidade_escolhida, dados do aceite, token único, status, timestamps)
+- RLS:
+  - Admin da empresa: ALL nos termos da própria empresa
+  - **anon**: SELECT e UPDATE somente quando filtra por `token` (necessário para o cliente assinar sem login). Bloqueio de INSERT/DELETE para anon. Campos sensíveis ficam protegidos pela natureza do token aleatório.
+- Índices em `token` e `cotacao_id`
 
-### `src/pages/admin/Configuracoes.tsx`
-- Adicionar Tabs no topo (Geral / Tabela de Preços TV)
-- Novo componente `TabelaPrecosTVCard` com a grade editável (inputs por célula, salva on blur)
-
-### `src/pages/admin/cotacoes/Nova.tsx`
-- Detectar quando tipo de serviço = "Instalação de TV"
-- Mostrar 3 selects (Tamanho / Parede / Cobertura)
-- Buscar preço da tabela e auto-preencher Mão de Obra, Material, origem_suporte e custo_suporte
-- Aviso visual quando combinação for ND
-
-### `src/pages/admin/cotacoes/Lista.tsx` (modal de edição)
-- Mesma lógica: ao editar uma cotação de "Instalação de TV", mostrar os 3 selects e permitir recalcular
+### Código
+- **Nova rota pública** `/aceite/:token` em `src/App.tsx` (fora do `ProtectedRoute`)
+- **Nova página** `src/pages/AceiteTermo.tsx` (mobile-first, stepper, canvas de assinatura)
+- **Novo componente** `src/components/admin/EnviarTermoModal.tsx` (form com dados da TV + valores)
+- **Novo componente** `src/components/admin/TermoAceiteCard.tsx` (painel de status no modal de edição)
+- **Novo arquivo** `src/lib/termoTexto.ts` (texto completo do termo como constante)
+- **Editar** `src/pages/admin/cotacoes/Lista.tsx`: integrar botão "Enviar Termo" e card de status no Dialog de edição quando `ehInstalacaoTV(tipo_servico)` for true
 
 ## Detalhes técnicos
-- Os 3 selects só aparecem se o tipo de serviço cadastrado tiver nome contendo "Instalação de TV" (case-insensitive)
-- Os valores auto-preenchidos sobrescrevem o que estiver nos campos, mas você pode editar depois
-- "ND" → mostra alerta vermelho e desabilita o botão Salvar
-- Suporte "Incluso" salva `origem_suporte='empresa'` e `custo_suporte=0`
-- Suporte com valor (R$ 79, R$ 450) salva `origem_suporte='empresa'` e `custo_suporte=valor`
-- "Não fornecemos" salva `origem_suporte='instalador'` (você define o valor)
-- Sem mudança no fluxo de cotações que **não** sejam de TV — continua exatamente igual
+- Token: `crypto.randomUUID().split('-')[0]` (8 chars) — colisão improvável, fácil de digitar
+- Assinatura: `<canvas>` com handlers `pointerdown/move/up`, exporta `toDataURL('image/png')` salvo como `assinatura_base64` (texto)
+- Telefone WhatsApp: normaliza com `replace(/\D/g,'')` e prefixa `55` se faltar
+- IP do aceite: omitido (frontend não tem acesso confiável); registramos só `user_agent` e timestamp
+- PDF: `window.print()` com CSS `@media print` na página de confirmação (sem dependências novas)
+- Validação Colaborativa indisponível: `tipo === 'OLED' || tipo === 'The Frame' || polegadas > 55`
+- Inputs com `font-size: 16px` (anti-zoom iOS)
+- Sem alterações no fluxo das cotações que não são de TV
 
