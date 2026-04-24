@@ -11,7 +11,7 @@ export interface TermoPDFData {
   tv_marca_modelo?: string | null;
   tv_polegadas?: string | null;
   tv_tipo?: string | null;
-  tvs_itens?: Array<{ marca_modelo?: string | null; polegadas?: string | null; tipo?: string | null }> | null;
+  tvs_itens?: Array<{ marca_modelo?: string | null; polegadas?: string | null; tipo?: string | null; valor_completa_item?: number | null; valor_colaborativa_item?: number | null }> | null;
   modalidade_escolhida?: string | null;
   valor_completa?: number | null;
   valor_colaborativa?: number | null;
