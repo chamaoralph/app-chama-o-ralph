@@ -1,90 +1,74 @@
-
-
-# PDF Completo do Termo Assinado
+# Múltiplas TVs na Cotação — Botão "+1 TV"
 
 ## Objetivo
-Quando o cliente conclui a assinatura no `/aceite/:token`, gerar **automaticamente um PDF completo e profissional** com todos os dados do termo (cliente, equipamento, modalidade escolhida, valor, texto integral do termo, assinatura e dados de auditoria). O PDF fica disponível para download imediato pelo cliente e acessível no painel admin como prova/garantia jurídica.
-
-## Como funciona
-
-### Fluxo do cliente (página pública)
-Hoje a Etapa 4 mostra "Termo aceito!" com um botão "Salvar / Imprimir" que usa `window.print()`. Vamos substituir isso por:
-1. Botão **"📄 Baixar PDF do Termo Assinado"** (verde, destaque)
-2. Ao clicar, gera o PDF no navegador (sem servidor) com `jsPDF` e dispara o download
-3. Mensagem complementar: "Guarde este documento — ele é sua garantia"
-4. O PDF é gerado **uma vez** ao abrir a Etapa 4 (auto), salvo no Storage e a URL fica vinculada ao termo. O botão também permite re-download a qualquer momento abrindo o link.
-
-### Fluxo no admin
-No `TermoAceiteCard` (modal de edição da cotação), quando o termo está aceito:
-- Botão **"📄 Ver PDF"** que abre o PDF salvo no Storage em nova aba
-- Se por algum motivo o PDF ainda não foi gerado, botão "Gerar PDF agora" que cria sob demanda
-
-### Conteúdo do PDF (1-2 páginas A4)
-
-**Cabeçalho**
-- Nome da empresa (buscado em `empresas`)
-- Título: "Termo de Instalação de TV — Aceite Digital"
-- ID do aceite + data/hora
-
-**Seção 1 — Dados do Cliente**
-- Nome, CPF, telefone, endereço
-
-**Seção 2 — Equipamento**
-- Marca/Modelo, Polegadas, Tipo (LED/QLED/OLED/The Frame)
-
-**Seção 3 — Modalidade Contratada**
-- Nome da modalidade (Completa ou Colaborativa)
-- Valor em destaque
-- Resumo das coberturas dessa modalidade
-
-**Seção 4 — Termo Completo**
-- Todas as 7 seções do texto (mesmo conteúdo de `TERMO_SECOES`)
-
-**Seção 5 — Aceite e Assinatura**
-- Texto do aceite (`TERMO_ACEITE_TEXTO`)
-- Imagem da assinatura (do `assinatura_base64`)
-- Linha "Assinado por: {nome} — CPF {cpf}"
-- Data/hora do aceite
-- User-agent (rodapé pequeno, prova técnica)
-- Validade conforme MP 2.200-2/2001
-
-**Rodapé em todas as páginas**
-- Empresa + ID do termo + paginação ("Página X de Y")
-
-### Onde o PDF fica salvo
-Novo bucket público no Storage: `termos-assinados`. Path: `{empresa_id}/{termo_id}.pdf`. URL pública salva em `termos_aceite.pdf_url` (coluna que **já existe**).
-
-### Quando o PDF é gerado
-Após a chamada bem-sucedida da edge function `aprovar-cotacao-via-termo`, o front:
-1. Gera o PDF localmente com jsPDF (rápido, sem custo de função)
-2. Faz upload no bucket `termos-assinados` via cliente Supabase (anon — política permite escrever quando linha do termo está em status `aceito`)
-3. Atualiza `termos_aceite.pdf_url`
+Permitir que uma cotação tenha várias TVs. O admin clica "+ Adicionar outra TV" na calculadora, configura cada uma (tamanho, parede, cobertura) e os totais (mão de obra, material, suporte) são somados automaticamente. O fluxo do termo, aceite pelo cliente, PDF e aprovação automática passam a considerar todas as TVs.
 
 ## Mudanças
 
-### Banco (1 migration)
-- Criar bucket `termos-assinados` (público)
-- Política de Storage: anon pode INSERT/UPDATE em `termos-assinados/{empresa_id}/...` apenas quando o token está aceito (validação simplificada: permitir INSERT por anon no bucket; arquivo é nomeado pelo termo_id que vem do registro autenticado por token); admins da empresa fazem ALL nos arquivos da própria empresa
-- (Coluna `pdf_url` já existe em `termos_aceite`, nada a alterar)
+### 1. Banco (migration)
+- `ALTER TABLE cotacoes ADD COLUMN tvs_itens jsonb` (nullable)
+- `ALTER TABLE termos_aceite ADD COLUMN tvs_itens jsonb` (nullable)
 
-### Dependências
-- `jspdf` — geração de PDF no cliente (sem precisar de servidor)
+Formato de cada item:
+```json
+{
+  "tamanho": "40_55",
+  "parede": "alvenaria",
+  "cobertura": "total",
+  "valor_mao_obra": 250,
+  "valor_material": 20,
+  "origem_suporte": "empresa",
+  "custo_suporte": 80,
+  "marca_modelo": "Samsung Q60",
+  "polegadas": "55",
+  "tipo": "QLED"
+}
+```
 
-### Frontend
-- **Novo arquivo** `src/lib/gerarTermoPDF.ts`: função `gerarTermoPDF(termo, empresa)` que retorna `Blob` do PDF usando `jsPDF`. Lida com quebras de página, embed da assinatura, formatação A4.
-- **Editar** `src/pages/AceiteTermo.tsx`:
-  - Após confirmar aceite, chamar `gerarTermoPDF`, fazer upload no bucket, atualizar `pdf_url`
-  - Etapa 4: substituir "Salvar / Imprimir" por botão "📄 Baixar PDF do Termo Assinado" que abre `pdf_url` (ou regera se ainda não existir)
-- **Editar** `src/components/admin/TermoAceiteCard.tsx`:
-  - Quando aceito: botão "Ver PDF" abre `pdf_url` em nova aba
-  - Se `pdf_url` ausente: botão "Gerar PDF agora" que executa a mesma rotina
+Colunas legadas (`tv_tamanho`, `tv_parede`, `tv_cobertura`, `tv_marca_modelo`, `tv_polegadas`, `tv_tipo`) continuam sendo preenchidas com o item **#1** para compatibilidade.
+
+### 2. `src/components/admin/SelectorPrecoTV.tsx` (refatoração)
+- Nova prop `items: TVItem[]` + `onItemsChange(items)`
+- Nova prop `onTotaisChange({ totalMaoObra, totalMaterial, totalCustoSuporte, origemSuporte })` — para preencher os campos agregados do formulário
+- Renderiza uma lista numerada de cards "TV 1", "TV 2"… cada um com os 3 selects + "Remover" (oculto no primeiro)
+- Botão **"+ Adicionar outra TV"** no rodapé
+- Cada item busca seu próprio preço via `buscarPrecoTV`
+- Mostra rodapé com totais: "Mão de obra: R$X · Material: R$Y · Suporte: R$Z"
+- Se qualquer item for ND, marca `indisponivel` globalmente
+
+### 3. `src/pages/admin/cotacoes/Nova.tsx` e `Lista.tsx`
+- Substituir `tvSelectores` / `tvSelectoresEdit` (objeto único) por `tvItens: TVItem[]`
+- `handlePrecoCalculado` vira `handleTotaisCalculados(totais)` — preenche `valor_mao_obra/estimado`, `valor_material`, `origem_suporte`, `custo_suporte` com os totais
+- No `insert`/`update` de `cotacoes`: gravar `tvs_itens: tvItens`, e manter `tv_tamanho/tv_parede/tv_cobertura` com o item[0]
+- Ao abrir edição: se `cotacao.tvs_itens` existir, carregar; senão, construir array de 1 item a partir das colunas legadas
+
+### 4. `src/components/admin/EnviarTermoModal.tsx`
+- Receber `cotacao.tvs_itens` como prop
+- Renderizar um bloco por TV com: Polegadas, Tipo (LED/QLED/OLED/The Frame/Outro), Marca/Modelo
+- Um único par de valores Completa/Colaborativa agregados (calculados a partir da tabela para cada item e somados)
+- Colaborativa só habilita se TODAS as TVs forem compatíveis (≤55", não OLED, não The Frame)
+- Gravar em `termos_aceite.tvs_itens` o array completo com os dados preenchidos; manter colunas legadas (`tv_marca_modelo`, `tv_polegadas`, `tv_tipo`) com item[0]
+
+### 5. `src/pages/AceiteTermo.tsx`
+- Ler `termo.tvs_itens` (fallback: construir array de 1 com colunas legadas)
+- Card "Equipamento" vira lista: "TV 1: Samsung 55 QLED · TV 2: LG 65 OLED"
+- `colaborativaIndisponivel` agora valida o array inteiro (se qualquer TV for incompatível → indisponível e mostra motivo específico)
+
+### 6. `src/lib/gerarTermoPDF.ts`
+- Seção "2. EQUIPAMENTO" lista todas as TVs com numeração e detalhes por item
+- Adicionar tipo `tvs_itens?: TVItem[]` em `TermoPDFData`
+
+### 7. `supabase/functions/aprovar-cotacao-via-termo/index.ts`
+- Se `cotacao.tvs_itens` existir: iterar, buscar preço de cada (com `novaCobertura`), somar totais e atualizar cotação
+- Atualizar `tvs_itens` da cotação com a nova cobertura e valores recalculados
+- Fallback atual (single TV) mantido para cotações antigas
 
 ## Detalhes técnicos
-- jsPDF roda 100% no navegador, sem custo de servidor
-- Assinatura é embutida como imagem PNG (já está em base64 no estado)
-- Layout A4 com margens de 18mm, fonte Helvetica, tamanho 10-11pt para corpo
-- O texto do termo (`TERMO_SECOES`) é a única fonte de verdade — mesmo conteúdo que o cliente leu na Etapa 2
-- Idempotente: se `pdf_url` já existe, não regera (a menos que admin force)
-- Arquivo nomeado: `termo-{cliente_nome_slug}-{id_curto}.pdf` no download
-- Bucket público para evitar lag de signed URLs (mesmo padrão de `fotos-servicos` já em uso no projeto)
+- Colaborativa: regra "todas precisam ser compatíveis" — se 1 for OLED/The Frame/>55", bloqueia
+- Totais: `Σ valor_mao_obra`, `Σ valor_material`, `Σ custo_suporte`. `origem_suporte` usa o do item[0] (na prática todas terão a mesma origem por virem da mesma tabela)
+- Compatibilidade: cotações antigas sem `tvs_itens` continuam funcionando — código faz fallback para colunas legadas
+- Validação ao salvar: se qualquer item estiver ND, mostra erro e bloqueia
 
+## Arquivos afetados
+- **Novo**: migration SQL
+- **Editados**: `SelectorPrecoTV.tsx`, `Nova.tsx`, `Lista.tsx`, `EnviarTermoModal.tsx`, `AceiteTermo.tsx`, `gerarTermoPDF.ts`, `termoTexto.ts` (helper para array), `aprovar-cotacao-via-termo/index.ts`
