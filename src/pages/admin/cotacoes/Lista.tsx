@@ -992,31 +992,60 @@ export default function ListaCotacoes() {
                               </Button>
                               {cotacao.status === 'pendente' && (
                                 <>
-                                  <Button
-                                    onClick={() => {
-                                      if (confirm('Aprovar esta cotação? O cliente precisará assinar o termo digital antes do serviço ser liberado para os instaladores.')) {
-                                        supabase
-                                          .from('cotacoes')
-                                          .update({ status: 'termo_pendente' })
-                                          .eq('id', cotacao.id)
-                                          .then(() => {
-                                            toast({ title: "Cotação aprovada!", description: "Abra a cotação para enviar o termo de aceite ao cliente." })
-                                            fetchCotacoes()
-                                          })
-                                      }
-                                    }}
-                                    size="sm"
-                                    variant="default"
-                                    className="bg-green-600 hover:bg-green-700"
-                                  >
-                                    Aprovar
-                                  </Button>
+                                  {(() => {
+                                    const temValor = (cotacao.valor_estimado ?? 0) > 0
+                                    const aprovarBtn = (
+                                      <Button
+                                        onClick={() => {
+                                          if (!temValor) {
+                                            toast({
+                                              title: "Valor não preenchido",
+                                              description: "Preencha o tamanho/parede da TV (ou um valor manual) antes de aprovar. Use o botão Editar.",
+                                              variant: "destructive",
+                                            })
+                                            return
+                                          }
+                                          if (confirm('Aprovar esta cotação? O cliente precisará assinar o termo digital antes do serviço ser liberado para os instaladores.')) {
+                                            supabase
+                                              .from('cotacoes')
+                                              .update({ status: 'termo_pendente' })
+                                              .eq('id', cotacao.id)
+                                              .then(() => {
+                                                toast({ title: "Cotação aprovada!", description: "Abra a cotação para enviar o termo de aceite ao cliente." })
+                                                fetchCotacoes()
+                                              })
+                                          }
+                                        }}
+                                        size="sm"
+                                        variant="default"
+                                        disabled={!temValor}
+                                        className="bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                      >
+                                        Aprovar
+                                      </Button>
+                                    )
+                                    if (temValor) return aprovarBtn
+                                    return (
+                                      <TooltipProvider>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <span tabIndex={0}>{aprovarBtn}</span>
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            Preencha o tamanho/parede da TV (ou valor manual) antes de aprovar. Use Editar.
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    )
+                                  })()}
                                   {(() => {
                                     const clienteTemTermo = clientesComTermo.has(cotacao.cliente_id)
+                                    const temValor = (cotacao.valor_estimado ?? 0) > 0
+                                    const habilitado = clienteTemTermo && temValor
                                     const btn = (
                                       <Button
                                         onClick={() => {
-                                          if (!clienteTemTermo) return
+                                          if (!habilitado) return
                                           if (confirm('Aprovar SEM exigir termo? O serviço será liberado imediatamente para os instaladores.')) {
                                             supabase
                                               .from('cotacoes')
@@ -1030,13 +1059,16 @@ export default function ListaCotacoes() {
                                         }}
                                         size="sm"
                                         variant="outline"
-                                        disabled={!clienteTemTermo}
+                                        disabled={!habilitado}
                                         className="text-green-700 border-green-300 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
                                       >
                                         Aprovar sem termo
                                       </Button>
                                     )
-                                    if (clienteTemTermo) return btn
+                                    if (habilitado) return btn
+                                    const motivo = !temValor
+                                      ? "Preencha o tamanho/parede da TV (ou valor manual) antes de aprovar."
+                                      : "Disponível apenas para clientes antigos que já assinaram pelo menos 1 termo."
                                     return (
                                       <TooltipProvider>
                                         <Tooltip>
@@ -1044,7 +1076,7 @@ export default function ListaCotacoes() {
                                             <span tabIndex={0}>{btn}</span>
                                           </TooltipTrigger>
                                           <TooltipContent>
-                                            Disponível apenas para clientes antigos que já assinaram pelo menos 1 termo.
+                                            {motivo}
                                           </TooltipContent>
                                         </Tooltip>
                                       </TooltipProvider>
