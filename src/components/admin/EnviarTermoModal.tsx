@@ -46,6 +46,7 @@ interface TVFormItem {
 
 export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }: Props) {
   const [itens, setItens] = useState<TVFormItem[]>([]);
+  const [modalidadesEnvio, setModalidadesEnvio] = useState<"ambas" | "completa" | "colaborativa">("ambas");
   const [valorCompleta, setValorCompleta] = useState("");
   const [valorColaborativa, setValorColaborativa] = useState("");
   const [enviando, setEnviando] = useState(false);
