@@ -464,9 +464,28 @@ export default function AceiteTermo() {
               )}
             </Card>
 
-            <Button onClick={() => window.print()} variant="outline" className="h-12 w-full no-print">
-              <Printer className="mr-2 h-4 w-4" /> Salvar / Imprimir
+            <Button
+              onClick={async () => {
+                if (pdfUrl) {
+                  window.open(pdfUrl, "_blank");
+                } else {
+                  await gerarPdfTermo();
+                }
+              }}
+              disabled={gerandoPdf}
+              className="h-12 w-full bg-emerald-600 text-base hover:bg-emerald-700 no-print"
+            >
+              {gerandoPdf ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Gerando PDF...</>
+              ) : pdfUrl ? (
+                <><Download className="mr-2 h-4 w-4" /> Baixar PDF do Termo Assinado</>
+              ) : (
+                <><Download className="mr-2 h-4 w-4" /> Gerar PDF do Termo</>
+              )}
             </Button>
+            <p className="text-center text-xs text-muted-foreground no-print">
+              💚 Guarde este documento — ele é sua garantia.
+            </p>
           </div>
         )}
       </main>
