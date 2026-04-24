@@ -170,6 +170,16 @@ export function TermoAceiteCard({ cotacao, tvsItens }: Props) {
             <div><span className="text-muted-foreground">Modalidade:</span> {termo.modalidade_escolhida ? (termo.modalidade_escolhida === "completa" ? "Completa" : "Colaborativa") : "—"}</div>
           </div>
 
+          {aceito ? (
+            <div className="rounded-md bg-emerald-100 px-3 py-2 text-xs text-emerald-800 font-medium">
+              ✅ Termo assinado — cotação aprovada e serviço liberado para os instaladores.
+            </div>
+          ) : (
+            <div className="rounded-md bg-amber-100 px-3 py-2 text-xs text-amber-800 font-medium">
+              ⏳ Aguardando assinatura — o serviço só aparecerá para os instaladores depois que o cliente assinar.
+            </div>
+          )}
+
           {aceito && (
             <div className="space-y-2 rounded-md border bg-background p-3">
               <div className="text-xs"><span className="text-muted-foreground">Nome:</span> {termo.nome_aceite}</div>
