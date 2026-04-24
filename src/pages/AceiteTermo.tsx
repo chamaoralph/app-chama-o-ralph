@@ -345,9 +345,9 @@ export default function AceiteTermo() {
                   <div className="text-lg font-semibold text-[#1e5a9e]">Completa</div>
                   <div className="text-xl font-bold text-[#1e5a9e]">{formatarMoeda(termo.valor_completa)}</div>
                 </div>
-                {tvsLista.length > 1 && tvsLista.some((t: any) => t.valor_completa_item != null) && (
+                {(tvsLista.length > 1 && tvsLista.some((t: any) => t.valor_completa_item != null)) || (termo.desconto_completa ?? 0) > 0 ? (
                   <div className="mt-3 space-y-1 rounded-lg bg-white/60 p-2 text-sm">
-                    {tvsLista.map((t: any, i) => (
+                    {tvsLista.length > 1 && tvsLista.some((t: any) => t.valor_completa_item != null) && tvsLista.map((t: any, i) => (
                       <div key={i} className="flex justify-between">
                         <span className="text-foreground/70">
                           TV {i + 1}{t.polegadas ? ` · ${t.polegadas}"` : ""}{t.tipo ? ` ${t.tipo}` : ""}
@@ -355,12 +355,24 @@ export default function AceiteTermo() {
                         <span className="font-medium">{formatarMoeda(t.valor_completa_item)}</span>
                       </div>
                     ))}
+                    {(termo.desconto_completa ?? 0) > 0 && (
+                      <>
+                        <div className="flex justify-between border-t pt-1">
+                          <span className="text-foreground/70">Subtotal</span>
+                          <span className="font-medium">{formatarMoeda((termo.valor_completa ?? 0) + (termo.desconto_completa ?? 0))}</span>
+                        </div>
+                        <div className="flex justify-between text-emerald-700">
+                          <span>Desconto</span>
+                          <span className="font-medium">− {formatarMoeda(termo.desconto_completa)}</span>
+                        </div>
+                      </>
+                    )}
                     <div className="mt-1 flex justify-between border-t pt-1 font-semibold text-[#1e5a9e]">
-                      <span>Total</span>
+                      <span>Total a pagar</span>
                       <span>{formatarMoeda(termo.valor_completa)}</span>
                     </div>
                   </div>
-                )}
+                ) : null}
                 <ul className="mt-2 space-y-1 text-sm text-foreground/80">
                   <li>✓ Técnico + ajudante fazem tudo</li>
                   <li>✓ Quebrou? Empresa cobre o conserto ou troca por equivalente</li>
