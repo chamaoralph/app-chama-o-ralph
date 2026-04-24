@@ -971,13 +971,13 @@ export default function ListaCotacoes() {
                                 <>
                                   <Button
                                     onClick={() => {
-                                      if (confirm('Aprovar esta cotação?')) {
+                                      if (confirm('Aprovar esta cotação? O cliente precisará assinar o termo digital antes do serviço ser liberado para os instaladores.')) {
                                         supabase
                                           .from('cotacoes')
-                                          .update({ status: 'aprovada' })
+                                          .update({ status: 'termo_pendente' })
                                           .eq('id', cotacao.id)
                                           .then(() => {
-                                            toast({ title: "Cotação aprovada!" })
+                                            toast({ title: "Cotação aprovada!", description: "Abra a cotação para enviar o termo de aceite ao cliente." })
                                             fetchCotacoes()
                                           })
                                       }
@@ -989,6 +989,26 @@ export default function ListaCotacoes() {
                                     Aprovar
                                   </Button>
                                   <Button
+                                    onClick={() => {
+                                      if (confirm('Aprovar SEM exigir termo? O serviço será liberado imediatamente para os instaladores.')) {
+                                        supabase
+                                          .from('cotacoes')
+                                          .update({ status: 'aprovada' })
+                                          .eq('id', cotacao.id)
+                                          .then(() => {
+                                            toast({ title: "Cotação aprovada sem termo!" })
+                                            fetchCotacoes()
+                                          })
+                                      }
+                                    }}
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-green-700 border-green-300 hover:bg-green-50"
+                                    title="Aprovar sem exigir termo assinado"
+                                  >
+                                    Aprovar sem termo
+                                  </Button>
+                                  <Button
                                     onClick={() => setCotacaoParaNaoGerou(cotacao.id)}
                                     size="sm"
                                     variant="outline"
@@ -996,6 +1016,39 @@ export default function ListaCotacoes() {
                                   >
                                     <XCircle className="w-4 h-4 mr-1" />
                                     Não Gerou
+                                  </Button>
+                                </>
+                              )}
+                              {cotacao.status === 'termo_pendente' && (
+                                <>
+                                  <Button
+                                    onClick={() => abrirEdicao(cotacao)}
+                                    size="sm"
+                                    variant="default"
+                                    className="bg-orange-600 hover:bg-orange-700"
+                                    title="Abrir cotação para enviar/acompanhar o termo"
+                                  >
+                                    Enviar Termo
+                                  </Button>
+                                  <Button
+                                    onClick={() => {
+                                      if (confirm('Voltar esta cotação para pendente?')) {
+                                        supabase
+                                          .from('cotacoes')
+                                          .update({ status: 'pendente' })
+                                          .eq('id', cotacao.id)
+                                          .then(() => {
+                                            toast({ title: "Cotação voltou para pendente" })
+                                            fetchCotacoes()
+                                          })
+                                      }
+                                    }}
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                                  >
+                                    <Undo2 className="w-4 h-4 mr-1" />
+                                    Reprovar
                                   </Button>
                                 </>
                               )}
