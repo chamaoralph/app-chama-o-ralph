@@ -13,7 +13,8 @@ import {
   formatarCPF,
   formatarMoeda,
 } from "@/lib/termoTexto";
-import { CheckCircle2, FileText, PenLine, ShieldCheck, AlertTriangle, Printer, ChevronDown } from "lucide-react";
+import { CheckCircle2, FileText, PenLine, ShieldCheck, AlertTriangle, Download, ChevronDown, Loader2 } from "lucide-react";
+import { gerarESalvarTermoPDF } from "@/lib/gerarTermoPDF";
 
 type Etapa = 1 | 2 | 3 | 4;
 
