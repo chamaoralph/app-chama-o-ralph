@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Search, X, Loader2 } from 'lucide-react'
 import { normalizarTelefone } from '@/lib/utils'
+import { SelectorPrecoTV, type SelectorTVValues, type PrecoTVResult } from '@/components/admin/SelectorPrecoTV'
+import { ehInstalacaoTV } from '@/lib/precosTV'
 
 interface TipoServico {
   id: string
@@ -25,6 +27,9 @@ export default function NovaCotacao() {
   const [clienteBuscado, setClienteBuscado] = useState(false)
   const [clienteEncontrado, setClienteEncontrado] = useState(false)
   const [buscandoCliente, setBuscandoCliente] = useState(false)
+  const [empresaId, setEmpresaId] = useState<string | null>(null)
+  const [tvSelectores, setTvSelectores] = useState<SelectorTVValues>({ tamanho_tv: '', tipo_parede: '', cobertura: '' })
+  const [tvIndisponivel, setTvIndisponivel] = useState(false)
   
   const [formData, setFormData] = useState({
     cliente_nome: '',
@@ -58,8 +63,29 @@ export default function NovaCotacao() {
       
       setTiposServico(data || [])
     }
+    async function fetchEmpresa() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase.from('usuarios').select('empresa_id').eq('id', user.id).maybeSingle()
+      if (data) setEmpresaId(data.empresa_id)
+    }
     fetchTiposServico()
+    fetchEmpresa()
   }, [])
+
+  const isInstalacaoTV = ehInstalacaoTV(formData.tipo_servico)
+
+  function handlePrecoCalculado(resultado: PrecoTVResult | null, indisponivel: boolean) {
+    setTvIndisponivel(indisponivel)
+    if (!resultado) return
+    setFormData(prev => ({
+      ...prev,
+      valor_mao_obra: resultado.valorMaoObra ? resultado.valorMaoObra.toString() : '',
+      valor_material: resultado.origemSuporte === 'empresa' ? '' : (resultado.valorMaterial ? resultado.valorMaterial.toString() : ''),
+      origem_suporte: resultado.origemSuporte,
+      custo_suporte: resultado.custoSuporte ? resultado.custoSuporte.toString() : '',
+    }))
+  }
 
   // Gerar opções de horário de 8:00 às 19:00 em intervalos de 30 minutos
   const horariosDisponiveis = []
