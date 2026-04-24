@@ -42,6 +42,9 @@ interface TVFormItem {
   polegadas: string;
   tipo: string;
   marca_modelo: string;
+  // valores individuais pré-calculados
+  valor_completa_item: number | null;
+  valor_colaborativa_item: number | null;
 }
 
 export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }: Props) {

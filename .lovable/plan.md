@@ -1,35 +1,64 @@
-## Escolher modalidades ao enviar o termo
 
-Hoje o termo sempre inclui as duas modalidades (Completa e Colaborativa). Quando o cliente já decidiu no momento da cotação, o admin poderá restringir o termo a **apenas uma modalidade**.
+## Objetivo
 
-### Mudanças
+Quando a cotação tem mais de uma TV, o termo atualmente mostra apenas o valor total somado ("Completa R$ 409,00"). Vamos passar a mostrar o **valor de cada TV individualmente** e uma **soma total** abaixo, tanto no termo digital (tela do cliente) quanto no PDF gerado.
 
-**`src/components/admin/EnviarTermoModal.tsx`**
-- Adicionar um seletor no topo do modal: **"Modalidades a enviar"** com 3 opções (RadioGroup ou Select):
-  1. **Ambas** (padrão — comportamento atual)
-  2. **Apenas Completa** (cliente já optou pela instalação completa)
-  3. **Apenas Colaborativa** (cliente já optou pela instalação mais simples)
-- Ocultar o campo de valor da modalidade que **não** será enviada.
-- Validação ao enviar:
-  - "Apenas Completa" → exige `valor_completa > 0`; grava `valor_colaborativa = null`.
-  - "Apenas Colaborativa" → exige `valor_colaborativa > 0`; grava `valor_completa = null`. Bloquear essa opção se `colabInfo.indisponivel` (TV OLED/The Frame/>55") com aviso explicativo.
-  - "Ambas" → comportamento atual.
+## Comportamento proposto
 
-**`src/pages/AceiteTermo.tsx`**
-- Na Etapa 2 (escolha da modalidade):
-  - Se `valor_colaborativa == null` → renderizar apenas o card **Completa** e pré-selecionar `modalidade = "completa"`.
-  - Se `valor_completa == null` → renderizar apenas o card **Colaborativa** e pré-selecionar `modalidade = "colaborativa"`.
-  - Se ambos presentes → layout atual com as duas opções.
-- Ajustar o texto de cabeçalho: quando só há uma modalidade, mostrar "Confirme os detalhes da sua instalação" em vez de "Escolha a modalidade".
+Com 1 TV: segue idêntico ao atual (um único valor).
 
-### Detalhes técnicos
+Com 2+ TVs, cada card de modalidade exibe um breakdown:
 
-- Nenhuma alteração de banco: `valor_completa` e `valor_colaborativa` já são nullable em `termos_aceite`.
-- A edge function `aprovar-cotacao-via-termo` já usa `modalidade_escolhida` para decidir o valor final — sem impacto.
-- `gerarTermoPDF.ts` já lê apenas a modalidade escolhida para o PDF — sem impacto.
-- O helper `colaborativaIndisponivelLista` continua válido para impedir o envio de "Apenas Colaborativa" quando há TV incompatível.
+```text
+Completa
+  TV 1 · 39" LED       R$ 189,00
+  TV 2 · 65" LED       R$ 220,00
+  ─────────────────────────────
+  Total                R$ 409,00
+```
 
-### Resultado
+O mesmo breakdown aparece no PDF na seção "3. Modalidade Contratada".
 
-**Enviar Termo**: admin escolhe entre "Ambas / Só Completa / Só Colaborativa" antes de gerar o link.  
-**Tela de Aceite**: cliente vê somente a(s) modalidade(s) enviada(s); se for uma só, ela já vem pré-selecionada e ele segue direto para assinatura.
+## Mudanças técnicas
+
+### 1. `EnviarTermoModal.tsx` — guardar valores por TV
+
+No pré-preenchimento (loop que já busca preços por item), além de somar o total, armazenar o valor por item. Ao montar `tvsParaSalvar`, incluir dois novos campos em cada item:
+
+- `valor_completa_item: number | null`
+- `valor_colaborativa_item: number | null`
+
+Assim a estrutura `tvs_itens` persistida no `termos_aceite` passa a conter os valores individuais (`valor_completa` e `valor_colaborativa` no registro principal continuam sendo o total — compatível com tudo que já existe).
+
+Se o admin editar manualmente o "Valor Completa (total)" após o pré-preenchimento, e os valores por item não baterem com o novo total, aplicamos um ajuste proporcional (rateio) ao salvar, para que a soma dos itens seja igual ao total informado. Isso mantém coerência visual sem exigir campo por item na UI.
+
+### 2. `AceiteTermo.tsx` — exibir breakdown
+
+Nos botões das modalidades Completa e Colaborativa, quando `tvsLista.length > 1` e houver `valor_*_item` nos itens, renderizar uma pequena tabela:
+
+- Linha por TV: "TV N · {polegadas}" {tipo}" à esquerda, valor formatado à direita.
+- Divisor.
+- Linha "Total" em negrito com `formatarMoeda(termo.valor_*)`.
+
+Fallback: se os itens não tiverem `valor_*_item` (termos antigos), mostra apenas o total como hoje.
+
+### 3. `gerarTermoPDF.ts` — breakdown no PDF
+
+Na seção "3. MODALIDADE CONTRATADA", após o título grande da modalidade e antes das "Coberturas":
+
+- Se `tvs_itens.length > 1` e houver `valor_*_item`: listar uma linha por TV (rótulo + valor alinhado à direita), depois linha "Total: R$ X".
+- Caso contrário: manter layout atual.
+
+Atualizar `TermoPDFData.tvs_itens` para incluir os campos opcionais `valor_completa_item` e `valor_colaborativa_item`.
+
+### 4. Edge Function `aprovar-cotacao-via-termo`
+
+Nenhuma alteração necessária — ela já recalcula valor por item a partir da tabela `precos_instalacao_tv` usando a modalidade escolhida.
+
+## Arquivos afetados
+
+- `src/components/admin/EnviarTermoModal.tsx`
+- `src/pages/AceiteTermo.tsx`
+- `src/lib/gerarTermoPDF.ts`
+
+Sem migrações de banco (os valores por item vivem dentro do JSON `tvs_itens` que já existe).
