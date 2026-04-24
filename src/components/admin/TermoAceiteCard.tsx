@@ -31,6 +31,17 @@ interface Termo {
   nome_aceite: string | null;
   cpf_aceite: string | null;
   assinatura_base64: string | null;
+  pdf_url: string | null;
+  cliente_nome: string;
+  cliente_telefone: string | null;
+  cliente_endereco: string | null;
+  tv_marca_modelo: string | null;
+  tv_polegadas: string | null;
+  tv_tipo: string | null;
+  valor_completa: number | null;
+  valor_colaborativa: number | null;
+  aceite_user_agent: string | null;
+  empresa_id: string;
 }
 
 function fmtData(s: string | null) {
