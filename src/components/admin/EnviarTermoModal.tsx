@@ -66,6 +66,7 @@ export function EnviarTermoModal({ open, onClose, cotacao, tvsItens, onEnviado }
     );
     setValorCompleta("");
     setValorColaborativa("");
+    setModalidadesEnvio("ambas");
 
     // Pré-preenche valores somando Completa e Colaborativa por item
     (async () => {
