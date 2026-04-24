@@ -10,6 +10,7 @@ import {
   TERMO_SECOES,
   TERMO_ACEITE_TEXTO,
   colaborativaIndisponivel,
+  colaborativaIndisponivelLista,
   formatarCPF,
   formatarMoeda,
 } from "@/lib/termoTexto";
@@ -39,6 +40,7 @@ interface Termo {
   assinatura_base64: string | null;
   aceite_user_agent: string | null;
   pdf_url: string | null;
+  tvs_itens: any[] | null;
 }
 
 export default function AceiteTermo() {
@@ -95,7 +97,15 @@ export default function AceiteTermo() {
     })();
   }, [token]);
 
-  const colabInfo = colaborativaIndisponivel(termo?.tv_tipo, termo?.tv_polegadas);
+  const tvsLista: Array<{ tipo?: string | null; polegadas?: string | null; marca_modelo?: string | null }> =
+    Array.isArray(termo?.tvs_itens) && termo!.tvs_itens!.length > 0
+      ? termo!.tvs_itens as any
+      : termo
+      ? [{ tipo: termo.tv_tipo, polegadas: termo.tv_polegadas, marca_modelo: termo.tv_marca_modelo }]
+      : [];
+  const colabInfo = tvsLista.length > 1
+    ? colaborativaIndisponivelLista(tvsLista)
+    : colaborativaIndisponivel(termo?.tv_tipo, termo?.tv_polegadas);
 
   // Scroll do termo
   function handleScroll(e: React.UIEvent<HTMLDivElement>) {
@@ -292,8 +302,13 @@ export default function AceiteTermo() {
         {etapa === 1 && (
           <div className="space-y-4">
             <Card className="p-4">
-              <div className="text-sm text-muted-foreground">Equipamento</div>
-              <div className="font-medium">{termo.tv_marca_modelo || "TV"} {termo.tv_polegadas ? `· ${termo.tv_polegadas}"` : ""} {termo.tv_tipo ? `· ${termo.tv_tipo}` : ""}</div>
+              <div className="text-sm text-muted-foreground">Equipamento{tvsLista.length > 1 ? "s" : ""}</div>
+              {tvsLista.map((t, i) => (
+                <div key={i} className="font-medium">
+                  {tvsLista.length > 1 && <span className="text-muted-foreground mr-1">TV {i + 1}:</span>}
+                  {t.marca_modelo || "TV"} {t.polegadas ? `· ${t.polegadas}"` : ""} {t.tipo ? `· ${t.tipo}` : ""}
+                </div>
+              ))}
               {termo.cliente_endereco && <div className="mt-1 text-sm text-muted-foreground">{termo.cliente_endereco}</div>}
             </Card>
 
