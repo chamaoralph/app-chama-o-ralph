@@ -191,12 +191,51 @@ export default function AceiteTermo() {
         console.warn("Falha ao aprovar cotação automaticamente:", e);
       }
       setEtapa(4);
+      // Gera o PDF do termo assinado em background
+      void gerarPdfTermo({ ...termo, modalidade_escolhida: modalidade, nome_aceite: nome.trim(), cpf_aceite: cpf, assinatura_base64: dataUrl, aceito_em: agora });
     } catch (e) {
       alert("Erro ao salvar aceite. Tente novamente.");
     } finally {
       setSalvando(false);
     }
   }, [termo, modalidade, nome, cpf]);
+
+  const gerarPdfTermo = useCallback(async (termoAtualizado?: Termo) => {
+    const t = termoAtualizado || termo;
+    if (!t) return;
+    setGerandoPdf(true);
+    try {
+      // Busca nome da empresa
+      const { data: emp } = await supabase
+        .from("empresas")
+        .select("nome")
+        .eq("id", t.empresa_id)
+        .maybeSingle();
+      const empresaNome = (emp as any)?.nome || "Empresa";
+      const url = await gerarESalvarTermoPDF(supabase, {
+        id: t.id,
+        cliente_nome: t.cliente_nome,
+        cliente_telefone: t.cliente_telefone,
+        cliente_endereco: t.cliente_endereco,
+        cpf_aceite: t.cpf_aceite,
+        nome_aceite: t.nome_aceite,
+        tv_marca_modelo: t.tv_marca_modelo,
+        tv_polegadas: t.tv_polegadas,
+        tv_tipo: t.tv_tipo,
+        modalidade_escolhida: t.modalidade_escolhida,
+        valor_completa: t.valor_completa,
+        valor_colaborativa: t.valor_colaborativa,
+        assinatura_base64: t.assinatura_base64,
+        aceito_em: t.aceito_em,
+        aceite_user_agent: t.aceite_user_agent,
+      }, t.empresa_id, empresaNome);
+      setPdfUrl(url);
+    } catch (e) {
+      console.warn("Falha ao gerar PDF:", e);
+    } finally {
+      setGerandoPdf(false);
+    }
+  }, [termo]);
 
   if (loading) {
     return <div className="flex min-h-screen items-center justify-center bg-[#f6f5f0]"><div className="text-muted-foreground">Carregando...</div></div>;
