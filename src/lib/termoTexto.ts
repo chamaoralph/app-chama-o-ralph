@@ -84,7 +84,7 @@ export function colaborativaIndisponivel(
   if (tipoTV === "OLED") return { indisponivel: true, motivo: "TVs OLED não são elegíveis para a modalidade Colaborativa." };
   if (tipoTV === "The Frame") return { indisponivel: true, motivo: "Samsung The Frame não é elegível para a modalidade Colaborativa." };
   const pol = parseInt(String(polegadas || "").replace(/\D/g, ""), 10);
-  if (!isNaN(pol) && pol > 55) return { indisponivel: true, motivo: "Modalidade Colaborativa válida apenas para TVs até 55\"." };
+  if (!isNaN(pol) && pol > 75) return { indisponivel: true, motivo: "Modalidade Colaborativa válida apenas para TVs até 75\"." };
   return { indisponivel: false };
 }
 
