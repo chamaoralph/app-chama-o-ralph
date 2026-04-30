@@ -160,6 +160,7 @@ export default function ListaCotacoes() {
   const [error, setError] = useState<string | null>(null)
   const [cotacaoParaExcluir, setCotacaoParaExcluir] = useState<string | null>(null)
   const [cotacaoParaNaoGerou, setCotacaoParaNaoGerou] = useState<string | null>(null)
+  const [cotacaoParaAprovarSemTermo, setCotacaoParaAprovarSemTermo] = useState<{ id: string; clienteTemTermo: boolean } | null>(null)
   const [cotacaoParaEditar, setCotacaoParaEditar] = useState<Cotacao | null>(null)
   const [editForm, setEditForm] = useState<EditForm>({
     cliente_nome: '',
@@ -1042,29 +1043,11 @@ export default function ListaCotacoes() {
                                     const clienteTemTermo = clientesComTermo.has(cotacao.cliente_id)
                                     const temValor = (cotacao.valor_estimado ?? 0) > 0
                                     const habilitado = temValor
-                                    const aprovarSemTermo = () => {
-                                      supabase
-                                        .from('cotacoes')
-                                        .update({ status: 'aprovada' })
-                                        .eq('id', cotacao.id)
-                                        .then(() => {
-                                          toast({ title: "Cotação aprovada sem termo!" })
-                                          fetchCotacoes()
-                                        })
-                                    }
                                     const btn = (
                                       <Button
                                         onClick={() => {
                                           if (!habilitado) return
-                                          if (!clienteTemTermo) {
-                                            if (confirm('⚠️ Esse cliente NUNCA assinou um termo. Deseja prosseguir e liberar o serviço sem termo assinado?')) {
-                                              aprovarSemTermo()
-                                            }
-                                            return
-                                          }
-                                          if (confirm('Aprovar SEM exigir termo? O serviço será liberado imediatamente para os instaladores.')) {
-                                            aprovarSemTermo()
-                                          }
+                                          setCotacaoParaAprovarSemTermo({ id: cotacao.id, clienteTemTermo })
                                         }}
                                         size="sm"
                                         variant="outline"
@@ -1512,6 +1495,42 @@ export default function ListaCotacoes() {
               className="bg-red-600 hover:bg-red-700"
             >
               Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* AlertDialog: Aprovar sem termo */}
+      <AlertDialog open={!!cotacaoParaAprovarSemTermo} onOpenChange={() => setCotacaoParaAprovarSemTermo(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Aprovar sem termo de aceite?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {cotacaoParaAprovarSemTermo?.clienteTemTermo
+                ? "O serviço será liberado imediatamente para os instaladores, sem exigir assinatura digital do cliente."
+                : "⚠️ Esse cliente NUNCA assinou um termo. Deseja prosseguir e liberar o serviço sem termo assinado?"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-green-600 hover:bg-green-700"
+              onClick={async () => {
+                if (!cotacaoParaAprovarSemTermo) return
+                const { error } = await supabase
+                  .from('cotacoes')
+                  .update({ status: 'aprovada' })
+                  .eq('id', cotacaoParaAprovarSemTermo.id)
+                if (error) {
+                  toast({ title: "Erro ao aprovar", description: error.message, variant: "destructive" })
+                } else {
+                  toast({ title: "Cotação aprovada sem termo!" })
+                  fetchCotacoes()
+                }
+                setCotacaoParaAprovarSemTermo(null)
+              }}
+            >
+              Sim, aprovar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
