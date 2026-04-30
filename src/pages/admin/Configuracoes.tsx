@@ -39,6 +39,7 @@ interface TipoServico {
   nome: string
   ativo: boolean
   ordem: number
+  exige_termo: boolean
 }
 
 interface Instalador {
