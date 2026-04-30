@@ -85,57 +85,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signUp(
-    email: string, 
-    password: string, 
-    userData: { 
+    email: string,
+    password: string,
+    userData: {
       empresa_id: string
       nome: string
       telefone: string
-      tipo: 'admin' | 'instalador' 
+      tipo: 'admin' | 'instalador'
     }
   ) {
-    // Role comes from server-validated invitation, not user input
+    // Role e dados do usuário vêm via raw_user_meta_data — um trigger no banco
+    // (handle_new_user) cria os registros em usuarios/user_roles/instaladores
+    // de forma atômica e segura, sem depender de auth.uid() no client.
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/`
-      }
+        emailRedirectTo: `${window.location.origin}/`,
+        data: {
+          nome: userData.nome,
+          telefone: userData.telefone,
+          empresa_id: userData.empresa_id,
+          tipo: userData.tipo,
+        },
+      },
     })
 
     if (authError) throw authError
     if (!authData.user) throw new Error('Erro ao criar usuário')
-
-    const { error: userError } = await supabase.from('usuarios').insert({
-      id: authData.user.id,
-      empresa_id: userData.empresa_id,
-      nome: userData.nome,
-      telefone: userData.telefone,
-      tipo: userData.tipo,
-      ativo: true,
-    })
-
-    if (userError) throw userError
-
-    // Insert user role (role is validated server-side via invitation)
-    const { error: roleError } = await supabase.from('user_roles').insert({
-      user_id: authData.user.id,
-      role: userData.tipo,
-    })
-
-    if (roleError) throw roleError
-
-    if (userData.tipo === 'instalador') {
-      const { error: instaladorError } = await supabase
-        .from('instaladores')
-        .insert({
-          id: authData.user.id,
-          empresa_id: userData.empresa_id,
-          ativo: true,
-        })
-
-      if (instaladorError) throw instaladorError
-    }
   }
 
   async function signOut() {
