@@ -160,6 +160,7 @@ export default function ListaCotacoes() {
   const [error, setError] = useState<string | null>(null)
   const [cotacaoParaExcluir, setCotacaoParaExcluir] = useState<string | null>(null)
   const [cotacaoParaNaoGerou, setCotacaoParaNaoGerou] = useState<string | null>(null)
+  const [cotacaoParaAprovarSemTermo, setCotacaoParaAprovarSemTermo] = useState<{ id: string; clienteTemTermo: boolean } | null>(null)
   const [cotacaoParaEditar, setCotacaoParaEditar] = useState<Cotacao | null>(null)
   const [editForm, setEditForm] = useState<EditForm>({
     cliente_nome: '',
