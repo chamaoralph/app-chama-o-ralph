@@ -1500,6 +1500,42 @@ export default function ListaCotacoes() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* AlertDialog: Aprovar sem termo */}
+      <AlertDialog open={!!cotacaoParaAprovarSemTermo} onOpenChange={() => setCotacaoParaAprovarSemTermo(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Aprovar sem termo de aceite?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {cotacaoParaAprovarSemTermo?.clienteTemTermo
+                ? "O serviço será liberado imediatamente para os instaladores, sem exigir assinatura digital do cliente."
+                : "⚠️ Esse cliente NUNCA assinou um termo. Deseja prosseguir e liberar o serviço sem termo assinado?"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-green-600 hover:bg-green-700"
+              onClick={async () => {
+                if (!cotacaoParaAprovarSemTermo) return
+                const { error } = await supabase
+                  .from('cotacoes')
+                  .update({ status: 'aprovada' })
+                  .eq('id', cotacaoParaAprovarSemTermo.id)
+                if (error) {
+                  toast({ title: "Erro ao aprovar", description: error.message, variant: "destructive" })
+                } else {
+                  toast({ title: "Cotação aprovada sem termo!" })
+                  fetchCotacoes()
+                }
+                setCotacaoParaAprovarSemTermo(null)
+              }}
+            >
+              Sim, aprovar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Dialog de Não Gerou Serviço */}
       <Dialog open={!!cotacaoParaNaoGerou} onOpenChange={() => setCotacaoParaNaoGerou(null)}>
         <DialogContent>
