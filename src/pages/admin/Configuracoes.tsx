@@ -248,7 +248,32 @@ export default function Configuracoes() {
     }
   }
 
-  async function handleDelete(tipo: TipoServico) {
+  async function handleToggleExigeTermo(tipo: TipoServico) {
+    try {
+      const { error } = await supabase
+        .from('tipos_servico')
+        .update({ exige_termo: !tipo.exige_termo })
+        .eq('id', tipo.id)
+
+      if (error) throw error
+
+      setTiposServico(prev =>
+        prev.map(t => t.id === tipo.id ? { ...t, exige_termo: !t.exige_termo } : t)
+      )
+
+      toast({
+        title: tipo.exige_termo ? '📄 Termo opcional' : '📄 Termo obrigatório',
+        description: `"${tipo.nome}" agora ${tipo.exige_termo ? 'NÃO exige' : 'exige'} termo de aceite`
+      })
+    } catch (error: any) {
+      console.error('Erro ao atualizar exige_termo:', error)
+      toast({
+        title: '❌ Erro',
+        description: 'Não foi possível atualizar',
+        variant: 'destructive'
+      })
+    }
+  }
     if (!confirm(`Deseja realmente excluir "${tipo.nome}"?`)) return
 
     try {
