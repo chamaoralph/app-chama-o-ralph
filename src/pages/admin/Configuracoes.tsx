@@ -333,6 +333,7 @@ export default function Configuracoes() {
                   <TableRow>
                     <TableHead className="w-12"></TableHead>
                     <TableHead>Nome</TableHead>
+                    <TableHead className="w-32 text-center">Exige termo</TableHead>
                     <TableHead className="w-24 text-center">Ativo</TableHead>
                     <TableHead className="w-24 text-right">Ações</TableHead>
                   </TableRow>
