@@ -156,6 +156,7 @@ export default function ListaCotacoes() {
   const { toast } = useToast()
   const [cotacoes, setCotacoes] = useState<Cotacao[]>([])
   const [clientesComTermo, setClientesComTermo] = useState<Set<string>>(new Set())
+  const [tiposExigemTermo, setTiposExigemTermo] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [cotacaoParaExcluir, setCotacaoParaExcluir] = useState<string | null>(null)
@@ -213,10 +214,22 @@ export default function ListaCotacoes() {
   async function fetchTiposServico() {
     const { data } = await supabase
       .from('tipos_servico')
-      .select('id, nome')
-      .eq('ativo', true)
+      .select('id, nome, exige_termo, ativo')
       .order('ordem')
-    setTiposServico(data || [])
+    const ativos = (data || []).filter((t: any) => t.ativo)
+    setTiposServico(ativos)
+    // Set inclui TODOS os tipos com exige_termo=true (mesmo inativos), comparando por nome (case-insensitive)
+    const exigem = new Set<string>(
+      (data || [])
+        .filter((t: any) => t.exige_termo)
+        .map((t: any) => String(t.nome || '').trim().toLowerCase())
+    )
+    setTiposExigemTermo(exigem)
+  }
+
+  function cotacaoExigeTermo(tiposCotacao: string[] | null | undefined): boolean {
+    if (!tiposCotacao || tiposCotacao.length === 0) return false
+    return tiposCotacao.some(t => tiposExigemTermo.has(String(t || '').trim().toLowerCase()))
   }
 
   async function fetchCotacoes() {
@@ -995,6 +1008,7 @@ export default function ListaCotacoes() {
                                 <>
                                   {(() => {
                                     const temValor = (cotacao.valor_estimado ?? 0) > 0
+                                    const exigeTermo = cotacaoExigeTermo(cotacao.tipo_servico)
                                     const aprovarBtn = (
                                       <Button
                                         onClick={() => {
@@ -1006,13 +1020,25 @@ export default function ListaCotacoes() {
                                             })
                                             return
                                           }
-                                          if (confirm('Aprovar esta cotação? O cliente precisará assinar o termo digital antes do serviço ser liberado para os instaladores.')) {
+                                          if (exigeTermo) {
+                                            if (confirm('Aprovar esta cotação? O cliente precisará assinar o termo digital antes do serviço ser liberado para os instaladores.')) {
+                                              supabase
+                                                .from('cotacoes')
+                                                .update({ status: 'termo_pendente' })
+                                                .eq('id', cotacao.id)
+                                                .then(() => {
+                                                  toast({ title: "Cotação aprovada!", description: "Abra a cotação para enviar o termo de aceite ao cliente." })
+                                                  fetchCotacoes()
+                                                })
+                                            }
+                                          } else {
+                                            // Tipo de serviço não exige termo — libera direto
                                             supabase
                                               .from('cotacoes')
-                                              .update({ status: 'termo_pendente' })
+                                              .update({ status: 'aprovada' })
                                               .eq('id', cotacao.id)
                                               .then(() => {
-                                                toast({ title: "Cotação aprovada!", description: "Abra a cotação para enviar o termo de aceite ao cliente." })
+                                                toast({ title: "Cotação aprovada!", description: "Serviço liberado para os instaladores (este tipo não exige termo)." })
                                                 fetchCotacoes()
                                               })
                                           }
@@ -1039,7 +1065,7 @@ export default function ListaCotacoes() {
                                       </TooltipProvider>
                                     )
                                   })()}
-                                  {(() => {
+                                  {cotacaoExigeTermo(cotacao.tipo_servico) && (() => {
                                     const clienteTemTermo = clientesComTermo.has(cotacao.cliente_id)
                                     const temValor = (cotacao.valor_estimado ?? 0) > 0
                                     const habilitado = temValor

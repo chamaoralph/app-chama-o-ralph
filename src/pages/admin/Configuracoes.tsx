@@ -39,6 +39,7 @@ interface TipoServico {
   nome: string
   ativo: boolean
   ordem: number
+  exige_termo: boolean
 }
 
 interface Instalador {
@@ -247,8 +248,36 @@ export default function Configuracoes() {
     }
   }
 
+  async function handleToggleExigeTermo(tipo: TipoServico) {
+    try {
+      const { error } = await supabase
+        .from('tipos_servico')
+        .update({ exige_termo: !tipo.exige_termo })
+        .eq('id', tipo.id)
+
+      if (error) throw error
+
+      setTiposServico(prev =>
+        prev.map(t => t.id === tipo.id ? { ...t, exige_termo: !t.exige_termo } : t)
+      )
+
+      toast({
+        title: tipo.exige_termo ? '📄 Termo opcional' : '📄 Termo obrigatório',
+        description: `"${tipo.nome}" agora ${tipo.exige_termo ? 'NÃO exige' : 'exige'} termo de aceite`
+      })
+    } catch (error: any) {
+      console.error('Erro ao atualizar exige_termo:', error)
+      toast({
+        title: '❌ Erro',
+        description: 'Não foi possível atualizar',
+        variant: 'destructive'
+      })
+    }
+  }
+
   async function handleDelete(tipo: TipoServico) {
     if (!confirm(`Deseja realmente excluir "${tipo.nome}"?`)) return
+
 
     try {
       const { error } = await supabase
@@ -304,6 +333,7 @@ export default function Configuracoes() {
                   <TableRow>
                     <TableHead className="w-12"></TableHead>
                     <TableHead>Nome</TableHead>
+                    <TableHead className="w-32 text-center">Exige termo</TableHead>
                     <TableHead className="w-24 text-center">Ativo</TableHead>
                     <TableHead className="w-24 text-right">Ações</TableHead>
                   </TableRow>
@@ -315,6 +345,12 @@ export default function Configuracoes() {
                         <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
                       </TableCell>
                       <TableCell className="font-medium">{tipo.nome}</TableCell>
+                      <TableCell className="text-center">
+                        <Switch
+                          checked={tipo.exige_termo}
+                          onCheckedChange={() => handleToggleExigeTermo(tipo)}
+                        />
+                      </TableCell>
                       <TableCell className="text-center">
                         <Switch
                           checked={tipo.ativo}
