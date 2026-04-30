@@ -347,6 +347,12 @@ export default function Configuracoes() {
                       <TableCell className="font-medium">{tipo.nome}</TableCell>
                       <TableCell className="text-center">
                         <Switch
+                          checked={tipo.exige_termo}
+                          onCheckedChange={() => handleToggleExigeTermo(tipo)}
+                        />
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Switch
                           checked={tipo.ativo}
                           onCheckedChange={() => handleToggleAtivo(tipo)}
                         />
