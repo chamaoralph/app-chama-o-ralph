@@ -274,7 +274,10 @@ export default function Configuracoes() {
       })
     }
   }
+
+  async function handleDelete(tipo: TipoServico) {
     if (!confirm(`Deseja realmente excluir "${tipo.nome}"?`)) return
+
 
     try {
       const { error } = await supabase
