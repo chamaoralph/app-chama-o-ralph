@@ -1008,6 +1008,7 @@ export default function ListaCotacoes() {
                                 <>
                                   {(() => {
                                     const temValor = (cotacao.valor_estimado ?? 0) > 0
+                                    const exigeTermo = cotacaoExigeTermo(cotacao.tipo_servico)
                                     const aprovarBtn = (
                                       <Button
                                         onClick={() => {
@@ -1019,13 +1020,25 @@ export default function ListaCotacoes() {
                                             })
                                             return
                                           }
-                                          if (confirm('Aprovar esta cotação? O cliente precisará assinar o termo digital antes do serviço ser liberado para os instaladores.')) {
+                                          if (exigeTermo) {
+                                            if (confirm('Aprovar esta cotação? O cliente precisará assinar o termo digital antes do serviço ser liberado para os instaladores.')) {
+                                              supabase
+                                                .from('cotacoes')
+                                                .update({ status: 'termo_pendente' })
+                                                .eq('id', cotacao.id)
+                                                .then(() => {
+                                                  toast({ title: "Cotação aprovada!", description: "Abra a cotação para enviar o termo de aceite ao cliente." })
+                                                  fetchCotacoes()
+                                                })
+                                            }
+                                          } else {
+                                            // Tipo de serviço não exige termo — libera direto
                                             supabase
                                               .from('cotacoes')
-                                              .update({ status: 'termo_pendente' })
+                                              .update({ status: 'aprovada' })
                                               .eq('id', cotacao.id)
                                               .then(() => {
-                                                toast({ title: "Cotação aprovada!", description: "Abra a cotação para enviar o termo de aceite ao cliente." })
+                                                toast({ title: "Cotação aprovada!", description: "Serviço liberado para os instaladores (este tipo não exige termo)." })
                                                 fetchCotacoes()
                                               })
                                           }
@@ -1052,7 +1065,7 @@ export default function ListaCotacoes() {
                                       </TooltipProvider>
                                     )
                                   })()}
-                                  {(() => {
+                                  {cotacaoExigeTermo(cotacao.tipo_servico) && (() => {
                                     const clienteTemTermo = clientesComTermo.has(cotacao.cliente_id)
                                     const temValor = (cotacao.valor_estimado ?? 0) > 0
                                     const habilitado = temValor
