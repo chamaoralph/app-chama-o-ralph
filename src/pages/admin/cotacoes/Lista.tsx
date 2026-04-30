@@ -1043,29 +1043,11 @@ export default function ListaCotacoes() {
                                     const clienteTemTermo = clientesComTermo.has(cotacao.cliente_id)
                                     const temValor = (cotacao.valor_estimado ?? 0) > 0
                                     const habilitado = temValor
-                                    const aprovarSemTermo = () => {
-                                      supabase
-                                        .from('cotacoes')
-                                        .update({ status: 'aprovada' })
-                                        .eq('id', cotacao.id)
-                                        .then(() => {
-                                          toast({ title: "Cotação aprovada sem termo!" })
-                                          fetchCotacoes()
-                                        })
-                                    }
                                     const btn = (
                                       <Button
                                         onClick={() => {
                                           if (!habilitado) return
-                                          if (!clienteTemTermo) {
-                                            if (confirm('⚠️ Esse cliente NUNCA assinou um termo. Deseja prosseguir e liberar o serviço sem termo assinado?')) {
-                                              aprovarSemTermo()
-                                            }
-                                            return
-                                          }
-                                          if (confirm('Aprovar SEM exigir termo? O serviço será liberado imediatamente para os instaladores.')) {
-                                            aprovarSemTermo()
-                                          }
+                                          setCotacaoParaAprovarSemTermo({ id: cotacao.id, clienteTemTermo })
                                         }}
                                         size="sm"
                                         variant="outline"
