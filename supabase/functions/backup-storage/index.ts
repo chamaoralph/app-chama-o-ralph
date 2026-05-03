@@ -12,12 +12,6 @@ interface ArquivoBucket {
   criado_em: string;
 }
 
-interface BucketInfo {
-  total_arquivos: number;
-  tamanho_bytes: number;
-  arquivos: ArquivoBucket[];
-}
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -26,7 +20,7 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    
+
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Não autorizado' }), {
@@ -35,7 +29,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Criar cliente com token do usuário para verificar permissões
     const supabaseUser = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -48,7 +41,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Verificar se é admin
     const { data: userRole } = await supabaseUser
       .from('user_roles')
       .select('role')
@@ -63,7 +55,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Obter empresa_id do usuário
     const { data: usuario } = await supabaseUser
       .from('usuarios')
       .select('empresa_id')
@@ -77,115 +68,159 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Usar service role para acessar storage
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Buscar mapeamento UUID -> código do serviço
-    const { data: servicos } = await supabaseAdmin
-      .from('servicos')
-      .select('id, codigo')
-      .eq('empresa_id', usuario.empresa_id);
+    // Parse query params
+    const url = new URL(req.url);
+    const mode = url.searchParams.get('mode') || 'summary'; // 'summary' or 'files'
+    const bucketParam = url.searchParams.get('bucket');
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const perPage = Math.min(parseInt(url.searchParams.get('per_page') || '50'), 50);
 
-    const mapaServicos: Record<string, string> = {};
-    for (const servico of servicos || []) {
-      mapaServicos[servico.id] = servico.codigo;
+    // MODE: summary — fast, no signed URLs
+    if (mode === 'summary') {
+      const buckets = ['fotos-servicos', 'notas-fiscais', 'comprovantes'];
+      const resumo: Record<string, { total_arquivos: number; tamanho_bytes: number }> = {};
+
+      for (const bucketName of buckets) {
+        let totalArquivos = 0;
+        let tamanhoTotal = 0;
+
+        try {
+          const { data: itensRaiz } = await supabaseAdmin.storage
+            .from(bucketName)
+            .list('', { limit: 1000 });
+
+          for (const item of itensRaiz || []) {
+            if (!item.name || item.name.startsWith('.')) continue;
+
+            if (item.id === null) {
+              // Folder
+              const { data: arquivosPasta } = await supabaseAdmin.storage
+                .from(bucketName)
+                .list(item.name, { limit: 1000 });
+
+              for (const arquivo of arquivosPasta || []) {
+                if (!arquivo.name || arquivo.name.startsWith('.') || arquivo.id === null) continue;
+                totalArquivos++;
+                tamanhoTotal += arquivo.metadata?.size || 0;
+              }
+            } else {
+              totalArquivos++;
+              tamanhoTotal += item.metadata?.size || 0;
+            }
+          }
+        } catch (err) {
+          console.error(`Erro processando bucket ${bucketName}:`, err);
+        }
+
+        resumo[bucketName] = { total_arquivos: totalArquivos, tamanho_bytes: tamanhoTotal };
+      }
+
+      const totalArquivos = Object.values(resumo).reduce((acc, b) => acc + b.total_arquivos, 0);
+      const tamanhoTotalBytes = Object.values(resumo).reduce((acc, b) => acc + b.tamanho_bytes, 0);
+
+      return new Response(JSON.stringify({
+        sucesso: true,
+        mode: 'summary',
+        buckets: resumo,
+        resumo: {
+          total_arquivos: totalArquivos,
+          tamanho_total_mb: Math.round(tamanhoTotalBytes / 1024 / 1024 * 100) / 100,
+        },
+        gerado_em: new Date().toISOString(),
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    const buckets = ['fotos-servicos', 'notas-fiscais', 'comprovantes'];
-    const resultado: Record<string, BucketInfo> = {};
-
-    for (const bucketName of buckets) {
-      const arquivosComUrl: ArquivoBucket[] = [];
-      let tamanhoTotal = 0;
+    // MODE: files — paginated with signed URLs for a specific bucket
+    if (mode === 'files' && bucketParam) {
+      // Collect all file paths first (no URLs yet)
+      const allFiles: { nome: string; tamanho: number; criado_em: string }[] = [];
 
       try {
-        // Listar itens na raiz (podem ser pastas ou arquivos)
-        const { data: itensRaiz, error: listError } = await supabaseAdmin.storage
-          .from(bucketName)
+        const { data: itensRaiz } = await supabaseAdmin.storage
+          .from(bucketParam)
           .list('', { limit: 1000 });
-
-        if (listError) {
-          console.error(`Erro ao listar bucket ${bucketName}:`, listError);
-          resultado[bucketName] = { total_arquivos: 0, tamanho_bytes: 0, arquivos: [] };
-          continue;
-        }
 
         for (const item of itensRaiz || []) {
           if (!item.name || item.name.startsWith('.')) continue;
 
-          // Se item.id é null, é uma pasta - listar conteúdo recursivamente
           if (item.id === null) {
             const { data: arquivosPasta } = await supabaseAdmin.storage
-              .from(bucketName)
+              .from(bucketParam)
               .list(item.name, { limit: 1000 });
 
             for (const arquivo of arquivosPasta || []) {
               if (!arquivo.name || arquivo.name.startsWith('.') || arquivo.id === null) continue;
-
-              const caminhoCompleto = `${item.name}/${arquivo.name}`;
-              
-              const { data: urlData } = await supabaseAdmin.storage
-                .from(bucketName)
-                .createSignedUrl(caminhoCompleto, 86400);
-
-              if (urlData?.signedUrl) {
-                const tamanho = arquivo.metadata?.size || 0;
-                tamanhoTotal += tamanho;
-
-                arquivosComUrl.push({
-                  nome: caminhoCompleto,
-                  tamanho,
-                  url: urlData.signedUrl,
-                  criado_em: arquivo.created_at || new Date().toISOString(),
-                });
-              }
-            }
-          } else {
-            // É um arquivo na raiz
-            const { data: urlData } = await supabaseAdmin.storage
-              .from(bucketName)
-              .createSignedUrl(item.name, 86400);
-
-            if (urlData?.signedUrl) {
-              const tamanho = item.metadata?.size || 0;
-              tamanhoTotal += tamanho;
-
-              arquivosComUrl.push({
-                nome: item.name,
-                tamanho,
-                url: urlData.signedUrl,
-                criado_em: item.created_at || new Date().toISOString(),
+              allFiles.push({
+                nome: `${item.name}/${arquivo.name}`,
+                tamanho: arquivo.metadata?.size || 0,
+                criado_em: arquivo.created_at || new Date().toISOString(),
               });
             }
+          } else {
+            allFiles.push({
+              nome: item.name,
+              tamanho: item.metadata?.size || 0,
+              criado_em: item.created_at || new Date().toISOString(),
+            });
           }
         }
       } catch (err) {
-        console.error(`Erro processando bucket ${bucketName}:`, err);
+        console.error(`Erro listando bucket ${bucketParam}:`, err);
       }
 
-      resultado[bucketName] = {
-        total_arquivos: arquivosComUrl.length,
-        tamanho_bytes: tamanhoTotal,
+      // Paginate
+      const startIndex = (page - 1) * perPage;
+      const pageFiles = allFiles.slice(startIndex, startIndex + perPage);
+      const hasMore = startIndex + perPage < allFiles.length;
+
+      // Generate signed URLs only for this page
+      const arquivosComUrl: ArquivoBucket[] = [];
+      for (const file of pageFiles) {
+        const { data: urlData } = await supabaseAdmin.storage
+          .from(bucketParam)
+          .createSignedUrl(file.nome, 86400);
+
+        arquivosComUrl.push({
+          nome: file.nome,
+          tamanho: file.tamanho,
+          url: urlData?.signedUrl || '',
+          criado_em: file.criado_em,
+        });
+      }
+
+      // Get mapa_servicos
+      const { data: servicos } = await supabaseAdmin
+        .from('servicos')
+        .select('id, codigo')
+        .eq('empresa_id', usuario.empresa_id);
+
+      const mapaServicos: Record<string, string> = {};
+      for (const servico of servicos || []) {
+        mapaServicos[servico.id] = servico.codigo;
+      }
+
+      return new Response(JSON.stringify({
+        sucesso: true,
+        mode: 'files',
+        bucket: bucketParam,
+        page,
+        per_page: perPage,
+        total: allFiles.length,
+        has_more: hasMore,
         arquivos: arquivosComUrl,
-      };
+        mapa_servicos: mapaServicos,
+        validade_urls: '24 horas',
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    // Calcular totais
-    const totalArquivos = Object.values(resultado).reduce((acc, b) => acc + b.total_arquivos, 0);
-    const tamanhoTotalBytes = Object.values(resultado).reduce((acc, b) => acc + b.tamanho_bytes, 0);
-
-    return new Response(JSON.stringify({
-      sucesso: true,
-      empresa_id: usuario.empresa_id,
-      buckets: resultado,
-      mapa_servicos: mapaServicos,
-      resumo: {
-        total_arquivos: totalArquivos,
-        tamanho_total_mb: Math.round(tamanhoTotalBytes / 1024 / 1024 * 100) / 100,
-      },
-      gerado_em: new Date().toISOString(),
-      validade_urls: '24 horas',
-    }), {
+    return new Response(JSON.stringify({ error: 'Parâmetros inválidos. Use mode=summary ou mode=files&bucket=nome' }), {
+      status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
