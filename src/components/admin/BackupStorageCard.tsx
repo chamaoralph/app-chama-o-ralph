@@ -134,11 +134,19 @@ async function getAuthToken() {
 async function fetchBackupApi(params: Record<string, string>) {
   const token = await getAuthToken();
   const queryString = new URLSearchParams(params).toString();
-  const response = await supabase.functions.invoke(`backup-storage?${queryString}`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+  const url = `https://${projectId}.supabase.co/functions/v1/backup-storage?${queryString}`;
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+    },
   });
-  if (response.error) throw new Error(response.error.message);
-  return response.data;
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.error || `Erro ${response.status}`);
+  }
+  return response.json();
 }
 
 export function BackupStorageCard() {
