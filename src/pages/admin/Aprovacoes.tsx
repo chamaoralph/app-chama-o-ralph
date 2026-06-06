@@ -71,7 +71,7 @@ export default function Aprovacoes() {
         .select(`
           *,
           clientes!servicos_cliente_id_fkey(nome, telefone),
-          usuarios!servicos_instalador_id_fkey(nome)
+          instaladores!servicos_instalador_id_fkey(usuarios!instaladores_id_fkey(nome))
         `)
 
       // Aplicar filtro
@@ -91,7 +91,7 @@ export default function Aprovacoes() {
         ...servico,
         cliente_nome: (servico.clientes as any)?.nome || '',
         cliente_telefone: (servico.clientes as any)?.telefone || '',
-        instalador_nome: (servico.usuarios as any)?.nome || null
+        instalador_nome: (servico.instaladores as any)?.usuarios?.nome || null
       })) || []
 
       setServicos(servicosFormatados)
