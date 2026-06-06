@@ -255,10 +255,10 @@ export function GerarReciboModal({
             <p className="text-sm text-muted-foreground">Total Bruto</p>
             <p className="text-xl font-semibold">R$ {totalGeral.toFixed(2)}</p>
           </div>
-          {totalRecebidoCliente > 0 && (
+          {totalRecebidoPeloInstalador > 0 && (
             <div className="text-center">
               <p className="text-sm text-muted-foreground">Recebido do Cliente</p>
-              <p className="text-xl font-semibold text-orange-600">R$ {totalRecebidoCliente.toFixed(2)}</p>
+              <p className="text-xl font-semibold text-orange-600">R$ {totalRecebidoPeloInstalador.toFixed(2)}</p>
             </div>
           )}
           <div className="text-center">
