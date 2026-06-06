@@ -70,7 +70,7 @@ export default function Aprovacoes() {
         .from('servicos')
         .select(`
           *,
-          clientes(nome, telefone),
+          clientes!servicos_cliente_id_fkey(nome, telefone),
           usuarios!fk_servicos_instalador(nome)
         `)
 
