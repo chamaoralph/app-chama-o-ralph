@@ -113,10 +113,10 @@ export function GerarReciboModal({
           .update({
             valor_mao_obra: totalMaoObra,
             valor_reembolso: totalReembolso,
-            valor_total: totalGeral,
+            valor_total: totalInst,
             quantidade_servicos: servicos.length,
             servicos_ids: servicos.map(s => s.id),
-            valor_recebido_cliente: totalRecebidoCliente
+            valor_recebido_cliente: totalRecebidoPeloInstalador
           })
           .eq('id', reciboExistente.id)
 
@@ -131,10 +131,10 @@ export function GerarReciboModal({
             data_referencia: dataFormatada,
             valor_mao_obra: totalMaoObra,
             valor_reembolso: totalReembolso,
-            valor_total: totalGeral,
+            valor_total: totalInst,
             quantidade_servicos: servicos.length,
             servicos_ids: servicos.map(s => s.id),
-            valor_recebido_cliente: totalRecebidoCliente
+            valor_recebido_cliente: totalRecebidoPeloInstalador
           })
 
         if (error) throw error
