@@ -88,7 +88,7 @@ export default function FinalizarServico() {
       
       const { data, error } = await supabase
         .from("servicos")
-        .select("*, clientes(*)")
+        .select("*, clientes!servicos_cliente_id_fkey(*)")
         .eq("id", servicoId)
         .maybeSingle();
 

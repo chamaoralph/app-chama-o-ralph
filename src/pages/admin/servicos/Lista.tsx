@@ -34,8 +34,10 @@ interface Servico {
   clientes: {
     nome: string
   }
-  usuarios?: {
-    nome: string
+  instaladores?: {
+    usuarios?: {
+      nome: string
+    }
   }
 }
 
@@ -90,8 +92,8 @@ export default function ListaServicos() {
         .from('servicos')
         .select(`
           *,
-          clientes(nome),
-          usuarios!fk_servicos_instalador(nome)
+          clientes!servicos_cliente_id_fkey(nome),
+          instaladores!servicos_instalador_id_fkey(usuarios!instaladores_id_fkey(nome))
         `)
         .order('created_at', { ascending: false })
 
@@ -360,7 +362,7 @@ export default function ListaServicos() {
         comparison = (a.tipo_servico?.join(', ') || '').localeCompare(b.tipo_servico?.join(', ') || '')
         break
       case 'instalador':
-        comparison = (a.usuarios?.nome || '').localeCompare(b.usuarios?.nome || '')
+        comparison = ((a.instaladores as any)?.usuarios?.nome || '').localeCompare((b.instaladores as any)?.usuarios?.nome || '')
         break
       case 'status':
         comparison = a.status.localeCompare(b.status)
@@ -614,7 +616,7 @@ export default function ListaServicos() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-foreground">
-                            {servico.usuarios?.nome || '-'}
+                            {(servico.instaladores as any)?.usuarios?.nome || '-'}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">

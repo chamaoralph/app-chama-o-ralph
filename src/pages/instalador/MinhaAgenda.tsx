@@ -42,7 +42,7 @@ export default function MinhaAgenda() {
         .select(
           `
           *,
-          clientes (nome, telefone, endereco_completo, bairro)
+          clientes!servicos_cliente_id_fkey (nome, telefone, endereco_completo, bairro)
         `
         )
         .eq("instalador_id", user.id)

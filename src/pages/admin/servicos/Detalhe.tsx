@@ -32,9 +32,11 @@ interface Servico {
     telefone: string
     bairro: string | null
   }
-  usuarios?: {
-    nome: string
-    telefone: string | null
+  instaladores?: {
+    usuarios?: {
+      nome: string
+      telefone: string | null
+    }
   }
 }
 
@@ -56,8 +58,8 @@ export default function DetalheServico() {
         .from('servicos')
         .select(`
           *,
-          clientes(nome, telefone, bairro),
-          usuarios!fk_servicos_instalador(nome, telefone)
+          clientes!servicos_cliente_id_fkey(nome, telefone, bairro),
+          instaladores!servicos_instalador_id_fkey(usuarios!instaladores_id_fkey(nome, telefone))
         `)
         .eq('id', id)
         .single()
@@ -231,13 +233,13 @@ export default function DetalheServico() {
               <CardTitle>Instalador</CardTitle>
             </CardHeader>
             <CardContent>
-              {servico.usuarios ? (
+              {(servico.instaladores as any)?.usuarios ? (
                 <div className="space-y-2">
-                  <p className="font-medium">{servico.usuarios.nome}</p>
-                  {servico.usuarios.telefone && (
+                  <p className="font-medium">{(servico.instaladores as any).usuarios.nome}</p>
+                  {(servico.instaladores as any).usuarios.telefone && (
                     <p className="text-gray-600 flex items-center gap-2">
                       <Phone className="w-4 h-4" />
-                      {servico.usuarios.telefone}
+                      {(servico.instaladores as any).usuarios.telefone}
                     </p>
                   )}
                 </div>

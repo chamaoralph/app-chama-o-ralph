@@ -159,7 +159,7 @@ export default function ServicosDisponiveis() {
           endereco_completo,
           valor_mao_obra_instalador,
           descricao,
-          clientes (
+          clientes!servicos_cliente_id_fkey (
             nome,
             telefone,
             bairro

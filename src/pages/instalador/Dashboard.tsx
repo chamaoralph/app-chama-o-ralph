@@ -99,7 +99,7 @@ export default function InstaladorDashboard() {
           data_servico_agendada,
           endereco_completo,
           valor_mao_obra_instalador,
-          cliente:clientes(nome)
+          cliente:clientes!servicos_cliente_id_fkey(nome)
         `)
         .eq('instalador_id', user.id)
         .in('status', ['atribuido', 'em_andamento', 'correcao_solicitada'])
