@@ -330,19 +330,15 @@ export default function MeuExtrato() {
                 min={format(subDays(new Date(), 7), 'yyyy-MM-dd')}
                 className="w-[160px]"
               />
-              <Button 
+              <Button
                 onClick={() => setModalReciboOpen(true)}
                 className="flex items-center gap-2"
-                disabled={servicosDataSelecionada.length === 0 || reciboJaGerado}
+                disabled={servicosDataSelecionada.length === 0}
+                variant={reciboJaGerado ? 'outline' : 'default'}
               >
                 <FileText className="h-4 w-4" />
-                Gerar Recibo ({servicosDataSelecionada.length})
+                {reciboJaGerado ? `Regerar Recibo (${servicosDataSelecionada.length})` : `Gerar Recibo (${servicosDataSelecionada.length})`}
               </Button>
-              {reciboJaGerado && (
-                <span className="text-sm text-orange-600 font-medium">
-                  Recibo já enviado
-                </span>
-              )}
             </div>
           </div>
         </div>
