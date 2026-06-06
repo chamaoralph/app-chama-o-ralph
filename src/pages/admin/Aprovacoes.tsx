@@ -17,6 +17,14 @@ import {
 } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 interface Servico {
   id: string
@@ -30,6 +38,9 @@ interface Servico {
   valor_total: number
   valor_mao_obra_instalador: number
   valor_reembolso_despesas: number
+  valor_recebido_cliente: number
+  recebimento_cliente: string | null
+  custo_suporte: number
   fotos_conclusao: string[]
   nota_fiscal_url: string | null
   observacoes_instalador: string | null
@@ -45,6 +56,17 @@ interface CorrecaoModal {
   observacao: string
 }
 
+interface AprovacaoModal {
+  open: boolean
+  servicoId: string | null
+  valor_total: string
+  valor_mao_obra_instalador: string
+  recebimento_cliente: string
+  valor_recebido_cliente: string
+  valor_reembolso_despesas: string
+  custo_suporte: string
+}
+
 export default function Aprovacoes() {
   const [servicos, setServicos] = useState<Servico[]>([])
   const [loading, setLoading] = useState(true)
@@ -56,6 +78,16 @@ export default function Aprovacoes() {
     open: false,
     servicoId: null,
     observacao: ''
+  })
+  const [aprovacaoModal, setAprovacaoModal] = useState<AprovacaoModal>({
+    open: false,
+    servicoId: null,
+    valor_total: '',
+    valor_mao_obra_instalador: '',
+    recebimento_cliente: 'empresa',
+    valor_recebido_cliente: '',
+    valor_reembolso_despesas: '',
+    custo_suporte: '',
   })
 
   useEffect(() => {
@@ -115,34 +147,50 @@ export default function Aprovacoes() {
     }
   }
 
-  async function aprovarServico(servicoId: string) {
-    const prevServicos = [...servicos]
+  function abrirModalAprovacao(servicoId: string) {
+    const servico = servicos.find(s => s.id === servicoId)
+    if (!servico) return
+    setAprovacaoModal({
+      open: true,
+      servicoId,
+      valor_total: String(servico.valor_total ?? ''),
+      valor_mao_obra_instalador: String(servico.valor_mao_obra_instalador ?? ''),
+      recebimento_cliente: servico.recebimento_cliente || 'empresa',
+      valor_recebido_cliente: String(servico.valor_recebido_cliente ?? ''),
+      valor_reembolso_despesas: String(servico.valor_reembolso_despesas ?? ''),
+      custo_suporte: String(servico.custo_suporte ?? ''),
+    })
+  }
+
+  async function confirmarAprovacao() {
+    const { servicoId, valor_total, valor_mao_obra_instalador, recebimento_cliente,
+            valor_recebido_cliente, valor_reembolso_despesas, custo_suporte } = aprovacaoModal
+    if (!servicoId) return
+
     try {
       setProcessingId(servicoId)
 
-      // Otimista: atualiza UI imediatamente
-      setServicos((list) => list.map((s) => (s.id === servicoId ? { ...s, status: 'concluido' } : s)))
-
       const { data, error } = await supabase
         .from('servicos')
-        .update({ status: 'concluido' })
+        .update({
+          status: 'concluido',
+          valor_total: parseFloat(valor_total) || 0,
+          valor_mao_obra_instalador: parseFloat(valor_mao_obra_instalador) || 0,
+          recebimento_cliente,
+          valor_recebido_cliente: parseFloat(valor_recebido_cliente) || 0,
+          valor_reembolso_despesas: parseFloat(valor_reembolso_despesas) || 0,
+          custo_suporte: parseFloat(custo_suporte) || 0,
+        })
         .eq('id', servicoId)
         .select()
 
-      if (error) {
-        console.error('Erro detalhado:', error)
-        throw error
-      }
+      if (error) throw error
+      if (!data || data.length === 0) throw new Error('Nenhum serviço foi atualizado. Verifique as permissões.')
 
-      if (!data || data.length === 0) {
-        throw new Error('Nenhum serviço foi atualizado. Verifique as permissões.')
-      }
-
+      setAprovacaoModal(prev => ({ ...prev, open: false, servicoId: null }))
       toast.success('Serviço aprovado com sucesso!')
       fetchServicos()
     } catch (error: any) {
-      // Reverte UI em caso de erro
-      setServicos(prevServicos)
       console.error('Erro ao aprovar serviço:', error)
       toast.error(error.message || 'Erro ao aprovar serviço')
     } finally {
@@ -531,7 +579,7 @@ export default function Aprovacoes() {
                     {servico.status === 'aguardando_aprovacao' && (
                       <>
                         <Button
-                          onClick={() => aprovarServico(servico.id)}
+                          onClick={() => abrirModalAprovacao(servico.id)}
                           disabled={processingId === servico.id}
                           className="bg-green-600 hover:bg-green-700"
                         >
@@ -575,6 +623,117 @@ export default function Aprovacoes() {
           </div>
         )}
       </div>
+
+      {/* Modal de Aprovação */}
+      <Dialog
+        open={aprovacaoModal.open}
+        onOpenChange={(open) => {
+          if (!open) setAprovacaoModal(prev => ({ ...prev, open: false, servicoId: null }))
+        }}
+      >
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Confirmar Aprovação</DialogTitle>
+            <DialogDescription>
+              Revise e ajuste os valores antes de aprovar o serviço.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="ap-valor-total">Valor total cobrado (R$)</Label>
+                <Input
+                  id="ap-valor-total"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={aprovacaoModal.valor_total}
+                  onChange={(e) => setAprovacaoModal(prev => ({ ...prev, valor_total: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="ap-mao-obra">Mão de obra instalador (R$)</Label>
+                <Input
+                  id="ap-mao-obra"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={aprovacaoModal.valor_mao_obra_instalador}
+                  onChange={(e) => setAprovacaoModal(prev => ({ ...prev, valor_mao_obra_instalador: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="ap-quem-recebeu">Quem recebeu o cliente</Label>
+                <Select
+                  value={aprovacaoModal.recebimento_cliente}
+                  onValueChange={(val) => setAprovacaoModal(prev => ({ ...prev, recebimento_cliente: val }))}
+                >
+                  <SelectTrigger id="ap-quem-recebeu">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="empresa">Empresa</SelectItem>
+                    <SelectItem value="instalador">Instalador</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="ap-valor-recebido">Valor recebido (R$)</Label>
+                <Input
+                  id="ap-valor-recebido"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={aprovacaoModal.valor_recebido_cliente}
+                  onChange={(e) => setAprovacaoModal(prev => ({ ...prev, valor_recebido_cliente: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="ap-reembolso-instalador">Reembolso instalador (R$)</Label>
+                <Input
+                  id="ap-reembolso-instalador"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={aprovacaoModal.valor_reembolso_despesas}
+                  onChange={(e) => setAprovacaoModal(prev => ({ ...prev, valor_reembolso_despesas: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="ap-reembolso-empresa">Reembolso empresa (R$)</Label>
+                <Input
+                  id="ap-reembolso-empresa"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={aprovacaoModal.custo_suporte}
+                  onChange={(e) => setAprovacaoModal(prev => ({ ...prev, custo_suporte: e.target.value }))}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAprovacaoModal(prev => ({ ...prev, open: false, servicoId: null }))}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={confirmarAprovacao}
+              disabled={processingId !== null}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {processingId ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+              Aprovar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de Correção */}
       <Dialog 
