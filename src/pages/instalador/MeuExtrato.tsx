@@ -20,6 +20,7 @@ interface Servico {
   tipo_servico: string[]
   valor_mao_obra_instalador: number
   valor_reembolso_despesas: number
+  custo_suporte: number
   valor_recebido_cliente: number
   recebimento_cliente: string | null
   cliente_nome: string
@@ -173,6 +174,7 @@ export default function MeuExtrato() {
         tipo_servico: s.tipo_servico,
         valor_mao_obra_instalador: s.valor_mao_obra_instalador || 0,
         valor_reembolso_despesas: s.valor_reembolso_despesas || 0,
+        custo_suporte: s.custo_suporte || 0,
         valor_recebido_cliente: Number(s.valor_recebido_cliente) || 0,
         recebimento_cliente: s.recebimento_cliente || null,
         cliente_nome: s.cliente?.nome || 'N/A',
@@ -455,7 +457,9 @@ export default function MeuExtrato() {
             tipo_servico: s.tipo_servico,
             valor_mao_obra_instalador: s.valor_mao_obra_instalador,
             valor_reembolso_despesas: s.valor_reembolso_despesas,
-            valor_recebido_cliente: s.valor_recebido_cliente || 0
+            custo_suporte: s.custo_suporte || 0,
+            valor_recebido_cliente: s.valor_recebido_cliente || 0,
+            recebimento_cliente: s.recebimento_cliente,
           }))}
           dataReferencia={dataRecibo}
           instaladorNome={instaladorNome}

@@ -15,7 +15,9 @@ interface ServicoRecibo {
   tipo_servico: string[]
   valor_mao_obra_instalador: number
   valor_reembolso_despesas: number
+  custo_suporte: number
   valor_recebido_cliente: number
+  recebimento_cliente: string | null
 }
 
 interface GerarReciboModalProps {
@@ -38,11 +40,21 @@ export function GerarReciboModal({
   const [gerando, setGerando] = useState(false)
   const hiddenContainerRef = useRef<HTMLDivElement>(null)
 
-  const totalMaoObra = servicos.reduce((sum, s) => sum + s.valor_mao_obra_instalador, 0)
-  const totalReembolso = servicos.reduce((sum, s) => sum + s.valor_reembolso_despesas, 0)
+  const totalMaoObra = servicos.reduce((sum, s) => sum + (s.valor_mao_obra_instalador || 0), 0)
+  const totalReembolso = servicos.reduce((sum, s) => sum + (s.valor_reembolso_despesas || 0) + (s.custo_suporte || 0), 0)
+  const totalInst = servicos.reduce((sum, s) => {
+    const reembInst = s.valor_reembolso_despesas || 0
+    const reembEmp = s.custo_suporte || 0
+    const recebido = s.valor_recebido_cliente || 0
+    const base = recebido - reembInst - reembEmp
+    return sum + (base / 2 + reembInst)
+  }, 0)
+  const totalRecebidoPeloInstalador = servicos.reduce(
+    (sum, s) => sum + (s.recebimento_cliente === 'instalador' ? (s.valor_recebido_cliente || 0) : 0),
+    0
+  )
   const totalGeral = totalMaoObra + totalReembolso
-  const totalRecebidoCliente = servicos.reduce((sum, s) => sum + (s.valor_recebido_cliente || 0), 0)
-  const saldoLiquido = totalGeral - totalRecebidoCliente
+  const saldoLiquido = totalInst - totalRecebidoPeloInstalador
 
   async function gerarImagem(): Promise<Blob | null> {
     const hiddenContainer = hiddenContainerRef.current
