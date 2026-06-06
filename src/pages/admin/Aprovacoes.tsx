@@ -147,12 +147,10 @@ export default function Aprovacoes() {
     }
   }
 
-  function abrirModalAprovacao(servicoId: string) {
-    const servico = servicos.find(s => s.id === servicoId)
-    if (!servico) return
+  function abrirModalAprovacao(servico: Servico) {
     setAprovacaoModal({
       open: true,
-      servicoId,
+      servicoId: servico.id,
       valor_total: String(servico.valor_total ?? ''),
       valor_mao_obra_instalador: String(servico.valor_mao_obra_instalador ?? ''),
       recebimento_cliente: servico.recebimento_cliente || 'empresa',
@@ -579,7 +577,7 @@ export default function Aprovacoes() {
                     {servico.status === 'aguardando_aprovacao' && (
                       <>
                         <Button
-                          onClick={() => abrirModalAprovacao(servico.id)}
+                          onClick={() => abrirModalAprovacao(servico)}
                           disabled={processingId === servico.id}
                           className="bg-green-600 hover:bg-green-700"
                         >
