@@ -113,7 +113,7 @@ export function GerarReciboModal({
           .update({
             valor_mao_obra: totalMaoObra,
             valor_reembolso: totalReembolso,
-            valor_total: totalInst,
+            valor_total: totalMaoObra,
             quantidade_servicos: servicos.length,
             servicos_ids: servicos.map(s => s.id),
             valor_recebido_cliente: totalRecebidoPeloInstalador
@@ -131,7 +131,7 @@ export function GerarReciboModal({
             data_referencia: dataFormatada,
             valor_mao_obra: totalMaoObra,
             valor_reembolso: totalReembolso,
-            valor_total: totalInst,
+            valor_total: totalMaoObra,
             quantidade_servicos: servicos.length,
             servicos_ids: servicos.map(s => s.id),
             valor_recebido_cliente: totalRecebidoPeloInstalador
