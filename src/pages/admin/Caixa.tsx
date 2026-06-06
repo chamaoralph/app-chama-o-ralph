@@ -59,13 +59,13 @@ export default function Caixa() {
 
       const { data, error } = await supabase
         .from("recibos_diarios")
-        .select("valor_total")
+        .select("valor_mao_obra")
         .eq("status_pagamento", "pago")
         .gte("data_referencia", primeiroDia)
         .lte("data_referencia", ultimoDia);
 
       if (error) throw error;
-      const total = (data || []).reduce((sum, r) => sum + Number(r.valor_total), 0);
+      const total = (data || []).reduce((sum, r) => sum + Number(r.valor_mao_obra), 0);
       setTotalInstaladoresRecibos(total);
     } catch (error) {
       console.error("Erro ao carregar total de recibos:", error);
