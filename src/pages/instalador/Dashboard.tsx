@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { InstaladorLayout } from '@/components/layout/InstaladorLayout'
 import { supabase } from '@/integrations/supabase/client'
 import { Link } from 'react-router-dom'
-import { Calendar, DollarSign, Package, TrendingUp, Clock, ChevronRight, MapPin } from 'lucide-react'
+import { Calendar, DollarSign, Package, TrendingUp, Clock, ChevronRight, ChevronLeft, MapPin } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -34,9 +34,66 @@ export default function InstaladorDashboard() {
   const [servicosDisponiveis, setServicosDisponiveis] = useState(0)
   const isMobile = useIsMobile()
 
+  const hoje = new Date()
+  const [mesDesempenho, setMesDesempenho] = useState({ ano: hoje.getFullYear(), mes: hoje.getMonth() + 1 })
+  const [desempenho, setDesempenho] = useState({ servicos: 0, maoObra: 0, reembolso: 0 })
+  const [loadingDesempenho, setLoadingDesempenho] = useState(false)
+
+  const isCurrentMonth = mesDesempenho.ano === hoje.getFullYear() && mesDesempenho.mes === hoje.getMonth() + 1
+
+  function irMesAnterior() {
+    setMesDesempenho(prev => prev.mes === 1
+      ? { ano: prev.ano - 1, mes: 12 }
+      : { ...prev, mes: prev.mes - 1 }
+    )
+  }
+
+  function irProximoMes() {
+    if (isCurrentMonth) return
+    setMesDesempenho(prev => prev.mes === 12
+      ? { ano: prev.ano + 1, mes: 1 }
+      : { ...prev, mes: prev.mes + 1 }
+    )
+  }
+
   useEffect(() => {
     carregarDados()
   }, [])
+
+  useEffect(() => {
+    carregarDesempenho(mesDesempenho.ano, mesDesempenho.mes)
+  }, [mesDesempenho])
+
+  async function carregarDesempenho(ano: number, mes: number) {
+    setLoadingDesempenho(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const pad = (n: number) => String(n).padStart(2, '0')
+      const primeiroDia = `${ano}-${pad(mes)}-01`
+      const ultimoDiaNum = new Date(ano, mes, 0).getDate()
+      const ultimoDia = `${ano}-${pad(mes)}-${pad(ultimoDiaNum)}`
+
+      const { data } = await supabase
+        .from('servicos')
+        .select('valor_mao_obra_instalador, valor_reembolso_despesas')
+        .eq('instalador_id', user.id)
+        .eq('status', 'concluido')
+        .gte('data_servico_agendada', `${primeiroDia}T00:00:00`)
+        .lte('data_servico_agendada', `${ultimoDia}T23:59:59`)
+
+      setDesempenho({
+        servicos: data?.length || 0,
+        maoObra: data?.reduce((sum, s) => sum + Number(s.valor_mao_obra_instalador || 0), 0) || 0,
+        reembolso: data?.reduce((sum, s) => sum + Number(s.valor_reembolso_despesas || 0), 0) || 0,
+      })
+    } catch (err) {
+      console.error('Erro ao carregar desempenho:', err)
+    } finally {
+      setLoadingDesempenho(false)
+    }
+  }
 
   async function carregarDados() {
     try {
@@ -200,6 +257,42 @@ export default function InstaladorDashboard() {
             </div>
           </div>
 
+          {/* Desempenho do Mês */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold text-gray-800 text-sm">Desempenho</h2>
+              <div className="flex items-center gap-2">
+                <button onClick={irMesAnterior} className="p-1 rounded-full hover:bg-gray-100">
+                  <ChevronLeft className="h-4 w-4 text-gray-500" />
+                </button>
+                <span className="text-xs font-medium text-gray-700 capitalize w-24 text-center">
+                  {format(new Date(mesDesempenho.ano, mesDesempenho.mes - 1, 1), 'MMM yyyy', { locale: ptBR })}
+                </span>
+                <button onClick={irProximoMes} disabled={isCurrentMonth} className="p-1 rounded-full hover:bg-gray-100 disabled:opacity-30">
+                  <ChevronRight className="h-4 w-4 text-gray-500" />
+                </button>
+              </div>
+            </div>
+            {loadingDesempenho ? (
+              <div className="flex justify-center py-2"><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600" /></div>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                <div className="text-center p-2 bg-purple-50 rounded-lg">
+                  <div className="text-xl font-bold text-purple-700">{desempenho.servicos}</div>
+                  <div className="text-xs text-purple-600">Concluídos</div>
+                </div>
+                <div className="text-center p-2 bg-green-50 rounded-lg">
+                  <div className="text-base font-bold text-green-700">R$ {desempenho.maoObra.toFixed(0)}</div>
+                  <div className="text-xs text-green-600">Mão de Obra</div>
+                </div>
+                <div className="text-center p-2 bg-blue-50 rounded-lg">
+                  <div className="text-base font-bold text-blue-700">R$ {desempenho.reembolso.toFixed(0)}</div>
+                  <div className="text-xs text-blue-600">Reembolsos</div>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Ação Principal - Serviços Disponíveis */}
           <Link to="/instalador/servicos-disponiveis">
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center justify-between">
@@ -293,6 +386,45 @@ export default function InstaladorDashboard() {
             )}
             <div className="text-xs opacity-75 mt-1">Próximo Serviço</div>
           </div>
+        </div>
+
+        {/* Desempenho do Mês */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <TrendingUp className="h-6 w-6 text-purple-600" />
+              Desempenho Mensal
+            </h2>
+            <div className="flex items-center gap-3">
+              <button onClick={irMesAnterior} className="p-2 rounded-full hover:bg-gray-100 border border-gray-200">
+                <ChevronLeft className="h-5 w-5 text-gray-600" />
+              </button>
+              <span className="text-base font-semibold text-gray-700 capitalize w-32 text-center">
+                {format(new Date(mesDesempenho.ano, mesDesempenho.mes - 1, 1), 'MMMM yyyy', { locale: ptBR })}
+              </span>
+              <button onClick={irProximoMes} disabled={isCurrentMonth} className="p-2 rounded-full hover:bg-gray-100 border border-gray-200 disabled:opacity-30 disabled:cursor-not-allowed">
+                <ChevronRight className="h-5 w-5 text-gray-600" />
+              </button>
+            </div>
+          </div>
+          {loadingDesempenho ? (
+            <div className="flex justify-center py-6"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" /></div>
+          ) : (
+            <div className="grid grid-cols-3 gap-4">
+              <div className="bg-purple-50 border border-purple-100 rounded-lg p-4 text-center">
+                <div className="text-3xl font-bold text-purple-700">{desempenho.servicos}</div>
+                <div className="text-sm text-purple-600 mt-1">Serviços Concluídos</div>
+              </div>
+              <div className="bg-green-50 border border-green-100 rounded-lg p-4 text-center">
+                <div className="text-2xl font-bold text-green-700">R$ {desempenho.maoObra.toFixed(2)}</div>
+                <div className="text-sm text-green-600 mt-1">Total Mão de Obra</div>
+              </div>
+              <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 text-center">
+                <div className="text-2xl font-bold text-blue-700">R$ {desempenho.reembolso.toFixed(2)}</div>
+                <div className="text-sm text-blue-600 mt-1">Total Reembolsos</div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Ações Rápidas */}
