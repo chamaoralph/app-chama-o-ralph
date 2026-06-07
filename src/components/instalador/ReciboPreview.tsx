@@ -22,13 +22,15 @@ interface ReciboPreviewProps {
 function calcServico(s: ServicoRecibo) {
   const reembInst = s.valor_reembolso_despesas || 0
   const reembEmp = s.custo_suporte || 0
+  const maoObra = s.valor_mao_obra_instalador || 0
+  // totalEmp/totalInst são calculados a partir do 50% fixo — independente de quem recebeu
+  const totalEmp = maoObra + reembEmp
+  const totalInst = maoObra + reembInst
+  // recebimento_cliente afeta apenas o saldo final (quem já tem o dinheiro em mãos)
   const recebido = s.valor_recebido_cliente || 0
-  const base = recebido - reembInst - reembEmp
-  const totalEmp = base / 2 + reembEmp
-  const totalInst = base / 2 + reembInst
   const recebInst = s.recebimento_cliente === 'instalador' ? recebido : 0
   const recebEmp = s.recebimento_cliente === 'empresa' ? recebido : 0
-  return { reembInst, reembEmp, recebido, recebInst, recebEmp, base, totalEmp, totalInst }
+  return { reembInst, reembEmp, recebido, recebInst, recebEmp, totalEmp, totalInst }
 }
 
 const fmt = (v: number) => `R$ ${v.toFixed(2)}`

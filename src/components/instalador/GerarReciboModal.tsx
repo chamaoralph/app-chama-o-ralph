@@ -44,10 +44,8 @@ export function GerarReciboModal({
   const totalReembolso = servicos.reduce((sum, s) => sum + (s.valor_reembolso_despesas || 0) + (s.custo_suporte || 0), 0)
   const totalInst = servicos.reduce((sum, s) => {
     const reembInst = s.valor_reembolso_despesas || 0
-    const reembEmp = s.custo_suporte || 0
-    const recebido = s.valor_recebido_cliente || 0
-    const base = recebido - reembInst - reembEmp
-    return sum + (base / 2 + reembInst)
+    const maoObra = s.valor_mao_obra_instalador || 0
+    return sum + (maoObra + reembInst)
   }, 0)
   const totalRecebidoPeloInstalador = servicos.reduce(
     (sum, s) => sum + (s.recebimento_cliente === 'instalador' ? (s.valor_recebido_cliente || 0) : 0),
