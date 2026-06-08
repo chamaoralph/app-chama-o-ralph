@@ -34,11 +34,6 @@ interface Servico {
   clientes: {
     nome: string
   }
-  instaladores?: {
-    usuarios?: {
-      nome: string
-    }
-  }
 }
 
 interface Instalador {
@@ -92,8 +87,7 @@ export default function ListaServicos() {
         .from('servicos')
         .select(`
           *,
-          clientes!servicos_cliente_id_fkey(nome),
-          instaladores!servicos_instalador_id_fkey(usuarios!instaladores_id_fkey(nome))
+          clientes!servicos_cliente_id_fkey(nome)
         `)
         .order('created_at', { ascending: false })
 
@@ -114,7 +108,6 @@ export default function ListaServicos() {
         .from('usuarios')
         .select('id, nome, ativo')
         .eq('tipo', 'instalador')
-        .eq('ativo', true)
         .order('nome')
 
       if (error) throw error
@@ -362,7 +355,7 @@ export default function ListaServicos() {
         comparison = (a.tipo_servico?.join(', ') || '').localeCompare(b.tipo_servico?.join(', ') || '')
         break
       case 'instalador':
-        comparison = ((a.instaladores as any)?.usuarios?.nome || '').localeCompare((b.instaladores as any)?.usuarios?.nome || '')
+        comparison = (instaladores.find(i => i.id === a.instalador_id)?.nome || '').localeCompare(instaladores.find(i => i.id === b.instalador_id)?.nome || '')
         break
       case 'status':
         comparison = a.status.localeCompare(b.status)
@@ -419,7 +412,7 @@ export default function ListaServicos() {
                 <SelectContent>
                   <SelectItem value="todos">Todos</SelectItem>
                   <SelectItem value="sem_instalador">Sem instalador</SelectItem>
-                  {instaladores.map((inst) => (
+                  {instaladores.filter(i => i.ativo).map((inst) => (
                     <SelectItem key={inst.id} value={inst.id}>{inst.nome}</SelectItem>
                   ))}
                 </SelectContent>
@@ -509,8 +502,8 @@ export default function ListaServicos() {
           </div>
         ) : (
           /* Desktop: Tabela */
-          <div className="bg-card rounded-lg shadow-md overflow-hidden">
-            <div className="overflow-x-auto">
+          <div className="bg-card rounded-lg shadow-md overflow-x-auto">
+            <div>
               <table className="min-w-full divide-y divide-border">
                 <thead className="bg-muted/50">
                   <tr>
@@ -616,7 +609,7 @@ export default function ListaServicos() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-foreground">
-                            {(servico.instaladores as any)?.usuarios?.nome || '-'}
+                            {instaladores.find(i => i.id === servico.instalador_id)?.nome || '-'}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -709,7 +702,7 @@ export default function ListaServicos() {
                 <SelectValue placeholder="Escolha um instalador..." />
               </SelectTrigger>
               <SelectContent>
-                {instaladores.map(instalador => (
+                {instaladores.filter(i => i.ativo).map(instalador => (
                   <SelectItem key={instalador.id} value={instalador.id}>
                     {instalador.nome}
                   </SelectItem>
