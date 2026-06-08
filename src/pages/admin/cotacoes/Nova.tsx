@@ -7,7 +7,7 @@ import { ImportacaoCotacoes } from '@/components/admin/ImportacaoCotacoes'
 import { useToast } from '@/hooks/use-toast'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Search, X, Loader2 } from 'lucide-react'
+import { Search, X, Loader2, Plus, Trash2 } from 'lucide-react'
 import { normalizarTelefone } from '@/lib/utils'
 import { SelectorPrecoTV, type TVItem, type TotaisTV, novoItemTV } from '@/components/admin/SelectorPrecoTV'
 import { ehInstalacaoTV } from '@/lib/precosTV'
@@ -15,6 +15,12 @@ import { ehInstalacaoTV } from '@/lib/precosTV'
 interface TipoServico {
   id: string
   nome: string
+}
+
+interface ItemExtra {
+  id: string
+  descricao: string
+  valor: string
 }
 
 export default function NovaCotacao() {
@@ -30,6 +36,9 @@ export default function NovaCotacao() {
   const [empresaId, setEmpresaId] = useState<string | null>(null)
   const [tvItens, setTvItens] = useState<TVItem[]>([novoItemTV()])
   const [tvIndisponivel, setTvIndisponivel] = useState(false)
+  const [itensExtras, setItensExtras] = useState<ItemExtra[]>([])
+  const totalItensExtras = itensExtras.reduce((s, i) => s + (parseFloat(i.valor) || 0), 0)
+  const valorTotalComExtras = (parseFloat(formData.valor_mao_obra) || 0) + totalItensExtras
   
   const [formData, setFormData] = useState({
     cliente_nome: '',
@@ -254,7 +263,8 @@ export default function NovaCotacao() {
           horario_fim: formData.horario_inicio ? calcularHorarioFim(formData.horario_inicio, formData.duracao) : null,
           tipo_servico: [tipoServicoFinal],
           descricao_servico: formData.descricao || tipoServicoFinal,
-          valor_estimado: formData.valor_mao_obra ? parseFloat(formData.valor_mao_obra) : null,
+          valor_estimado: valorTotalComExtras > 0 ? valorTotalComExtras : null,
+          itens_extras: itensExtras.filter(i => i.descricao.trim() && parseFloat(i.valor) > 0).map(i => ({ descricao: i.descricao.trim(), valor: parseFloat(i.valor) })) as any,
           valor_material: formData.origem_suporte === 'empresa' ? 0 : (formData.valor_material ? parseFloat(formData.valor_material) : 0),
           origem_lead: formData.origem_lead,
           ocasiao: formData.ocasiao,
@@ -404,6 +414,9 @@ export default function NovaCotacao() {
               <div>
                 <label className="block text-sm font-medium mb-2">Valor Mão de Obra</label>
                 <input type="number" step="0.01" value={formData.valor_mao_obra} onChange={(e) => setFormData({...formData, valor_mao_obra: e.target.value})} className="w-full px-3 py-2 border rounded-md" placeholder="R$ 0,00" />
+                {isInstalacaoTV && formData.valor_mao_obra && (
+                  <p className="text-xs text-muted-foreground mt-1">💡 Calculado pela calculadora. Edite se necessário.</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2">Valor do Material</label>
@@ -490,6 +503,59 @@ export default function NovaCotacao() {
                   onTotaisChange={handleTotaisCalculados}
                 />
               )}
+
+              {/* Itens extras */}
+              <div className="col-span-2 border rounded-md p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Itens Extras</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setItensExtras(prev => [...prev, { id: `${Date.now()}`, descricao: '', valor: '' }])}
+                  >
+                    <Plus className="w-4 h-4 mr-1" /> Adicionar Item
+                  </Button>
+                </div>
+                {itensExtras.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Ex: suporte extra, material adicional, bronca...</p>
+                )}
+                {itensExtras.map((item) => (
+                  <div key={item.id} className="flex gap-2 items-center">
+                    <input
+                      type="text"
+                      placeholder="Descrição do item"
+                      value={item.descricao}
+                      onChange={(e) => setItensExtras(prev => prev.map(i => i.id === item.id ? { ...i, descricao: e.target.value } : i))}
+                      className="flex-1 px-3 py-2 border rounded-md text-sm"
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="0,00"
+                      value={item.valor}
+                      onChange={(e) => setItensExtras(prev => prev.map(i => i.id === item.id ? { ...i, valor: e.target.value } : i))}
+                      className="w-28 px-3 py-2 border rounded-md text-sm"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setItensExtras(prev => prev.filter(i => i.id !== item.id))}
+                    >
+                      <Trash2 className="w-4 h-4 text-muted-foreground" />
+                    </Button>
+                  </div>
+                ))}
+                {itensExtras.length > 0 && (
+                  <div className="text-sm text-right text-muted-foreground border-t pt-2">
+                    Mão de obra: R$ {(parseFloat(formData.valor_mao_obra) || 0).toFixed(2)}
+                    {totalItensExtras > 0 && <> + Itens extras: R$ {totalItensExtras.toFixed(2)}</>}
+                    <span className="font-semibold text-foreground ml-2">= R$ {valorTotalComExtras.toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+
               <div className="col-span-2">
                 <label className="block text-sm font-medium mb-2">Descrição do Serviço</label>
                 <textarea 

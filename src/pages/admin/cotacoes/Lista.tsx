@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ImportacaoCotacoes } from '@/components/admin/ImportacaoCotacoes'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Trash2, XCircle, Pencil, Users, Undo2, List, Calendar, CalendarDays, Ban } from 'lucide-react'
+import { Trash2, XCircle, Pencil, Users, Undo2, List, Calendar, CalendarDays, Ban, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -201,6 +201,8 @@ export default function ListaCotacoes() {
   const [empresaIdAtual, setEmpresaIdAtual] = useState<string | null>(null)
   const [tvItensEdit, setTvItensEdit] = useState<TVItem[]>([novoItemTV()])
   const [tvIndisponivelEdit, setTvIndisponivelEdit] = useState(false)
+  const [itensExtrasEdit, setItensExtrasEdit] = useState<{ id: string; descricao: string; valor: string }[]>([])
+  const totalItensExtrasEdit = itensExtrasEdit.reduce((s, i) => s + (parseFloat(i.valor) || 0), 0)
 
   useEffect(() => {
     fetchCotacoes()
@@ -367,6 +369,12 @@ export default function ListaCotacoes() {
       setTvItensEdit([novoItemTV()])
     }
     setTvIndisponivelEdit(false)
+    const itensExistentes = (cotacao as any).itens_extras
+    setItensExtrasEdit(
+      Array.isArray(itensExistentes)
+        ? itensExistentes.map((i: any, idx: number) => ({ id: `${idx}`, descricao: String(i.descricao || ''), valor: String(i.valor || '') }))
+        : []
+    )
     setCotacaoParaEditar(cotacao)
   }
 
@@ -419,7 +427,8 @@ export default function ListaCotacoes() {
           horario_inicio: editForm.horario_inicio || null,
           horario_fim: horarioFim,
           created_at: editForm.data_criacao ? new Date(editForm.data_criacao).toISOString() : undefined,
-          valor_estimado: editForm.valor_estimado ? parseFloat(editForm.valor_estimado) : null,
+          valor_estimado: (() => { const base = parseFloat(editForm.valor_estimado) || 0; const total = base + totalItensExtrasEdit; return total > 0 ? total : null })(),
+          itens_extras: itensExtrasEdit.filter(i => i.descricao.trim() && parseFloat(i.valor) > 0).map(i => ({ descricao: i.descricao.trim(), valor: parseFloat(i.valor) })) as any,
           valor_material: editForm.origem_suporte === 'empresa' ? 0 : (editForm.valor_material ? parseFloat(editForm.valor_material) : null),
           origem_lead: editForm.origem_lead || null,
           ocasiao: editForm.ocasiao || null,
@@ -1359,13 +1368,16 @@ export default function ListaCotacoes() {
                 </div>
                 <div className="space-y-2">
                   <Label>Valor Mão de Obra (R$)</Label>
-                  <Input 
+                  <Input
                     type="number"
                     step="0.01"
                     value={editForm.valor_estimado}
                     onChange={(e) => setEditForm({...editForm, valor_estimado: e.target.value})}
                     placeholder="0,00"
                   />
+                  {ehInstalacaoTV(editForm.tipo_servico) && editForm.valor_estimado && (
+                    <p className="text-xs text-muted-foreground">💡 Calculado pela calculadora. Edite se necessário.</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Valor do Material (R$)</Label>
@@ -1447,6 +1459,58 @@ export default function ListaCotacoes() {
                     onTotaisChange={handleTotaisCalculadosEdit}
                   />
                 )}
+
+                {/* Itens extras */}
+                <div className="col-span-2 border rounded-md p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Itens Extras</span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setItensExtrasEdit(prev => [...prev, { id: `${Date.now()}`, descricao: '', valor: '' }])}
+                    >
+                      <Plus className="w-4 h-4 mr-1" /> Adicionar Item
+                    </Button>
+                  </div>
+                  {itensExtrasEdit.length === 0 && (
+                    <p className="text-xs text-muted-foreground">Ex: suporte extra, material adicional, bronca...</p>
+                  )}
+                  {itensExtrasEdit.map((item) => (
+                    <div key={item.id} className="flex gap-2 items-center">
+                      <Input
+                        placeholder="Descrição do item"
+                        value={item.descricao}
+                        onChange={(e) => setItensExtrasEdit(prev => prev.map(i => i.id === item.id ? { ...i, descricao: e.target.value } : i))}
+                        className="flex-1"
+                      />
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0,00"
+                        value={item.valor}
+                        onChange={(e) => setItensExtrasEdit(prev => prev.map(i => i.id === item.id ? { ...i, valor: e.target.value } : i))}
+                        className="w-28"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setItensExtrasEdit(prev => prev.filter(i => i.id !== item.id))}
+                      >
+                        <Trash2 className="w-4 h-4 text-muted-foreground" />
+                      </Button>
+                    </div>
+                  ))}
+                  {itensExtrasEdit.length > 0 && (
+                    <div className="text-sm text-right text-muted-foreground border-t pt-2">
+                      Mão de obra: R$ {(parseFloat(editForm.valor_estimado) || 0).toFixed(2)}
+                      {totalItensExtrasEdit > 0 && <> + Itens extras: R$ {totalItensExtrasEdit.toFixed(2)}</>}
+                      <span className="font-semibold text-foreground ml-2">= R$ {((parseFloat(editForm.valor_estimado) || 0) + totalItensExtrasEdit).toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+
                 <div className="col-span-2 space-y-2">
                   <Label>Descrição do Serviço (Detalhes)</Label>
                   <Textarea 
