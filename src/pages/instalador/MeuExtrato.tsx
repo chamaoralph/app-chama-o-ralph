@@ -322,27 +322,41 @@ export default function MeuExtrato() {
             </div>
 
             {tipoPeriodo === 'personalizado' && (
-              <div className="flex items-end gap-2 flex-1 min-w-[300px]">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium mb-2">De</label>
-                  <Input
-                    type="date"
-                    value={dataPersonalizadaDe}
-                    max={dataPersonalizadaAte}
-                    onChange={(e) => setDataPersonalizadaDe(e.target.value)}
-                  />
+              <div className="flex-1 min-w-[300px]">
+                <div className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium mb-2">De</label>
+                    <Input
+                      type="date"
+                      value={dataPersonalizadaDe}
+                      max={format(new Date(), 'yyyy-MM-dd')}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setDataPersonalizadaDe(val)
+                        if (val > dataPersonalizadaAte) setDataPersonalizadaAte(val)
+                      }}
+                    />
+                  </div>
+                  <span className="pb-2 text-muted-foreground">→</span>
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium mb-2">Até</label>
+                    <Input
+                      type="date"
+                      value={dataPersonalizadaAte}
+                      max={format(new Date(), 'yyyy-MM-dd')}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setDataPersonalizadaAte(val)
+                        if (val < dataPersonalizadaDe) setDataPersonalizadaDe(val)
+                      }}
+                    />
+                  </div>
                 </div>
-                <span className="pb-2 text-muted-foreground">→</span>
-                <div className="flex-1">
-                  <label className="block text-sm font-medium mb-2">Até</label>
-                  <Input
-                    type="date"
-                    value={dataPersonalizadaAte}
-                    min={dataPersonalizadaDe}
-                    max={format(new Date(), 'yyyy-MM-dd')}
-                    onChange={(e) => setDataPersonalizadaAte(e.target.value)}
-                  />
-                </div>
+                {dataPersonalizadaDe && dataPersonalizadaAte && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {Math.round((new Date(dataPersonalizadaAte).getTime() - new Date(dataPersonalizadaDe).getTime()) / 86400000) + 1} dia(s) selecionado(s)
+                  </p>
+                )}
               </div>
             )}
 
