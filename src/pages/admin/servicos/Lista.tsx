@@ -275,6 +275,10 @@ export default function ListaServicos() {
     }
   }
 
+  function primeirosDoisNomes(nome: string): string {
+    return nome.trim().split(/\s+/).slice(0, 2).join(' ')
+  }
+
   function getStatusLabel(status: string): string {
     const labels: Record<string, string> = {
       aguardando_distribuicao: 'Aguardando Distribuição',
@@ -503,8 +507,7 @@ export default function ListaServicos() {
         ) : (
           /* Desktop: Tabela */
           <div className="bg-card rounded-lg shadow-md overflow-x-auto">
-            <div>
-              <table className="min-w-full divide-y divide-border">
+              <table className="min-w-[960px] w-full divide-y divide-border">
                 <thead className="bg-muted/50">
                   <tr>
                     <th className="px-4 py-3 text-left">
@@ -600,7 +603,7 @@ export default function ListaServicos() {
                           <div className="text-sm font-medium text-foreground">{servico.codigo}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-foreground">{servico.clientes.nome}</div>
+                          <div className="text-sm text-foreground">{primeirosDoisNomes(servico.clientes.nome)}</div>
                         </td>
                         <td className="px-6 py-4">
                           <div className="text-sm text-foreground">
@@ -609,7 +612,7 @@ export default function ListaServicos() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-foreground">
-                            {instaladores.find(i => i.id === servico.instalador_id)?.nome || '-'}
+                            {(() => { const n = instaladores.find(i => i.id === servico.instalador_id)?.nome; return n ? primeirosDoisNomes(n) : '-' })()}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -671,7 +674,6 @@ export default function ListaServicos() {
                   )}
                 </tbody>
               </table>
-            </div>
           </div>
         )}
 
