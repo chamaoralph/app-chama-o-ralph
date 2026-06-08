@@ -1535,9 +1535,12 @@ export default function ListaCotacoes() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Origem do Suporte</Label>
-                      <Select 
-                        value={editForm.origem_suporte} 
-                        onValueChange={(v) => setEditForm({...editForm, origem_suporte: v, valor_material: v === 'empresa' ? '' : editForm.valor_material})}
+                      <Select
+                        value={editForm.origem_suporte}
+                        onValueChange={(v) => {
+                          setEditForm({...editForm, origem_suporte: v, valor_material: v === 'empresa' ? '' : editForm.valor_material})
+                          setTvItensEdit(prev => prev.map(it => ({ ...it, origem_suporte: v as TVItem['origem_suporte'] })))
+                        }}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Não aplicável" />
@@ -1557,7 +1560,10 @@ export default function ListaCotacoes() {
                           type="number"
                           step="0.01"
                           value={editForm.custo_suporte}
-                          onChange={(e) => setEditForm({...editForm, custo_suporte: e.target.value})}
+                          onChange={(e) => {
+                            setEditForm({...editForm, custo_suporte: e.target.value})
+                            setTvItensEdit(prev => prev.map(it => ({ ...it, custo_suporte: parseFloat(e.target.value) || 0 })))
+                          }}
                           placeholder="0,00"
                         />
                       </div>

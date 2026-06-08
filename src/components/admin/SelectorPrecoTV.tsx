@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, Plus, Trash2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -92,9 +92,19 @@ export function SelectorPrecoTV({ empresaId, items, onItemsChange, onTotaisChang
   // Estado local do texto digitado para mão de obra (por índice)
   const [maoObraRaw, setMaoObraRaw] = useState<Record<number, string>>({});
 
+  // Controla se já passou pelo mount inicial — evita sobrescrever valores
+  // editados pelo usuário quando o componente monta com items já carregados.
+  const didMountRef = useRef(false);
+
   // Buscar preços quando items mudam (tamanho/parede/cobertura)
   useEffect(() => {
     if (!empresaId) return;
+    // Na primeira montagem com items já carregados, preservar os valores salvos.
+    // Novas buscas só ocorrem quando o usuário muda tamanho/parede/cobertura.
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
     let cancelled = false;
     (async () => {
       const precos = await Promise.all(
@@ -161,9 +171,9 @@ export function SelectorPrecoTV({ empresaId, items, onItemsChange, onTotaisChang
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [empresaId, items.map((i) => `${i.tamanho}|${i.parede}|${i.cobertura}`).join(",")]);
 
-  // Limpar edições manuais de mão de obra quando as seleções mudam (tabela vai sobrescrever)
+  // Limpar edições manuais de mão de obra quando o usuário muda seleções (tabela vai sobrescrever)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { setMaoObraRaw({}); }, [items.map((i) => `${i.tamanho}|${i.parede}|${i.cobertura}`).join(",")]);
+  useEffect(() => { if (didMountRef.current) setMaoObraRaw({}); }, [items.map((i) => `${i.tamanho}|${i.parede}|${i.cobertura}`).join(",")]);
 
   // Calcular e notificar totais
   const totais = useMemo<TotaisTV>(() => {
