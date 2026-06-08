@@ -322,8 +322,8 @@ export default function MeuExtrato() {
             </div>
 
             {tipoPeriodo === 'personalizado' && (
-              <>
-                <div className="flex-1 min-w-[140px]">
+              <div className="flex items-end gap-2 flex-1 min-w-[300px]">
+                <div className="flex-1">
                   <label className="block text-sm font-medium mb-2">De</label>
                   <Input
                     type="date"
@@ -332,7 +332,8 @@ export default function MeuExtrato() {
                     onChange={(e) => setDataPersonalizadaDe(e.target.value)}
                   />
                 </div>
-                <div className="flex-1 min-w-[140px]">
+                <span className="pb-2 text-muted-foreground">→</span>
+                <div className="flex-1">
                   <label className="block text-sm font-medium mb-2">Até</label>
                   <Input
                     type="date"
@@ -342,7 +343,7 @@ export default function MeuExtrato() {
                     onChange={(e) => setDataPersonalizadaAte(e.target.value)}
                   />
                 </div>
-              </>
+              </div>
             )}
 
             <Button 
