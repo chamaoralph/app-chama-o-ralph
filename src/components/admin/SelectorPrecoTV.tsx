@@ -99,12 +99,6 @@ export function SelectorPrecoTV({ empresaId, items, onItemsChange, onTotaisChang
   // Buscar preços quando items mudam (tamanho/parede/cobertura)
   useEffect(() => {
     if (!empresaId) return;
-    // Na primeira montagem com items já carregados, preservar os valores salvos.
-    // Novas buscas só ocorrem quando o usuário muda tamanho/parede/cobertura.
-    if (!didMountRef.current) {
-      didMountRef.current = true;
-      return;
-    }
     let cancelled = false;
     (async () => {
       const precos = await Promise.all(
@@ -116,16 +110,30 @@ export function SelectorPrecoTV({ empresaId, items, onItemsChange, onTotaisChang
       if (cancelled) return;
       setPrecosPorItem(precos);
 
-      const nds: boolean[] = [];
+      const nds: boolean[] = items.map((it, idx) => {
+        const p = precos[idx];
+        const configCompleta = !!(it.tamanho && it.parede && it.cobertura);
+        if (!configCompleta) return false;
+        return !p || !p.disponivel || p.valor_mao_obra == null;
+      });
+      setNdPorItem(nds);
+
+      // Na primeira montagem com items já carregados, preservar os valores salvos
+      // (não sobrescrever valor_mao_obra/custo_suporte/origem_suporte vindos do banco).
+      // Novas buscas já populam precosPorItem/ndPorItem acima, então o bloco de
+      // exibição (incluindo o input de mão de obra) continua aparecendo.
+      if (!didMountRef.current) {
+        didMountRef.current = true;
+        return;
+      }
+
       const novosItems = items.map((it, idx) => {
         const p = precos[idx];
         const configCompleta = !!(it.tamanho && it.parede && it.cobertura);
         if (!configCompleta) {
-          nds.push(false);
           return { ...it, valor_mao_obra: 0, valor_material: 0, origem_suporte: "" as const, custo_suporte: 0 };
         }
-        const isND = !p || !p.disponivel || p.valor_mao_obra == null;
-        nds.push(isND);
+        const isND = nds[idx];
         if (isND) {
           return { ...it, valor_mao_obra: 0, valor_material: 0, origem_suporte: "" as const, custo_suporte: 0 };
         }
@@ -151,7 +159,6 @@ export function SelectorPrecoTV({ empresaId, items, onItemsChange, onTotaisChang
           valor_suporte: Number(p!.valor_suporte ?? 0),
         };
       });
-      setNdPorItem(nds);
 
       // Só atualizar se algo mudou nos snapshots
       const mudou = novosItems.some((ni, i) => {
