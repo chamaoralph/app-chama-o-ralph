@@ -190,17 +190,20 @@ export default function FinalizarServico() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
+      const reembInstFinal = temReembolso ? parseFloat(valorReembolso || '0') : (servico.valor_reembolso_despesas || 0)
+      const valorEmpresaRecebeu = (servico.valor_mao_obra_instalador || 0) * 2 + (servico.custo_suporte || 0) + reembInstFinal
+
       const { error: updateError } = await supabase
         .from("servicos")
         .update({
           status: "aguardando_aprovacao",
           fotos_conclusao: fotosPaths,
           nota_fiscal_url: notaFiscalPath,
-          valor_reembolso_despesas: temReembolso ? parseFloat(valorReembolso) : servico.valor_reembolso_despesas,
+          valor_reembolso_despesas: reembInstFinal,
           observacoes_instalador: observacoes,
           data_conclusao: new Date().toISOString(),
           recebimento_cliente: recebimentoCliente,
-          valor_recebido_cliente: recebimentoCliente === 'instalador' ? parseFloat(valorRecebidoCliente || '0') : 0,
+          valor_recebido_cliente: recebimentoCliente === 'instalador' ? parseFloat(valorRecebidoCliente || '0') : valorEmpresaRecebeu,
         })
         .eq("id", servicoId)
         .eq("instalador_id", user.id)

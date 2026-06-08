@@ -206,6 +206,13 @@ export function ReciboPreview({ instaladorNome, dataReferencia, servicos }: Reci
           </div>
         </div>
 
+        {totals.recebEmp > 0 && (
+          <div style={{ ...s.summaryRow, color: '#2563eb' }}>
+            <span>Já recebido pela empresa do cliente:</span>
+            <span style={{ fontWeight: '600' }}>{fmt(totals.recebEmp)}</span>
+          </div>
+        )}
+
         {totalRecebidoPeloInstalador > 0 && (
           <div style={{ ...s.summaryRow, color: '#ea580c' }}>
             <span>Já recebido em mãos pelo instalador:</span>

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { ReciboPreview } from './ReciboPreview'
@@ -39,6 +39,26 @@ export function GerarReciboModal({
 }: GerarReciboModalProps) {
   const [gerando, setGerando] = useState(false)
   const hiddenContainerRef = useRef<HTMLDivElement>(null)
+
+  const previewWrapperRef = useRef<HTMLDivElement>(null)
+  const previewInnerRef = useRef<HTMLDivElement>(null)
+  const [previewScale, setPreviewScale] = useState(1)
+  const [previewHeight, setPreviewHeight] = useState<number | undefined>()
+
+  useEffect(() => {
+    function update() {
+      const wrapper = previewWrapperRef.current
+      const inner = previewInnerRef.current
+      if (!wrapper || !inner) return
+      const scale = Math.min(1, wrapper.offsetWidth / 800)
+      setPreviewScale(scale)
+      setPreviewHeight(inner.scrollHeight * scale)
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    if (previewWrapperRef.current) ro.observe(previewWrapperRef.current)
+    return () => ro.disconnect()
+  }, [servicos])
 
   const totalMaoObra = servicos.reduce((sum, s) => sum + (s.valor_mao_obra_instalador || 0), 0)
   const totalReembolso = servicos.reduce((sum, s) => sum + (s.valor_reembolso_despesas || 0) + (s.custo_suporte || 0), 0)
@@ -269,13 +289,22 @@ export function GerarReciboModal({
           </div>
         </div>
 
-        {/* Preview visível do Recibo */}
-        <div className="border rounded-lg overflow-x-auto bg-white">
-          <ReciboPreview
-            instaladorNome={instaladorNome}
-            dataReferencia={dataReferencia}
-            servicos={servicos}
-          />
+        {/* Preview visível do Recibo — escala para caber na tela, mantendo 800px para captura */}
+        <div
+          ref={previewWrapperRef}
+          className="border rounded-lg bg-white overflow-hidden"
+          style={{ height: previewHeight }}
+        >
+          <div
+            ref={previewInnerRef}
+            style={{ width: '800px', transformOrigin: 'top left', transform: `scale(${previewScale})` }}
+          >
+            <ReciboPreview
+              instaladorNome={instaladorNome}
+              dataReferencia={dataReferencia}
+              servicos={servicos}
+            />
+          </div>
         </div>
 
         {/* Container oculto para captura - posição fixa fora da tela */}
