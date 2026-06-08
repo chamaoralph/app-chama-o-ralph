@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ImportacaoCotacoes } from '@/components/admin/ImportacaoCotacoes'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Trash2, XCircle, Pencil, Users, Undo2, List, Calendar, CalendarDays, Ban, Plus } from 'lucide-react'
+import { Trash2, XCircle, Pencil, Users, Undo2, RotateCcw, List, Calendar, CalendarDays, Ban, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -662,6 +662,31 @@ export default function ListaCotacoes() {
     }
   }
 
+  async function reativarCotacao(cotacaoId: string) {
+    try {
+      const { error } = await supabase
+        .from('cotacoes')
+        .update({ status: 'pendente' })
+        .eq('id', cotacaoId)
+
+      if (error) throw error
+
+      toast({
+        title: "✅ Cotação reativada",
+        description: "A cotação voltou para pendente e poderá ser avaliada novamente."
+      })
+
+      fetchCotacoes()
+    } catch (err) {
+      console.error('Erro ao reativar cotação:', err)
+      toast({
+        title: "❌ Erro",
+        description: "Não foi possível reativar a cotação.",
+        variant: "destructive"
+      })
+    }
+  }
+
   async function bloquearTelefone(cotacao: Cotacao) {
     const telefone = cotacao.clientes.telefone
     const nome = cotacao.clientes.nome
@@ -744,6 +769,7 @@ export default function ListaCotacoes() {
       pendente: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Pendente' },
       termo_pendente: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Aguardando Termo' },
       aprovada: { bg: 'bg-green-100', text: 'text-green-800', label: 'Aprovada' },
+      reprovada: { bg: 'bg-red-100', text: 'text-red-800', label: 'Reprovada' },
       perdida: { bg: 'bg-red-100', text: 'text-red-800', label: 'Perdida' },
       sem_resposta: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Sem Resposta' },
       nao_gerou: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Não Gerou' },
@@ -1194,6 +1220,21 @@ export default function ListaCotacoes() {
                                 >
                                   <Undo2 className="w-4 h-4 mr-1" />
                                   Reprovar
+                                </Button>
+                              )}
+                              {cotacao.status === 'reprovada' && (
+                                <Button
+                                  onClick={() => {
+                                    if (confirm('Reativar esta cotação? Ela voltará para pendente e poderá ser avaliada novamente.')) {
+                                      reativarCotacao(cotacao.id)
+                                    }
+                                  }}
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                >
+                                  <RotateCcw className="w-4 h-4 mr-1" />
+                                  Reativar
                                 </Button>
                               )}
                               <Button
