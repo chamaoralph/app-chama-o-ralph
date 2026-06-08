@@ -48,6 +48,7 @@ interface Cotacao {
     tipo_alerta: string | null
     observacao_alerta: string | null
   }
+  instalador_nome?: string | null
 }
 
 interface EditForm {
@@ -237,12 +238,41 @@ export default function ListaCotacoes() {
       setLoading(true)
       const { data, error } = await supabase
         .from('cotacoes')
-        .select('*, clientes(*), servicos!servicos_cotacao_id_fkey(instalador_id, usuarios!fk_servicos_instalador(nome))')
+        .select('*, clientes(*)')
         .order('created_at', { ascending: false })
 
       if (error) throw error
+
+      const cotacoesRaw = data || []
+
+      // Buscar instalador_id dos serviços vinculados às cotações
+      let instaladorNomePorCotacao: Record<string, string> = {}
+      if (cotacoesRaw.length > 0) {
+        const cotacaoIds = cotacoesRaw.map(c => c.id)
+        const { data: servData } = await supabase
+          .from('servicos')
+          .select('cotacao_id, instalador_id')
+          .in('cotacao_id', cotacaoIds)
+          .not('instalador_id', 'is', null)
+
+        if (servData && servData.length > 0) {
+          const instaladorIds = [...new Set(servData.map(s => s.instalador_id as string))]
+          const { data: usersData } = await supabase
+            .from('usuarios')
+            .select('id, nome')
+            .in('id', instaladorIds)
+
+          const nomeMap: Record<string, string> = {}
+          usersData?.forEach(u => { nomeMap[u.id] = u.nome })
+          servData.forEach(s => {
+            if (s.cotacao_id && s.instalador_id && nomeMap[s.instalador_id]) {
+              instaladorNomePorCotacao[s.cotacao_id] = nomeMap[s.instalador_id]
+            }
+          })
+        }
+      }
       
-      setCotacoes(data || [])
+      setCotacoes(cotacoesRaw.map(c => ({ ...c, instalador_nome: instaladorNomePorCotacao[c.id] ?? null })) as any)
 
       // Buscar clientes que já assinaram pelo menos 1 termo
       const { data: termos } = await supabase

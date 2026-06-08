@@ -22,7 +22,7 @@ interface Cotacao {
   origem_lead: string | null
   descricao_servico: string | null
   observacoes: string | null
-  servicos?: { instalador_id: string | null; usuarios?: { nome: string } | null }[]
+  instalador_nome?: string | null
   clientes: {
     id: string
     nome: string
@@ -322,9 +322,9 @@ export function CalendarioCotacoesMensal({ cotacoes, onAprovar, onEditar, onExcl
                             <div className="text-sm mt-1">
                               {[cotacao.tipo_servico?.join(', '), cotacao.clientes.bairro].filter(Boolean).join(' - ')}
                             </div>
-                            {cotacao.servicos?.[0]?.usuarios?.nome && (
+                            {cotacao.instalador_nome && (
                               <div className="text-xs mt-0.5 opacity-70">
-                                {cotacao.servicos[0].usuarios.nome.trim().split(/\s+/).slice(0, 2).join(' ')}
+                                {cotacao.instalador_nome.trim().split(/\s+/).slice(0, 2).join(' ')}
                               </div>
                             )}
                             {cotacao.horario_inicio && (
