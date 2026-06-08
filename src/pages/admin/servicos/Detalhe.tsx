@@ -32,11 +32,9 @@ interface Servico {
     telefone: string
     bairro: string | null
   }
-  instaladores?: {
-    usuarios?: {
-      nome: string
-      telefone: string | null
-    }
+  instalador?: {
+    nome: string
+    telefone: string | null
   }
 }
 
@@ -58,14 +56,26 @@ export default function DetalheServico() {
         .from('servicos')
         .select(`
           *,
-          clientes!servicos_cliente_id_fkey(nome, telefone, bairro),
-          instaladores!servicos_instalador_id_fkey(usuarios!instaladores_id_fkey(nome, telefone))
+          clientes!servicos_cliente_id_fkey(nome, telefone, bairro)
         `)
         .eq('id', id)
         .single()
 
       if (error) throw error
-      setServico(data as any)
+
+      // Buscar dados do instalador separadamente (evita depender da tabela "instaladores",
+      // que nem sempre tem registro correspondente para instaladores mais antigos)
+      let instalador: { nome: string; telefone: string | null } | undefined
+      if (data?.instalador_id) {
+        const { data: usuarioData } = await supabase
+          .from('usuarios')
+          .select('nome, telefone')
+          .eq('id', data.instalador_id)
+          .maybeSingle()
+        if (usuarioData) instalador = usuarioData
+      }
+
+      setServico({ ...(data as any), instalador })
     } catch (err) {
       console.error('Erro ao buscar serviço:', err)
       toast({ title: "Erro ao carregar serviço", variant: "destructive" })
@@ -233,13 +243,13 @@ export default function DetalheServico() {
               <CardTitle>Instalador</CardTitle>
             </CardHeader>
             <CardContent>
-              {(servico.instaladores as any)?.usuarios ? (
+              {servico.instalador ? (
                 <div className="space-y-2">
-                  <p className="font-medium">{(servico.instaladores as any).usuarios.nome}</p>
-                  {(servico.instaladores as any).usuarios.telefone && (
+                  <p className="font-medium">{servico.instalador.nome}</p>
+                  {servico.instalador.telefone && (
                     <p className="text-gray-600 flex items-center gap-2">
                       <Phone className="w-4 h-4" />
-                      {(servico.instaladores as any).usuarios.telefone}
+                      {servico.instalador.telefone}
                     </p>
                   )}
                 </div>

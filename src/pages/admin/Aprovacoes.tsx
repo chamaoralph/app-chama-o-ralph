@@ -102,8 +102,7 @@ export default function Aprovacoes() {
         .from('servicos')
         .select(`
           *,
-          clientes!servicos_cliente_id_fkey(nome, telefone),
-          instaladores!servicos_instalador_id_fkey(usuarios!instaladores_id_fkey(nome))
+          clientes!servicos_cliente_id_fkey(nome, telefone)
         `)
 
       // Aplicar filtro
@@ -118,12 +117,28 @@ export default function Aprovacoes() {
 
       if (error) throw error
 
+      // Buscar nomes dos instaladores separadamente (evita depender da tabela "instaladores",
+      // que nem sempre tem registro correspondente para instaladores mais antigos)
+      const instaladorIds = Array.from(new Set((data || []).map(s => s.instalador_id).filter(Boolean)))
+      const nomesInstaladores: Record<string, string> = {}
+      if (instaladorIds.length > 0) {
+        const { data: usuariosData, error: erroUsuarios } = await supabase
+          .from('usuarios')
+          .select('id, nome')
+          .in('id', instaladorIds)
+
+        if (erroUsuarios) throw erroUsuarios
+        for (const u of usuariosData || []) {
+          nomesInstaladores[u.id] = u.nome
+        }
+      }
+
       // Transformar os dados para o formato correto
       const servicosFormatados = data?.map(servico => ({
         ...servico,
         cliente_nome: (servico.clientes as any)?.nome || '',
         cliente_telefone: (servico.clientes as any)?.telefone || '',
-        instalador_nome: (servico.instaladores as any)?.usuarios?.nome || null
+        instalador_nome: (servico.instalador_id && nomesInstaladores[servico.instalador_id]) || null
       })) || []
 
       setServicos(servicosFormatados)
