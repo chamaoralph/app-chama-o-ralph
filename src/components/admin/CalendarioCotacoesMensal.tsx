@@ -319,7 +319,7 @@ export function CalendarioCotacoesMensal({ cotacoes, onAprovar, onEditar, onExcl
                               <span className="text-xs">{getStatusLabel(cotacao.status)}</span>
                             </div>
                             <div className="text-sm mt-1">
-                              {cotacao.tipo_servico?.join(', ')}
+                              {[cotacao.tipo_servico?.join(', '), cotacao.clientes.bairro].filter(Boolean).join(' - ')}
                             </div>
                             {cotacao.horario_inicio && (
                               <div className="text-xs flex items-center gap-1 mt-1 opacity-75">

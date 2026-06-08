@@ -254,7 +254,7 @@ export function CalendarioCotacoesSemanal({ cotacoes, onAprovar, onEditar, onExc
                           </div>
                         )}
                         <div className="text-xs truncate mt-1">
-                          {cotacao.tipo_servico?.join(', ')}
+                          {[cotacao.tipo_servico?.join(', '), cotacao.clientes.bairro].filter(Boolean).join(' - ')}
                         </div>
                       </div>
                     ))
