@@ -237,7 +237,7 @@ export default function ListaCotacoes() {
       setLoading(true)
       const { data, error } = await supabase
         .from('cotacoes')
-        .select('*, clientes(*)')
+        .select('*, clientes(*), servicos!servicos_cotacao_id_fkey(instalador_id, usuarios!fk_servicos_instalador(nome))')
         .order('created_at', { ascending: false })
 
       if (error) throw error
