@@ -89,6 +89,8 @@ export function SelectorPrecoTV({ empresaId, items, onItemsChange, onTotaisChang
   // Precos e status ND por item
   const [precosPorItem, setPrecosPorItem] = useState<(PrecoTV | null)[]>([]);
   const [ndPorItem, setNdPorItem] = useState<boolean[]>([]);
+  // Estado local do texto digitado para mão de obra (por índice)
+  const [maoObraRaw, setMaoObraRaw] = useState<Record<number, string>>({});
 
   // Buscar preços quando items mudam (tamanho/parede/cobertura)
   useEffect(() => {
@@ -158,6 +160,10 @@ export function SelectorPrecoTV({ empresaId, items, onItemsChange, onTotaisChang
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [empresaId, items.map((i) => `${i.tamanho}|${i.parede}|${i.cobertura}`).join(",")]);
+
+  // Limpar edições manuais de mão de obra quando as seleções mudam (tabela vai sobrescrever)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setMaoObraRaw({}); }, [items.map((i) => `${i.tamanho}|${i.parede}|${i.cobertura}`).join(",")]);
 
   // Calcular e notificar totais
   const totais = useMemo<TotaisTV>(() => {
@@ -259,9 +265,31 @@ export function SelectorPrecoTV({ empresaId, items, onItemsChange, onTotaisChang
               </div>
             )}
             {preco && !isND && (
-              <div className="text-xs text-muted-foreground">
-                Mão de obra R$ {Number(item.valor_mao_obra).toFixed(2)} · Material R$ {Number(item.valor_material).toFixed(2)}
-                {item.custo_suporte > 0 && ` · Suporte R$ ${Number(item.custo_suporte).toFixed(2)}`}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <span>Mão de obra R$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={maoObraRaw[idx] ?? item.valor_mao_obra.toFixed(2)}
+                    onChange={(e) => {
+                      setMaoObraRaw((prev) => ({ ...prev, [idx]: e.target.value }));
+                      const val = parseFloat(e.target.value);
+                      if (!isNaN(val)) atualizarItem(idx, { valor_mao_obra: val });
+                    }}
+                    onBlur={() => {
+                      const raw = maoObraRaw[idx];
+                      if (raw !== undefined) {
+                        atualizarItem(idx, { valor_mao_obra: parseFloat(raw) || 0 });
+                        setMaoObraRaw((prev) => { const n = { ...prev }; delete n[idx]; return n; });
+                      }
+                    }}
+                    className="w-20 px-2 py-0.5 border rounded text-xs font-medium text-foreground bg-background"
+                  />
+                </div>
+                <span>· Material R$ {Number(item.valor_material).toFixed(2)}</span>
+                {item.custo_suporte > 0 && <span>· Suporte R$ {Number(item.custo_suporte).toFixed(2)}</span>}
               </div>
             )}
           </div>
