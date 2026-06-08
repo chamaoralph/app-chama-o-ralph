@@ -32,6 +32,8 @@ export default function MeuExtrato() {
   const [loading, setLoading] = useState(true)
   const [filtroStatus, setFiltroStatus] = useState('todos')
   const [tipoPeriodo, setTipoPeriodo] = useState('ultimo_mes')
+  const [dataPersonalizadaDe, setDataPersonalizadaDe] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'))
+  const [dataPersonalizadaAte, setDataPersonalizadaAte] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [modalReciboOpen, setModalReciboOpen] = useState(false)
   const [instaladorNome, setInstaladorNome] = useState('')
   const [dataRecibo, setDataRecibo] = useState<Date>(new Date())
@@ -68,7 +70,7 @@ export default function MeuExtrato() {
     carregarServicos()
     carregarNomeInstalador()
     carregarRecibosGerados()
-  }, [filtroStatus, tipoPeriodo])
+  }, [filtroStatus, tipoPeriodo, dataPersonalizadaDe, dataPersonalizadaAte])
 
   async function carregarRecibosGerados() {
     try {
@@ -135,7 +137,7 @@ export default function MeuExtrato() {
       // Aplicar filtro de período
       const hoje = new Date()
       let dataInicio: Date | null = null
-      
+
       switch(tipoPeriodo) {
         case 'ultima_semana':
           dataInicio = subDays(hoje, 7)
@@ -149,11 +151,18 @@ export default function MeuExtrato() {
         case 'ultimos_6_meses':
           dataInicio = subDays(hoje, 180)
           break
+        case 'personalizado':
+          if (dataPersonalizadaDe && dataPersonalizadaAte) {
+            query = query
+              .gte('data_servico_agendada', new Date(dataPersonalizadaDe + 'T00:00:00').toISOString())
+              .lte('data_servico_agendada', new Date(dataPersonalizadaAte + 'T23:59:59').toISOString())
+          }
+          break
         case 'todos':
           dataInicio = null
           break
       }
-      
+
       if (dataInicio) {
         query = query
           .gte('data_servico_agendada', dataInicio.toISOString())
@@ -307,9 +316,34 @@ export default function MeuExtrato() {
                   <SelectItem value="ultimos_3_meses">Últimos 3 Meses</SelectItem>
                   <SelectItem value="ultimos_6_meses">Últimos 6 Meses</SelectItem>
                   <SelectItem value="todos">Todos os Períodos</SelectItem>
+                  <SelectItem value="personalizado">Período Personalizado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
+            {tipoPeriodo === 'personalizado' && (
+              <>
+                <div className="flex-1 min-w-[140px]">
+                  <label className="block text-sm font-medium mb-2">De</label>
+                  <Input
+                    type="date"
+                    value={dataPersonalizadaDe}
+                    max={dataPersonalizadaAte}
+                    onChange={(e) => setDataPersonalizadaDe(e.target.value)}
+                  />
+                </div>
+                <div className="flex-1 min-w-[140px]">
+                  <label className="block text-sm font-medium mb-2">Até</label>
+                  <Input
+                    type="date"
+                    value={dataPersonalizadaAte}
+                    min={dataPersonalizadaDe}
+                    max={format(new Date(), 'yyyy-MM-dd')}
+                    onChange={(e) => setDataPersonalizadaAte(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
 
             <Button 
               onClick={exportarCSV}
