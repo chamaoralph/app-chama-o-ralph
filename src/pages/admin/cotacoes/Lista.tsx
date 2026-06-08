@@ -1222,7 +1222,7 @@ export default function ListaCotacoes() {
                                   Reprovar
                                 </Button>
                               )}
-                              {cotacao.status === 'reprovada' && (
+                              {(cotacao.status === 'reprovada' || cotacao.status === 'perdida' || cotacao.status === 'nao_gerou') && (
                                 <Button
                                   onClick={() => {
                                     if (confirm('Reativar esta cotação? Ela voltará para pendente e poderá ser avaliada novamente.')) {
