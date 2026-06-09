@@ -1,17 +1,25 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, eachDayOfInterval, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { TrendingUp, Users, Target, DollarSign, ArrowDown, Percent, CalendarIcon, Receipt, MousePointerClick, Eye, BarChart3, RefreshCw, Clock, CheckCircle2 } from "lucide-react";
+import {
+  TrendingUp, Users, Target, DollarSign, ArrowDown, Percent, CalendarIcon, Receipt,
+  MousePointerClick, Eye, BarChart3, RefreshCw, Clock, CheckCircle2, ExternalLink, ChevronRight
+} from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { MetricasLineChart } from "./MetricasLineChart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface FunnelData {
   investimento: number;
@@ -39,6 +47,31 @@ interface DailyData {
   impressions: number;
 }
 
+interface CotacaoDetalhe {
+  id: string;
+  nome_cliente: string;
+  telefone_cliente: string | null;
+  bairro: string | null;
+  status: string;
+  created_at: string;
+  origem_lead: string | null;
+}
+
+interface ServicoDetalhe {
+  id: string;
+  cotacao_id: string | null;
+  valor_total: number;
+  status: string;
+  data_servico_agendada: string | null;
+  data_conclusao: string | null;
+  nome_cliente: string;
+  bairro: string | null;
+}
+
+type DrawerTipo = "google_conv" | "leads" | "agendados" | "receita" | null;
+
+// ─── Constantes ───────────────────────────────────────────────────────────────
+
 const ORIGENS_LEAD = [
   { value: "todos", label: "Todos" },
   { value: "google", label: "Google" },
@@ -60,20 +93,51 @@ const FAIXAS_HORARIAS = [
   { faixa: "20h-22h", inicio: 20, fim: 22 },
 ];
 
+const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
+  pendente:            { label: "Pendente",          cls: "bg-yellow-100 text-yellow-800" },
+  aprovada:            { label: "Aprovada",           cls: "bg-green-100 text-green-800" },
+  reprovada:           { label: "Reprovada",          cls: "bg-red-100 text-red-800" },
+  perdida:             { label: "Perdida",            cls: "bg-gray-100 text-gray-700" },
+  nao_gerou:           { label: "Não gerou",          cls: "bg-gray-100 text-gray-700" },
+  disponivel:          { label: "Disponível",         cls: "bg-blue-100 text-blue-800" },
+  agendado:            { label: "Agendado",           cls: "bg-indigo-100 text-indigo-800" },
+  em_andamento:        { label: "Em andamento",       cls: "bg-orange-100 text-orange-800" },
+  concluido:           { label: "Concluído",          cls: "bg-green-100 text-green-800" },
+  cancelado:           { label: "Cancelado",          cls: "bg-red-100 text-red-800" },
+  aguardando_aprovacao:{ label: "Ag. aprovação",      cls: "bg-purple-100 text-purple-800" },
+  correcao_solicitada: { label: "Correção",           cls: "bg-amber-100 text-amber-800" },
+};
+
+function StatusBadge({ status }: { status: string }) {
+  const cfg = STATUS_BADGE[status] ?? { label: status, cls: "bg-gray-100 text-gray-700" };
+  return (
+    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${cfg.cls}`}>
+      {cfg.label}
+    </span>
+  );
+}
+
+function fmtBRL(v: number) {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
+}
+
+function fmtData(s: string | null) {
+  if (!s) return "—";
+  try { return format(new Date(s), "dd/MM/yyyy"); } catch { return s; }
+}
+
+// ─── Horários de pico ─────────────────────────────────────────────────────────
+
 function HorariosPicoChart({ timestamps }: { timestamps: string[] }) {
   const dados = useMemo(() => {
     const contagem = FAIXAS_HORARIAS.map(f => ({ faixa: f.faixa, quantidade: 0, inicio: f.inicio, fim: f.fim }));
-    
     timestamps.forEach(ts => {
       const date = new Date(ts);
-      // Converter para hora de São Paulo (UTC-3)
-      const horaSP = new Date(date.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+      const horaSP = new Date(date.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
       const hora = horaSP.getHours();
-      
       const faixa = contagem.find(f => hora >= f.inicio && hora < f.fim);
       if (faixa) faixa.quantidade++;
     });
-
     const maxQtd = Math.max(...contagem.map(c => c.quantidade));
     return contagem.map(c => ({ ...c, destaque: c.quantidade === maxQtd && maxQtd > 0 }));
   }, [timestamps]);
@@ -118,6 +182,185 @@ function HorariosPicoChart({ timestamps }: { timestamps: string[] }) {
   );
 }
 
+// ─── Drawer de detalhe ────────────────────────────────────────────────────────
+
+interface FunilDrawerProps {
+  tipo: DrawerTipo;
+  onClose: () => void;
+  cotacoes: CotacaoDetalhe[];
+  servicos: ServicoDetalhe[];
+  conversoesGoogle: number;
+}
+
+function FunilDrawer({ tipo, onClose, cotacoes, servicos, conversoesGoogle }: FunilDrawerProps) {
+  const navigate = useNavigate();
+
+  const servicosConcluidos = useMemo(
+    () => servicos.filter((s) => s.status === "concluido"),
+    [servicos]
+  );
+
+  const titulos: Record<NonNullable<DrawerTipo>, string> = {
+    google_conv: "Conversões Google Ads",
+    leads: `Leads — ${cotacoes.length} cotações`,
+    agendados: `Serviços Agendados — ${servicos.length} serviços`,
+    receita: `Receita Gerada — ${servicosConcluidos.length} serviços concluídos`,
+  };
+
+  return (
+    <Sheet open={tipo !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto p-0">
+        <SheetHeader className="px-6 py-4 border-b sticky top-0 bg-background z-10">
+          <SheetTitle className="text-base">{tipo ? titulos[tipo] : ""}</SheetTitle>
+        </SheetHeader>
+
+        <div className="px-6 py-4">
+          {/* Google Conversions — sem registros individuais */}
+          {tipo === "google_conv" && (
+            <div className="space-y-4">
+              <div className="bg-violet-50 border border-violet-200 rounded-lg p-4">
+                <p className="font-semibold text-violet-800 text-2xl">{conversoesGoogle.toFixed(0)}</p>
+                <p className="text-sm text-violet-700 mt-1">
+                  Conversões reportadas diretamente pelo Google Ads via API.
+                </p>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Esses números vêm da plataforma do Google Ads (
+                <code>google_ads_metrics.conversions</code>) e não correspondem a
+                registros individuais no sistema — por isso não há lista expandível.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Para ver os leads confirmados no sistema, clique no bloco{" "}
+                <strong>Leads (Cotações)</strong>.
+              </p>
+            </div>
+          )}
+
+          {/* Leads — cotações */}
+          {tipo === "leads" && (
+            <>
+              {cotacoes.length === 0 ? (
+                <p className="text-muted-foreground text-sm py-8 text-center">
+                  Nenhuma cotação no período.
+                </p>
+              ) : (
+                <div className="divide-y">
+                  {cotacoes.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => { onClose(); navigate("/admin/cotacoes"); }}
+                      className="w-full text-left py-3 flex items-start justify-between gap-3 hover:bg-muted/50 rounded-lg px-2 transition-colors group"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{c.nome_cliente || "—"}</p>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground mt-0.5">
+                          {c.telefone_cliente && <span>{c.telefone_cliente}</span>}
+                          {c.bairro && <span>{c.bairro}</span>}
+                          {c.origem_lead && <span>Origem: {c.origem_lead}</span>}
+                          <span>{fmtData(c.created_at)}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <StatusBadge status={c.status} />
+                        <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Serviços Agendados */}
+          {tipo === "agendados" && (
+            <>
+              {servicos.length === 0 ? (
+                <p className="text-muted-foreground text-sm py-8 text-center">
+                  Nenhum serviço no período.
+                </p>
+              ) : (
+                <>
+                  <div className="mb-3 text-sm text-muted-foreground">
+                    Total: <strong>{fmtBRL(servicos.reduce((s, v) => s + v.valor_total, 0))}</strong>
+                  </div>
+                  <div className="divide-y">
+                    {servicos.map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => { onClose(); navigate(`/admin/servicos/${s.id}`); }}
+                        className="w-full text-left py-3 flex items-start justify-between gap-3 hover:bg-muted/50 rounded-lg px-2 transition-colors group"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{s.nome_cliente || "—"}</p>
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground mt-0.5">
+                            {s.bairro && <span>{s.bairro}</span>}
+                            {s.data_servico_agendada && (
+                              <span>Agendado: {fmtData(s.data_servico_agendada)}</span>
+                            )}
+                            <span className="font-medium text-foreground">{fmtBRL(s.valor_total)}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <StatusBadge status={s.status} />
+                          <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          {/* Receita Gerada — só concluídos */}
+          {tipo === "receita" && (
+            <>
+              {servicosConcluidos.length === 0 ? (
+                <p className="text-muted-foreground text-sm py-8 text-center">
+                  Nenhum serviço concluído no período.
+                </p>
+              ) : (
+                <>
+                  <div className="mb-3 text-sm text-muted-foreground">
+                    Receita:{" "}
+                    <strong>
+                      {fmtBRL(servicosConcluidos.reduce((s, v) => s + v.valor_total, 0))}
+                    </strong>{" "}
+                    · {servicosConcluidos.length} serviços
+                  </div>
+                  <div className="divide-y">
+                    {servicosConcluidos.map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => { onClose(); navigate(`/admin/servicos/${s.id}`); }}
+                        className="w-full text-left py-3 flex items-start justify-between gap-3 hover:bg-muted/50 rounded-lg px-2 transition-colors group"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{s.nome_cliente || "—"}</p>
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground mt-0.5">
+                            {s.bairro && <span>{s.bairro}</span>}
+                            {s.data_conclusao && (
+                              <span>Concluído: {fmtData(s.data_conclusao)}</span>
+                            )}
+                            <span className="font-semibold text-green-700">{fmtBRL(s.valor_total)}</span>
+                          </div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-1" />
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ─── Componente principal ─────────────────────────────────────────────────────
+
 export function FunilConversaoContent() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -138,12 +381,16 @@ export function FunilConversaoContent() {
   const [mesSelecionado, setMesSelecionado] = useState<string>("");
   const [origemFiltro, setOrigemFiltro] = useState<string>("todos");
 
+  // Detalhe do drawer
+  const [drawerAberto, setDrawerAberto] = useState<DrawerTipo>(null);
+  const [cotacoesDetalhadas, setCotacoesDetalhadas] = useState<CotacaoDetalhe[]>([]);
+  const [servicosDetalhados, setServicosDetalhados] = useState<ServicoDetalhe[]>([]);
+
   const origemLabel = ORIGENS_LEAD.find(o => o.value === origemFiltro)?.label || "Todos";
 
-  // Gerar lista de meses: de janeiro 2026 até o mês atual
   const opcoesMeses = (() => {
     const meses = [];
-    const inicio = new Date(2026, 0, 1); // Janeiro 2026
+    const inicio = new Date(2026, 0, 1);
     const hoje = new Date();
     let current = startOfMonth(hoje);
     while (current >= inicio) {
@@ -169,28 +416,25 @@ export function FunilConversaoContent() {
       const dataInicioStr = format(dataInicio, "yyyy-MM-dd");
       const dataFimStr = format(dataFim, "yyyy-MM-dd");
 
-      // Fetch Google Ads metrics (cost, clicks, impressions)
+      // Google Ads metrics
       const { data: adsMetrics, error: erroAds } = await supabase
         .from("google_ads_metrics")
         .select("*")
         .gte("data", dataInicioStr)
         .lte("data", dataFimStr);
-
       if (erroAds) throw erroAds;
 
       let totalClicks = 0;
       let totalImpressions = 0;
       let investimento = 0;
       let usandoGoogleAds = false;
-
       let investimentoAds = 0;
+
       if (adsMetrics && adsMetrics.length > 0) {
         totalClicks = adsMetrics.reduce((sum, m) => sum + (m.clicks || 0), 0);
         totalImpressions = adsMetrics.reduce((sum, m) => sum + (m.impressions || 0), 0);
-        
         const totalCostMicros = adsMetrics.reduce((sum, m) => sum + Number(m.cost_micros || 0), 0);
         investimentoAds = totalCostMicros / 1_000_000;
-
         const maxSync = adsMetrics.reduce((max, m) => {
           const s = m.synced_at;
           return s && s > max ? s : max;
@@ -198,77 +442,86 @@ export function FunilConversaoContent() {
         if (maxSync) setLastSync(maxSync);
       }
 
-      // Sempre buscar lançamentos manuais para comparar
       const { data: despesas, error: erroDespesas } = await supabase
         .from("lancamentos_caixa")
         .select("valor, data_lancamento, categoria, descricao")
         .eq("tipo", "despesa")
         .gte("data_lancamento", dataInicioStr)
         .lte("data_lancamento", dataFimStr);
-
       if (erroDespesas) throw erroDespesas;
 
       const despesasMarketing = despesas?.filter(d =>
-        d.categoria?.toLowerCase().includes('marketing') ||
-        d.categoria?.toLowerCase().includes('google') ||
-        d.descricao?.toLowerCase().includes('google')
+        d.categoria?.toLowerCase().includes("marketing") ||
+        d.categoria?.toLowerCase().includes("google") ||
+        d.descricao?.toLowerCase().includes("google")
       ) || [];
-
       const investimentoManual = despesasMarketing.reduce((sum, d) => sum + Number(d.valor), 0);
 
-      // Usar o maior valor entre API e manual (dados parciais da API não devem subestimar)
       if (investimentoAds > 0 && investimentoAds >= investimentoManual) {
-        investimento = investimentoAds;
-        usandoGoogleAds = true;
+        investimento = investimentoAds; usandoGoogleAds = true;
       } else if (investimentoManual > 0) {
-        investimento = investimentoManual;
-        usandoGoogleAds = false;
+        investimento = investimentoManual; usandoGoogleAds = false;
       } else {
-        investimento = investimentoAds;
-        usandoGoogleAds = investimentoAds > 0;
+        investimento = investimentoAds; usandoGoogleAds = investimentoAds > 0;
       }
-
       setFonteInvestimento(usandoGoogleAds ? "google_ads" : "manual");
 
-      // Conversões reportadas pelo Google Ads
       const totalConversoesGoogle = adsMetrics?.reduce((sum, m) => sum + Number(m.conversions || 0), 0) || 0;
       setConversoesGoogle(Math.round(totalConversoesGoogle * 100) / 100);
 
-      // Leads & conversions
+      // Cotações — agora com campos para o drawer
       let cotacoesQuery = supabase
         .from("cotacoes")
-        .select("id, status, created_at")
+        .select("id, status, created_at, nome_cliente, telefone_cliente, bairro, origem_lead")
         .gte("created_at", dataInicioStr)
         .lte("created_at", dataFimStr + "T23:59:59");
-
       if (origemFiltro !== "todos") {
         cotacoesQuery = cotacoesQuery.ilike("origem_lead", `%${origemFiltro}%`);
       }
-
       const { data: cotacoes, error: erroCotacoes } = await cotacoesQuery;
-
       if (erroCotacoes) throw erroCotacoes;
 
       const leads = cotacoes?.length || 0;
       const cotacaoIds = cotacoes?.map((c) => c.id) || [];
       setCotacoesTimestamps(cotacoes?.map(c => c.created_at).filter(Boolean) as string[] || []);
+      setCotacoesDetalhadas((cotacoes || []) as CotacaoDetalhe[]);
+
+      // Mapa cotação_id → info do cliente para enriquecer serviços
+      const cotacaoInfoMap: Record<string, { nome_cliente: string; bairro: string | null }> = {};
+      for (const c of cotacoes || []) {
+        cotacaoInfoMap[c.id] = { nome_cliente: c.nome_cliente || "—", bairro: c.bairro || null };
+      }
 
       let agendados = 0;
       let receita = 0;
-      let servicos: any[] = [];
+      let servicosRaw: any[] = [];
 
       if (cotacaoIds.length > 0) {
         const { data: servicosData, error: erroServicos } = await supabase
           .from("servicos")
-          .select("id, valor_total, status, cotacao_id, created_at")
+          .select("id, valor_total, status, cotacao_id, created_at, data_servico_agendada, data_conclusao, bairro")
           .in("cotacao_id", cotacaoIds);
-
         if (erroServicos) throw erroServicos;
-
-        servicos = servicosData || [];
-        agendados = servicos.length;
-        receita = servicos.reduce((sum, s) => sum + Number(s.valor_total), 0);
+        servicosRaw = servicosData || [];
+        agendados = servicosRaw.length;
+        receita = servicosRaw.reduce((sum, s) => sum + Number(s.valor_total), 0);
       }
+
+      // Enriquecer serviços com nome do cliente via cotação
+      const servicosEnriquecidos: ServicoDetalhe[] = servicosRaw.map((s) => {
+        const info = s.cotacao_id ? cotacaoInfoMap[s.cotacao_id] : null;
+        return {
+          id: s.id,
+          cotacao_id: s.cotacao_id,
+          valor_total: Number(s.valor_total ?? 0),
+          status: s.status,
+          data_servico_agendada: s.data_servico_agendada,
+          data_conclusao: s.data_conclusao,
+          nome_cliente: info?.nome_cliente ?? "—",
+          bairro: s.bairro || info?.bairro || null,
+        };
+      });
+      setServicosDetalhados(servicosEnriquecidos);
 
       const cpl = leads > 0 ? investimento / leads : 0;
       const cpc = agendados > 0 ? investimento / agendados : 0;
@@ -283,17 +536,13 @@ export function FunilConversaoContent() {
         clicks: totalClicks, impressions: totalImpressions, ctr,
       });
 
-      // Build daily data
       const days = eachDayOfInterval({ start: dataInicio, end: dataFim });
       const dailyMetrics: DailyData[] = days.map(day => {
         const dayStr = format(day, "yyyy-MM-dd");
         const dayLabel = format(day, "dd/MM", { locale: ptBR });
-
         let dayInvestimento = 0;
         let dayClicks = 0;
         let dayImpressions = 0;
-
-        // Engagement + investment from Google Ads
         if (adsMetrics && adsMetrics.length > 0) {
           const dayAds = adsMetrics.filter(m => m.data === dayStr);
           dayClicks = dayAds.reduce((sum, m) => sum + (m.clicks || 0), 0);
@@ -302,52 +551,38 @@ export function FunilConversaoContent() {
             dayInvestimento = dayAds.reduce((sum, m) => sum + Number(m.cost_micros || 0), 0) / 1_000_000;
           }
         }
-
-        const dayLeads = cotacoes?.filter(c =>
+        const dayCotacaoIds = (cotacoes || []).filter(c =>
           c.created_at && c.created_at.startsWith(dayStr)
-        ).length || 0;
-
-        const dayCotacaoIds = cotacoes?.filter(c =>
-          c.created_at && c.created_at.startsWith(dayStr)
-        ).map(c => c.id) || [];
-
-        const dayServicos = servicos.filter(s =>
+        ).map(c => c.id);
+        const dayServicos = servicosRaw.filter(s =>
           s.cotacao_id && dayCotacaoIds.includes(s.cotacao_id)
         );
-
         return {
-          data: dayStr,
-          dataLabel: dayLabel,
+          data: dayStr, dataLabel: dayLabel,
           investimento: dayInvestimento,
-          leads: dayLeads,
+          leads: (cotacoes || []).filter(c => c.created_at?.startsWith(dayStr)).length,
           conversoes: dayServicos.length,
           receita: dayServicos.reduce((sum, s) => sum + Number(s.valor_total), 0),
-          clicks: dayClicks,
-          impressions: dayImpressions,
+          clicks: dayClicks, impressions: dayImpressions,
         };
       });
-
       setDailyData(dailyMetrics);
     } catch (error: any) {
-      toast({
-        title: "Erro ao carregar dados",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Erro ao carregar dados", description: error.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => {
-    carregarDados();
-  }, [dataInicio, dataFim, origemFiltro]);
+  useEffect(() => { carregarDados(); }, [dataInicio, dataFim, origemFiltro]);
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
-
   const formatNumber = (value: number) =>
     new Intl.NumberFormat("pt-BR").format(value);
+
+  // Classe compartilhada para blocos clicáveis do funil
+  const funilBlocoBase = "cursor-pointer hover:opacity-90 hover:scale-[1.02] transition-all active:scale-[0.99] select-none";
 
   return (
     <div className="space-y-6">
@@ -447,7 +682,6 @@ export function FunilConversaoContent() {
             </div>
           </CardContent>
         </Card>
-
         <Card className="bg-gradient-to-br from-indigo-500 to-indigo-600 text-white">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -459,7 +693,6 @@ export function FunilConversaoContent() {
             </div>
           </CardContent>
         </Card>
-
         <Card className="bg-gradient-to-br from-sky-500 to-sky-600 text-white">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -471,7 +704,6 @@ export function FunilConversaoContent() {
             </div>
           </CardContent>
         </Card>
-
         <Card className="bg-gradient-to-br from-teal-500 to-teal-600 text-white">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -483,7 +715,6 @@ export function FunilConversaoContent() {
             </div>
           </CardContent>
         </Card>
-
         {conversoesGoogle > 0 && (
           <Card className="bg-gradient-to-br from-violet-500 to-violet-600 text-white">
             <CardContent className="p-4">
@@ -500,7 +731,6 @@ export function FunilConversaoContent() {
             </CardContent>
           </Card>
         )}
-
         <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -512,7 +742,6 @@ export function FunilConversaoContent() {
             </div>
           </CardContent>
         </Card>
-
         <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -524,7 +753,6 @@ export function FunilConversaoContent() {
             </div>
           </CardContent>
         </Card>
-
         <Card className="bg-gradient-to-br from-amber-500 to-amber-600 text-white">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -536,7 +764,6 @@ export function FunilConversaoContent() {
             </div>
           </CardContent>
         </Card>
-
         <Card className="bg-gradient-to-br from-cyan-500 to-cyan-600 text-white">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -553,17 +780,27 @@ export function FunilConversaoContent() {
       {/* Gráfico de Linha */}
       <MetricasLineChart dailyData={dailyData} loading={loading} />
 
-      {/* Funil Visual */}
+      {/* Funil Visual — blocos clicáveis */}
       <Card>
         <CardHeader>
           <CardTitle>Funil de Conversão - {origemLabel}</CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            Clique em qualquer bloco para ver os registros detalhados.
+          </p>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center space-y-4">
+
+            {/* Conversões Google Ads */}
             {conversoesGoogle > 0 && (
               <>
-                <div className="w-full max-w-lg">
-                  <div className="bg-violet-500 text-white p-6 rounded-t-lg text-center">
+                <div
+                  className={`w-full max-w-lg ${funilBlocoBase}`}
+                  onClick={() => setDrawerAberto("google_conv")}
+                  title="Ver detalhes das conversões Google Ads"
+                >
+                  <div className="bg-violet-500 text-white p-6 rounded-t-lg text-center relative">
+                    <ExternalLink className="absolute top-3 right-3 h-4 w-4 opacity-60" />
                     <p className="text-lg font-semibold">Conversões Google Ads</p>
                     <p className="text-4xl font-bold">{conversoesGoogle.toFixed(0)}</p>
                     <p className="text-violet-200 text-xs mt-1">Reportadas pelo Google</p>
@@ -581,27 +818,50 @@ export function FunilConversaoContent() {
                 <ArrowDown className="h-8 w-8 text-muted-foreground" />
               </>
             )}
-            <div className="w-full max-w-md">
-              <div className="bg-blue-500 text-white p-6 rounded-t-lg text-center">
+
+            {/* Leads */}
+            <div
+              className={`w-full max-w-md ${funilBlocoBase}`}
+              onClick={() => setDrawerAberto("leads")}
+              title="Ver lista de cotações"
+            >
+              <div className="bg-blue-500 text-white p-6 rounded-lg text-center relative">
+                <ExternalLink className="absolute top-3 right-3 h-4 w-4 opacity-60" />
                 <p className="text-lg font-semibold">Leads (Cotações)</p>
                 <p className="text-4xl font-bold">{funnelData.leads}</p>
               </div>
             </div>
+
             <ArrowDown className="h-8 w-8 text-muted-foreground" />
             <div className="flex items-center gap-2 text-muted-foreground">
               <Percent className="h-5 w-5" />
               <span className="font-semibold">{funnelData.taxaConversao.toFixed(1)}% de conversão</span>
             </div>
             <ArrowDown className="h-8 w-8 text-muted-foreground" />
-            <div className="w-full max-w-sm">
-              <div className="bg-green-500 text-white p-6 rounded-lg text-center">
+
+            {/* Serviços Agendados */}
+            <div
+              className={`w-full max-w-sm ${funilBlocoBase}`}
+              onClick={() => setDrawerAberto("agendados")}
+              title="Ver lista de serviços agendados"
+            >
+              <div className="bg-green-500 text-white p-6 rounded-lg text-center relative">
+                <ExternalLink className="absolute top-3 right-3 h-4 w-4 opacity-60" />
                 <p className="text-lg font-semibold">Serviços Agendados</p>
                 <p className="text-4xl font-bold">{funnelData.agendados}</p>
               </div>
             </div>
+
             <ArrowDown className="h-8 w-8 text-gray-400" />
-            <div className="w-full max-w-xs">
-              <div className="bg-amber-500 text-white p-6 rounded-b-lg text-center">
+
+            {/* Receita Gerada */}
+            <div
+              className={`w-full max-w-xs ${funilBlocoBase}`}
+              onClick={() => setDrawerAberto("receita")}
+              title="Ver serviços concluídos"
+            >
+              <div className="bg-amber-500 text-white p-6 rounded-lg text-center relative">
+                <ExternalLink className="absolute top-3 right-3 h-4 w-4 opacity-60" />
                 <p className="text-lg font-semibold">Receita Gerada</p>
                 <p className="text-3xl font-bold">{formatCurrency(funnelData.receita)}</p>
               </div>
@@ -639,6 +899,15 @@ export function FunilConversaoContent() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Drawer de detalhes */}
+      <FunilDrawer
+        tipo={drawerAberto}
+        onClose={() => setDrawerAberto(null)}
+        cotacoes={cotacoesDetalhadas}
+        servicos={servicosDetalhados}
+        conversoesGoogle={conversoesGoogle}
+      />
     </div>
   );
 }
