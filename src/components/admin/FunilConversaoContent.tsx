@@ -63,6 +63,7 @@ interface ServicoDetalhe {
   id: string;
   cotacao_id: string | null;
   valor_total: number;
+  valor_mao_obra_instalador: number;
   status: string;
   data_servico_agendada: string | null;
   data_conclusao: string | null;
@@ -283,7 +284,7 @@ function FunilDrawer({ tipo, onClose, cotacoes, servicos, conversoesGoogle }: Fu
               ) : (
                 <>
                   <div className="mb-3 text-sm text-muted-foreground">
-                    Total: <strong>{fmtBRL(servicos.reduce((s, v) => s + v.valor_total, 0))}</strong>
+                    Total: <strong>{fmtBRL(servicos.reduce((s, v) => s + v.valor_mao_obra_instalador, 0))}</strong>
                   </div>
                   <div className="divide-y">
                     {servicos.map((s) => (
@@ -299,7 +300,7 @@ function FunilDrawer({ tipo, onClose, cotacoes, servicos, conversoesGoogle }: Fu
                             {s.data_servico_agendada && (
                               <span>Agendado: {fmtData(s.data_servico_agendada)}</span>
                             )}
-                            <span className="font-medium text-foreground">{fmtBRL(s.valor_total)}</span>
+                            <span className="font-medium text-foreground">{fmtBRL(s.valor_mao_obra_instalador)}</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
@@ -326,7 +327,7 @@ function FunilDrawer({ tipo, onClose, cotacoes, servicos, conversoesGoogle }: Fu
                   <div className="mb-3 text-sm text-muted-foreground">
                     Receita:{" "}
                     <strong>
-                      {fmtBRL(servicosConcluidos.reduce((s, v) => s + v.valor_total, 0))}
+                      {fmtBRL(servicosConcluidos.reduce((s, v) => s + v.valor_mao_obra_instalador, 0))}
                     </strong>{" "}
                     · {servicosConcluidos.length} serviços
                   </div>
@@ -344,7 +345,7 @@ function FunilDrawer({ tipo, onClose, cotacoes, servicos, conversoesGoogle }: Fu
                             {s.data_conclusao && (
                               <span>Concluído: {fmtData(s.data_conclusao)}</span>
                             )}
-                            <span className="font-semibold text-green-700">{fmtBRL(s.valor_total)}</span>
+                            <span className="font-semibold text-green-700">{fmtBRL(s.valor_mao_obra_instalador)}</span>
                           </div>
                         </div>
                         <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-1" />
@@ -503,14 +504,14 @@ export function FunilConversaoContent() {
       if (cotacaoIds.length > 0) {
         const { data: servicosData, error: erroServicos } = await supabase
           .from("servicos")
-          .select("id, valor_total, status, cotacao_id, created_at, data_servico_agendada, data_conclusao")
+          .select("id, valor_total, valor_mao_obra_instalador, status, cotacao_id, created_at, data_servico_agendada, data_conclusao")
           .in("cotacao_id", cotacaoIds);
         if (erroServicos) throw erroServicos;
         servicosRaw = servicosData || [];
         const servicosConcl = servicosRaw.filter(s => s.status === "concluido");
         servicosAtivos = servicosRaw.filter(s => s.status !== "cancelado");
         agendados = servicosAtivos.length;
-        receita = servicosConcl.reduce((sum, s) => sum + Number(s.valor_total), 0);
+        receita = servicosConcl.reduce((sum, s) => sum + Number(s.valor_mao_obra_instalador), 0);
       }
 
       // Enriquecer serviços com nome do cliente via cotação
@@ -520,6 +521,7 @@ export function FunilConversaoContent() {
           id: s.id,
           cotacao_id: s.cotacao_id,
           valor_total: Number(s.valor_total ?? 0),
+          valor_mao_obra_instalador: Number(s.valor_mao_obra_instalador ?? 0),
           status: s.status,
           data_servico_agendada: s.data_servico_agendada,
           data_conclusao: s.data_conclusao,
@@ -569,7 +571,7 @@ export function FunilConversaoContent() {
           investimento: dayInvestimento,
           leads: (cotacoes || []).filter(c => c.created_at?.startsWith(dayStr)).length,
           conversoes: dayServicos.length,
-          receita: dayServicosConc.reduce((sum, s) => sum + Number(s.valor_total), 0),
+          receita: dayServicosConc.reduce((sum, s) => sum + Number(s.valor_mao_obra_instalador), 0),
           clicks: dayClicks, impressions: dayImpressions,
         };
       });
