@@ -498,6 +498,7 @@ export function FunilConversaoContent() {
       let agendados = 0;
       let receita = 0;
       let servicosRaw: any[] = [];
+      let servicosAtivos: any[] = [];
 
       if (cotacaoIds.length > 0) {
         const { data: servicosData, error: erroServicos } = await supabase
@@ -506,12 +507,14 @@ export function FunilConversaoContent() {
           .in("cotacao_id", cotacaoIds);
         if (erroServicos) throw erroServicos;
         servicosRaw = servicosData || [];
-        agendados = servicosRaw.length;
-        receita = servicosRaw.reduce((sum, s) => sum + Number(s.valor_total), 0);
+        const servicosConcl = servicosRaw.filter(s => s.status === "concluido");
+        servicosAtivos = servicosRaw.filter(s => s.status !== "cancelado");
+        agendados = servicosAtivos.length;
+        receita = servicosConcl.reduce((sum, s) => sum + Number(s.valor_total), 0);
       }
 
       // Enriquecer serviços com nome do cliente via cotação
-      const servicosEnriquecidos: ServicoDetalhe[] = servicosRaw.map((s) => {
+      const servicosEnriquecidos: ServicoDetalhe[] = servicosAtivos.map((s) => {
         const info = s.cotacao_id ? cotacaoInfoMap[s.cotacao_id] : null;
         return {
           id: s.id,
@@ -558,14 +561,15 @@ export function FunilConversaoContent() {
           c.created_at && c.created_at.startsWith(dayStr)
         ).map(c => c.id);
         const dayServicos = servicosRaw.filter(s =>
-          s.cotacao_id && dayCotacaoIds.includes(s.cotacao_id)
+          s.cotacao_id && dayCotacaoIds.includes(s.cotacao_id) && s.status !== "cancelado"
         );
+        const dayServicosConc = dayServicos.filter(s => s.status === "concluido");
         return {
           data: dayStr, dataLabel: dayLabel,
           investimento: dayInvestimento,
           leads: (cotacoes || []).filter(c => c.created_at?.startsWith(dayStr)).length,
           conversoes: dayServicos.length,
-          receita: dayServicos.reduce((sum, s) => sum + Number(s.valor_total), 0),
+          receita: dayServicosConc.reduce((sum, s) => sum + Number(s.valor_total), 0),
           clicks: dayClicks, impressions: dayImpressions,
         };
       });
