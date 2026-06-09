@@ -502,7 +502,7 @@ export function FunilConversaoContent() {
       if (cotacaoIds.length > 0) {
         const { data: servicosData, error: erroServicos } = await supabase
           .from("servicos")
-          .select("id, valor_total, status, cotacao_id, created_at, data_servico_agendada, data_conclusao, bairro")
+          .select("id, valor_total, status, cotacao_id, created_at, data_servico_agendada, data_conclusao")
           .in("cotacao_id", cotacaoIds);
         if (erroServicos) throw erroServicos;
         servicosRaw = servicosData || [];
@@ -521,7 +521,7 @@ export function FunilConversaoContent() {
           data_servico_agendada: s.data_servico_agendada,
           data_conclusao: s.data_conclusao,
           nome_cliente: info?.nome_cliente ?? "—",
-          bairro: s.bairro || info?.bairro || null,
+          bairro: info?.bairro || null,
         };
       });
       setServicosDetalhados(servicosEnriquecidos);
