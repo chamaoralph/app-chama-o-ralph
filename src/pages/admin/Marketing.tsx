@@ -2,7 +2,9 @@ import { AdminLayout } from "@/components/layout/AdminLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FunilConversaoContent } from "@/components/admin/FunilConversaoContent";
 import { RFMAnaliseContent } from "@/components/admin/RFMAnaliseContent";
-import { TrendingUp, Target } from "lucide-react";
+import { AcompanhamentoDiario } from "@/components/marketing/AcompanhamentoDiario";
+import { ComparativoMensal } from "@/components/marketing/ComparativoMensal";
+import { TrendingUp, Target, BarChart2, GitCompareArrows } from "lucide-react";
 
 export default function Marketing() {
   return (
@@ -14,7 +16,7 @@ export default function Marketing() {
         </div>
 
         <Tabs defaultValue="funil" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsList className="grid w-full grid-cols-4 max-w-2xl">
             <TabsTrigger value="funil" className="gap-2">
               <TrendingUp className="h-4 w-4" />
               Funil de Conversão
@@ -22,6 +24,14 @@ export default function Marketing() {
             <TabsTrigger value="rfm" className="gap-2">
               <Target className="h-4 w-4" />
               Análise RFM
+            </TabsTrigger>
+            <TabsTrigger value="acompanhamento" className="gap-2">
+              <BarChart2 className="h-4 w-4" />
+              Acompanhamento
+            </TabsTrigger>
+            <TabsTrigger value="comparativo" className="gap-2">
+              <GitCompareArrows className="h-4 w-4" />
+              Comparativo
             </TabsTrigger>
           </TabsList>
 
@@ -31,6 +41,14 @@ export default function Marketing() {
 
           <TabsContent value="rfm">
             <RFMAnaliseContent />
+          </TabsContent>
+
+          <TabsContent value="acompanhamento">
+            <AcompanhamentoDiario />
+          </TabsContent>
+
+          <TabsContent value="comparativo">
+            <ComparativoMensal />
           </TabsContent>
         </Tabs>
       </div>
