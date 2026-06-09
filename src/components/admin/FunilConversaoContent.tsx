@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { format, eachDayOfInterval, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { format, eachDayOfInterval, startOfMonth, endOfMonth, subMonths, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   TrendingUp, Users, Target, DollarSign, ArrowDown, Percent, CalendarIcon, Receipt,
@@ -475,8 +475,8 @@ export function FunilConversaoContent() {
       let cotacoesQuery = supabase
         .from("cotacoes")
         .select("id, status, created_at, origem_lead, clientes(nome, telefone, bairro)")
-        .gte("created_at", dataInicioStr)
-        .lte("created_at", dataFimStr + "T23:59:59");
+        .gte("created_at", dataInicioStr + "T03:00:00+00:00")
+        .lte("created_at", format(addDays(dataFim, 1), "yyyy-MM-dd") + "T02:59:59+00:00");
       if (origemFiltro !== "todos") {
         cotacoesQuery = cotacoesQuery.ilike("origem_lead", `%${origemFiltro}%`);
       }
