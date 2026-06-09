@@ -49,12 +49,14 @@ interface DailyData {
 
 interface CotacaoDetalhe {
   id: string;
-  nome_cliente: string;
-  telefone_cliente: string | null;
-  bairro: string | null;
   status: string;
   created_at: string;
   origem_lead: string | null;
+  clientes: {
+    nome: string;
+    telefone: string | null;
+    bairro: string | null;
+  } | null;
 }
 
 interface ServicoDetalhe {
@@ -252,10 +254,10 @@ function FunilDrawer({ tipo, onClose, cotacoes, servicos, conversoesGoogle }: Fu
                       className="w-full text-left py-3 flex items-start justify-between gap-3 hover:bg-muted/50 rounded-lg px-2 transition-colors group"
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{c.nome_cliente || "—"}</p>
+                        <p className="font-medium truncate">{c.clientes?.nome || "—"}</p>
                         <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground mt-0.5">
-                          {c.telefone_cliente && <span>{c.telefone_cliente}</span>}
-                          {c.bairro && <span>{c.bairro}</span>}
+                          {c.clientes?.telefone && <span>{c.clientes.telefone}</span>}
+                          {c.clientes?.bairro && <span>{c.clientes.bairro}</span>}
                           {c.origem_lead && <span>Origem: {c.origem_lead}</span>}
                           <span>{fmtData(c.created_at)}</span>
                         </div>
@@ -472,7 +474,7 @@ export function FunilConversaoContent() {
       // Cotações — agora com campos para o drawer
       let cotacoesQuery = supabase
         .from("cotacoes")
-        .select("id, status, created_at, nome_cliente, telefone_cliente, bairro, origem_lead")
+        .select("id, status, created_at, origem_lead, clientes(nome, telefone, bairro)")
         .gte("created_at", dataInicioStr)
         .lte("created_at", dataFimStr + "T23:59:59");
       if (origemFiltro !== "todos") {
@@ -489,7 +491,8 @@ export function FunilConversaoContent() {
       // Mapa cotação_id → info do cliente para enriquecer serviços
       const cotacaoInfoMap: Record<string, { nome_cliente: string; bairro: string | null }> = {};
       for (const c of cotacoes || []) {
-        cotacaoInfoMap[c.id] = { nome_cliente: c.nome_cliente || "—", bairro: c.bairro || null };
+        const cl = (c as any).clientes;
+        cotacaoInfoMap[c.id] = { nome_cliente: cl?.nome || "—", bairro: cl?.bairro || null };
       }
 
       let agendados = 0;
