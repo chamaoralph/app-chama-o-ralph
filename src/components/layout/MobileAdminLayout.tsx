@@ -53,6 +53,7 @@ const moreItems = [
   { to: "/admin/despesas", icon: Receipt, label: "Despesas" },
   { to: "/admin/relatorios", icon: BarChart3, label: "Relatórios" },
   { to: "/admin/marketing", icon: TrendingUp, label: "Marketing" },
+  { to: "/admin/rentabilidade-instaladores", icon: DollarSign, label: "Rentabilidade" },
   { to: "/admin/aprovacoes", icon: CheckCircle, label: "Aprovações" },
   { to: "/admin/avaliacoes", icon: Star, label: "Avaliações" },
   { to: "/admin/configuracoes", icon: Settings, label: "Configurações" },

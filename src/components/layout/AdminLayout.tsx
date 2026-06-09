@@ -128,6 +128,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           <Link to="/admin/marketing" className="block px-4 py-2 rounded hover:bg-gray-800 transition-colors">
             📈 Marketing
           </Link>
+          <Link to="/admin/rentabilidade-instaladores" className="block px-4 py-2 rounded hover:bg-gray-800 transition-colors">
+            💹 Rentabilidade
+          </Link>
           <Link to="/admin/aprovacoes" className="flex items-center justify-between px-4 py-2 rounded hover:bg-gray-800 transition-colors">
             <span>✅ Aprovações</span>
             {pendingCount > 0 && (

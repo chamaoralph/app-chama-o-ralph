@@ -40,6 +40,7 @@ const AdminGerenciarPerguntas = lazy(() => import('./pages/admin/GerenciarPergun
 const AdminCertificacoes = lazy(() => import('./pages/admin/CertificacoesInstaladores'));
 const AdminConfiguracoes = lazy(() => import('./pages/admin/Configuracoes'));
 const AdminAvaliacoes = lazy(() => import('./pages/admin/Avaliacoes'));
+const AdminRentabilidade = lazy(() => import('./pages/admin/RentabilidadeInstaladores'));
 const InstaladorFazerQuestionario = lazy(() => import('./pages/instalador/FazerQuestionario'));
 const InstaladorResultado = lazy(() => import('./pages/instalador/ResultadoQuestionario'));
 const InstaladorCertificados = lazy(() => import('./pages/instalador/MeusCertificados'));
@@ -92,6 +93,7 @@ function App() {
               <Route path="configuracoes" element={<Suspense><AdminConfiguracoes /></Suspense>} />
               <Route path="avaliacoes" element={<Suspense><AdminAvaliacoes /></Suspense>} />
               <Route path="analise-rfm" element={<Navigate to="/admin/marketing" replace />} />
+              <Route path="rentabilidade-instaladores" element={<Suspense><AdminRentabilidade /></Suspense>} />
             </Route>
 
             {/* Instalador Routes */}
