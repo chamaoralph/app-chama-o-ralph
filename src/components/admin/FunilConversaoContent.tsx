@@ -52,7 +52,7 @@ interface CotacaoDetalhe {
   status: string;
   created_at: string;
   origem_lead: string | null;
-  valor_mao_obra?: number | null;
+  valor_estimado?: number | null;
   clientes: {
     nome: string;
     telefone: string | null;
@@ -476,7 +476,7 @@ export function FunilConversaoContent() {
       // Cotações — agora com campos para o drawer
       let cotacoesQuery = supabase
         .from("cotacoes")
-        .select("id, status, created_at, origem_lead, valor_mao_obra, clientes(nome, telefone, bairro)")
+        .select("id, status, created_at, origem_lead, valor_estimado, clientes(nome, telefone, bairro)")
         .gte("created_at", dataInicioStr + "T00:00:00")
         .lte("created_at", dataFimStr + "T23:59:59");
       if (origemFiltro !== "todos") {
@@ -494,7 +494,7 @@ export function FunilConversaoContent() {
       const cotacaoInfoMap: Record<string, { nome_cliente: string; bairro: string | null; valor_mao_obra: number }> = {};
       for (const c of cotacoes || []) {
         const cl = (c as any).clientes;
-        cotacaoInfoMap[c.id] = { nome_cliente: cl?.nome || "—", bairro: cl?.bairro || null, valor_mao_obra: Number((c as any).valor_mao_obra ?? 0) };
+        cotacaoInfoMap[c.id] = { nome_cliente: cl?.nome || "—", bairro: cl?.bairro || null, valor_mao_obra: Number((c as any).valor_estimado ?? 0) };
       }
 
       let agendados = 0;
