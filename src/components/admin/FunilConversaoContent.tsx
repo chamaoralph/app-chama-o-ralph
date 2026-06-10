@@ -52,7 +52,6 @@ interface CotacaoDetalhe {
   status: string;
   created_at: string;
   origem_lead: string | null;
-  valor_total?: number;
   clientes: {
     nome: string;
     telefone: string | null;
@@ -64,7 +63,6 @@ interface ServicoDetalhe {
   id: string;
   cotacao_id: string | null;
   valor_total: number;
-  valor_cotacao: number;
   status: string;
   data_servico_agendada: string | null;
   data_conclusao: string | null;
@@ -285,7 +283,7 @@ function FunilDrawer({ tipo, onClose, cotacoes, servicos, conversoesGoogle }: Fu
               ) : (
                 <>
                   <div className="mb-3 text-sm text-muted-foreground">
-                    Total: <strong>{fmtBRL(servicos.reduce((s, v) => s + v.valor_cotacao, 0))}</strong>
+                    Total: <strong>{fmtBRL(servicos.reduce((s, v) => s + v.valor_total, 0))}</strong>
                   </div>
                   <div className="divide-y">
                     {servicos.map((s) => (
@@ -301,7 +299,7 @@ function FunilDrawer({ tipo, onClose, cotacoes, servicos, conversoesGoogle }: Fu
                             {s.data_servico_agendada && (
                               <span>Agendado: {fmtData(s.data_servico_agendada)}</span>
                             )}
-                            <span className="font-medium text-foreground">{fmtBRL(s.valor_cotacao)}</span>
+                            <span className="font-medium text-foreground">{fmtBRL(s.valor_total)}</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
@@ -328,7 +326,7 @@ function FunilDrawer({ tipo, onClose, cotacoes, servicos, conversoesGoogle }: Fu
                   <div className="mb-3 text-sm text-muted-foreground">
                     Receita:{" "}
                     <strong>
-                      {fmtBRL(servicosConcluidos.reduce((s, v) => s + v.valor_cotacao, 0))}
+                      {fmtBRL(servicosConcluidos.reduce((s, v) => s + v.valor_total, 0))}
                     </strong>{" "}
                     · {servicosConcluidos.length} serviços
                   </div>
@@ -346,7 +344,7 @@ function FunilDrawer({ tipo, onClose, cotacoes, servicos, conversoesGoogle }: Fu
                             {s.data_conclusao && (
                               <span>Concluído: {fmtData(s.data_conclusao)}</span>
                             )}
-                            <span className="font-semibold text-green-700">{fmtBRL(s.valor_cotacao)}</span>
+                            <span className="font-semibold text-green-700">{fmtBRL(s.valor_total)}</span>
                           </div>
                         </div>
                         <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-1" />
@@ -476,7 +474,7 @@ export function FunilConversaoContent() {
       // Cotações — agora com campos para o drawer
       let cotacoesQuery = supabase
         .from("cotacoes")
-        .select("id, status, created_at, origem_lead, valor_total, clientes(nome, telefone, bairro)")
+        .select("id, status, created_at, origem_lead, clientes(nome, telefone, bairro)")
         .gte("created_at", dataInicioStr + "T00:00:00")
         .lte("created_at", dataFimStr + "T23:59:59");
       if (origemFiltro !== "todos") {
@@ -491,10 +489,10 @@ export function FunilConversaoContent() {
       setCotacoesDetalhadas((cotacoes || []) as CotacaoDetalhe[]);
 
       // Mapa cotação_id → info do cliente para enriquecer serviços
-      const cotacaoInfoMap: Record<string, { nome_cliente: string; bairro: string | null; valor_total: number }> = {};
+      const cotacaoInfoMap: Record<string, { nome_cliente: string; bairro: string | null }> = {};
       for (const c of cotacoes || []) {
         const cl = (c as any).clientes;
-        cotacaoInfoMap[c.id] = { nome_cliente: cl?.nome || "—", bairro: cl?.bairro || null, valor_total: Number((c as any).valor_total ?? 0) };
+        cotacaoInfoMap[c.id] = { nome_cliente: cl?.nome || "—", bairro: cl?.bairro || null };
       }
 
       let agendados = 0;
@@ -512,7 +510,7 @@ export function FunilConversaoContent() {
         const servicosConcl = servicosRaw.filter(s => s.status === "concluido");
         servicosAtivos = servicosRaw.filter(s => s.status !== "cancelado");
         agendados = servicosAtivos.length;
-        receita = servicosConcl.reduce((sum, s) => sum + (s.cotacao_id ? (cotacaoInfoMap[s.cotacao_id]?.valor_total ?? 0) : 0), 0);
+        receita = servicosConcl.reduce((sum, s) => sum + Number(s.valor_total), 0);
       }
 
       // Enriquecer serviços com nome do cliente via cotação
@@ -522,7 +520,6 @@ export function FunilConversaoContent() {
           id: s.id,
           cotacao_id: s.cotacao_id,
           valor_total: Number(s.valor_total ?? 0),
-          valor_cotacao: s.cotacao_id ? (cotacaoInfoMap[s.cotacao_id]?.valor_total ?? 0) : 0,
           status: s.status,
           data_servico_agendada: s.data_servico_agendada,
           data_conclusao: s.data_conclusao,
@@ -572,7 +569,7 @@ export function FunilConversaoContent() {
           investimento: dayInvestimento,
           leads: (cotacoes || []).filter(c => c.created_at?.startsWith(dayStr)).length,
           conversoes: dayServicos.length,
-          receita: dayServicosConc.reduce((sum, s) => sum + (s.cotacao_id ? (cotacaoInfoMap[s.cotacao_id]?.valor_total ?? 0) : 0), 0),
+          receita: dayServicosConc.reduce((sum, s) => sum + Number(s.valor_total), 0),
           clicks: dayClicks, impressions: dayImpressions,
         };
       });
