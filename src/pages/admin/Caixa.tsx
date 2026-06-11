@@ -121,7 +121,7 @@ export default function Caixa() {
   }
 
   const totalReceitas = lancamentos
-    .filter((l) => l.tipo === "receita")
+    .filter((l) => l.tipo === "receita" && l.categoria !== "Reembolso Materiais")
     .reduce((acc, l) => acc + Number(l.valor), 0);
 
   const totalDespesasGerais = lancamentos
