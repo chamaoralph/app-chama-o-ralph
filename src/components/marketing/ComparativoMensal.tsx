@@ -186,14 +186,14 @@ export function ComparativoMensal() {
           .gte("data_lancamento", startDate)
           .lte("data_lancamento", endDate),
 
-        // Recibos diários pagos (6 meses)
+        // Custo instaladores - serviços concluídos (6 meses)
         supabase
-          .from("recibos_diarios")
-          .select("valor_total, data_referencia")
+          .from("servicos")
+          .select("valor_mao_obra_instalador, data_conclusao")
           .eq("empresa_id", userData.empresa_id)
-          .eq("status_pagamento", "pago")
-          .gte("data_referencia", startDate)
-          .lte("data_referencia", endDate),
+          .eq("status", "concluido")
+          .gte("data_conclusao", startDate)
+          .lte("data_conclusao", endDate + "T23:59:59"),
 
         // Cotações (6 meses)
         supabase
@@ -245,10 +245,10 @@ export function ComparativoMensal() {
         .filter((l) => l.tipo === "despesa" && l.categoria === "Marketing")
         .reduce((s, l) => s + Number(l.valor), 0)
 
-      // Recibos do mês
+      // Custo instaladores do mês
       d.totalInstaladores = recibos
-        .filter((r) => r.data_referencia.slice(0, 7) === mes)
-        .reduce((s, r) => s + Number(r.valor_total), 0)
+        .filter((r) => toMes(r.data_conclusao) === mes)
+        .reduce((s, r) => s + Number(r.valor_mao_obra_instalador || 0), 0)
 
       // Lucro
       d.lucroLiquido = d.totalReceitas - d.totalDespesasGerais - d.totalInstaladores
