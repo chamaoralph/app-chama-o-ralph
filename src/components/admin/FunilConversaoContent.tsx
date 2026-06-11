@@ -598,6 +598,12 @@ export function FunilConversaoContent() {
   const formatNumber = (value: number) =>
     new Intl.NumberFormat("pt-BR").format(value);
 
+  // Resumo do funil - métricas derivadas
+  const cliquesPorLead = funnelData.leads > 0 ? funnelData.clicks / funnelData.leads : 0;
+  const custoPorAgendado = funnelData.agendados > 0 ? funnelData.investimento / funnelData.agendados : 0;
+  const cliquesPorAgendado = funnelData.agendados > 0 ? funnelData.clicks / funnelData.agendados : 0;
+  const roasAgendados = funnelData.investimento > 0 ? funnelData.totalAgendados / funnelData.investimento : 0;
+
   // Classe compartilhada para blocos clicáveis do funil
   const funilBlocoBase = "cursor-pointer hover:opacity-90 hover:scale-[1.02] transition-all active:scale-[0.99] select-none";
 
@@ -886,6 +892,57 @@ export function FunilConversaoContent() {
                 <p className="text-3xl font-bold">{formatCurrency(funnelData.receita)}</p>
               </div>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Resumo do Funil */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Resumo do Funil</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto rounded-lg border">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-muted/50 border-b">
+                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Invest.</th>
+                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap border-l">Impressões</th>
+                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Cliques</th>
+                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">CTR</th>
+                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap border-l">Conv. Google</th>
+                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Leads</th>
+                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">CPL</th>
+                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Cliques/Lead</th>
+                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap border-l">Agendados</th>
+                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Valor Agend.</th>
+                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Custo/Agend.</th>
+                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Cliques/Agend.</th>
+                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap border-l">Receita</th>
+                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">ROAS Receita</th>
+                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">ROAS Agend.</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="hover:bg-muted/20 transition-colors">
+                  <td className="px-3 py-2.5 text-center tabular-nums font-medium">{formatCurrency(funnelData.investimento)}</td>
+                  <td className="px-3 py-2.5 text-center tabular-nums border-l">{formatNumber(funnelData.impressions)}</td>
+                  <td className="px-3 py-2.5 text-center tabular-nums">{formatNumber(funnelData.clicks)}</td>
+                  <td className="px-3 py-2.5 text-center tabular-nums">{funnelData.ctr.toFixed(2)}%</td>
+                  <td className="px-3 py-2.5 text-center tabular-nums border-l">{conversoesGoogle.toFixed(0)}</td>
+                  <td className="px-3 py-2.5 text-center tabular-nums">{funnelData.leads}</td>
+                  <td className="px-3 py-2.5 text-center tabular-nums">{formatCurrency(funnelData.cpl)}</td>
+                  <td className="px-3 py-2.5 text-center tabular-nums">{cliquesPorLead.toFixed(1)}</td>
+                  <td className="px-3 py-2.5 text-center tabular-nums border-l">{funnelData.agendados}</td>
+                  <td className="px-3 py-2.5 text-center tabular-nums">{formatCurrency(funnelData.totalAgendados)}</td>
+                  <td className="px-3 py-2.5 text-center tabular-nums">{formatCurrency(custoPorAgendado)}</td>
+                  <td className="px-3 py-2.5 text-center tabular-nums">{cliquesPorAgendado.toFixed(1)}</td>
+                  <td className="px-3 py-2.5 text-center tabular-nums border-l">{formatCurrency(funnelData.receita)}</td>
+                  <td className="px-3 py-2.5 text-center tabular-nums">{funnelData.roas.toFixed(2)}x</td>
+                  <td className="px-3 py-2.5 text-center tabular-nums">{roasAgendados.toFixed(2)}x</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </CardContent>
       </Card>
