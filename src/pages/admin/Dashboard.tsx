@@ -253,8 +253,9 @@ export default function AdminDashboard() {
         .gte('data_lancamento', startOfMonth.toISOString().split('T')[0])
 
       const receitaMes = lancamentos?.filter(l => l.tipo === 'receita' && l.categoria !== 'Reembolso Materiais').reduce((sum, l) => sum + Number(l.valor), 0) || 0
-      const despesasMes = lancamentos?.filter(l => l.tipo === 'despesa' && l.categoria !== 'Reembolso Materiais').reduce((sum, l) => sum + Number(l.valor), 0) || 0
-      const saldoCaixa = receitaMes - despesasMes
+      const despesasMes = lancamentos?.filter(l => l.tipo === 'despesa' && l.categoria !== 'Reembolso Materiais' && l.categoria !== 'Pagamento Instalador').reduce((sum, l) => sum + Number(l.valor), 0) || 0
+      const instaladoresMes = lancamentos?.filter(l => l.categoria === 'Pagamento Instalador').reduce((sum, l) => sum + Number(l.valor), 0) || 0
+      const saldoCaixa = receitaMes - despesasMes - instaladoresMes
 
       // Serviços concluídos no mês
       const { data: servicos } = await supabase
