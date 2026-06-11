@@ -58,14 +58,14 @@ export default function Caixa() {
       const ultimoDia = `${ano}-${mes}-${String(lastDay).padStart(2, "0")}`;
 
       const { data, error } = await supabase
-        .from("recibos_diarios")
-        .select("valor_mao_obra")
-        .eq("status_pagamento", "pago")
-        .gte("data_referencia", primeiroDia)
-        .lte("data_referencia", ultimoDia);
+        .from("servicos")
+        .select("valor_mao_obra_instalador")
+        .eq("status", "concluido")
+        .gte("data_servico_agendada", primeiroDia)
+        .lte("data_servico_agendada", ultimoDia + "T23:59:59");
 
       if (error) throw error;
-      const total = (data || []).reduce((sum, r) => sum + Number(r.valor_mao_obra), 0);
+      const total = (data || []).reduce((sum, s) => sum + Number(s.valor_mao_obra_instalador), 0);
       setTotalInstaladoresRecibos(total);
     } catch (error) {
       console.error("Erro ao carregar total de recibos:", error);
