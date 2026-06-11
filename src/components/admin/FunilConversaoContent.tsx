@@ -26,6 +26,7 @@ interface FunnelData {
   leads: number;
   agendados: number;
   receita: number;
+  totalAgendados: number;
   cpl: number;
   cpc: number;
   roas: number;
@@ -376,7 +377,7 @@ export function FunilConversaoContent() {
   );
   const [dataFim, setDataFim] = useState<Date>(new Date());
   const [funnelData, setFunnelData] = useState<FunnelData>({
-    investimento: 0, leads: 0, agendados: 0, receita: 0,
+    investimento: 0, leads: 0, agendados: 0, receita: 0, totalAgendados: 0,
     cpl: 0, cpc: 0, roas: 0, taxaConversao: 0, ticketMedio: 0,
     clicks: 0, impressions: 0, ctr: 0,
   });
@@ -503,6 +504,7 @@ export function FunilConversaoContent() {
 
       let agendados = 0;
       let receita = 0;
+      let totalAgendados = 0;
       let servicosRaw: any[] = [];
       let servicosAtivos: any[] = [];
 
@@ -517,6 +519,7 @@ export function FunilConversaoContent() {
         servicosAtivos = servicosRaw.filter(s => s.status !== "cancelado");
         agendados = servicosAtivos.length;
         receita = servicosConcl.reduce((sum, s) => sum + Number(cotacaoInfoMap[s.cotacao_id ?? ""]?.valor_mao_obra ?? 0), 0);
+        totalAgendados = servicosAtivos.reduce((sum, s) => sum + Number(cotacaoInfoMap[s.cotacao_id ?? ""]?.valor_mao_obra ?? 0), 0);
       }
 
       // Enriquecer serviços com nome do cliente via cotação
@@ -544,7 +547,7 @@ export function FunilConversaoContent() {
       const ctr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
 
       setFunnelData({
-        investimento, leads, agendados, receita,
+        investimento, leads, agendados, receita, totalAgendados,
         cpl, cpc, roas, taxaConversao, ticketMedio,
         clicks: totalClicks, impressions: totalImpressions, ctr,
       });
@@ -864,7 +867,7 @@ export function FunilConversaoContent() {
                 <p className="text-lg font-semibold">Serviços Agendados</p>
                 <div className="flex items-center justify-center gap-3">
                   <p className="text-4xl font-bold">{funnelData.agendados}</p>
-                  <p className="text-lg font-semibold opacity-80">{formatCurrency(funnelData.receita)}</p>
+                  <p className="text-lg font-semibold opacity-80">{formatCurrency(funnelData.totalAgendados)}</p>
                 </div>
               </div>
             </div>
