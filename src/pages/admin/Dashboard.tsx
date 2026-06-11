@@ -183,8 +183,7 @@ export default function AdminDashboard() {
         // Calcular lucro da empresa (desconta comissão do instalador + reembolso de material)
         const valorTotal = Number(s.valor_total) || 0
         const comissaoInstalador = Number(s.valor_mao_obra_instalador) || 0
-        const reembolsoMaterial = Number(s.valor_reembolso_despesas) || 0
-        const lucroEmpresa = valorTotal - comissaoInstalador - reembolsoMaterial
+        const lucroEmpresa = comissaoInstalador === 0 ? valorTotal : comissaoInstalador
 
         if (tipo === 'atribuido') {
           instaladoresMap[s.instalador_id].dias[diaSemanaServico].atribuidos += 1
