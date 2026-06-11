@@ -168,8 +168,8 @@ export default function Instaladores() {
         .select('instalador_id, valor_total, valor_mao_obra_instalador')
         .eq('empresa_id', userData.empresa_id)
         .eq('status', 'concluido')
-        .gte('data_servico_agendada', `${inicio}T00:00:00`)
-        .lte('data_servico_agendada', `${fim}T23:59:59`)
+        .gte('data_conclusao', `${inicio}T00:00:00`)
+        .lte('data_conclusao', `${fim}T23:59:59`)
 
       if (error) throw error
 
@@ -189,8 +189,9 @@ export default function Instaladores() {
         if (!s.instalador_id) continue
         const atual = agrupado.get(s.instalador_id) || { total_servicos: 0, receita: 0, mao_obra: 0 }
         atual.total_servicos += 1
-        atual.receita += s.valor_total || 0
-        atual.mao_obra += s.valor_mao_obra_instalador || 0
+        const maoObra = s.valor_mao_obra_instalador || 0
+        atual.receita += maoObra === 0 ? (s.valor_total || 0) : maoObra * 2
+        atual.mao_obra += maoObra
         agrupado.set(s.instalador_id, atual)
       }
 

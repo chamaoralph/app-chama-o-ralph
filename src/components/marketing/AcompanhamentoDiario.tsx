@@ -203,13 +203,16 @@ export function AcompanhamentoDiario() {
     for (const l of lancamentos) {
       const dia = l.data_lancamento.slice(0, 10)
       if (!lancPorDia[dia]) lancPorDia[dia] = { receita: 0, despesa: 0 }
-      if (l.tipo === "receita") lancPorDia[dia].receita += Number(l.valor)
-      else lancPorDia[dia].despesa += Number(l.valor)
+      if (l.tipo === "receita") {
+        if (l.categoria !== "Reembolso Materiais") lancPorDia[dia].receita += Number(l.valor)
+      } else {
+        if (!CATEGORIAS_INSTALADORES.has(l.categoria)) lancPorDia[dia].despesa += Number(l.valor)
+      }
     }
 
     // Resumo global
     const totalReceitas = lancamentos
-      .filter((l) => l.tipo === "receita")
+      .filter((l) => l.tipo === "receita" && l.categoria !== "Reembolso Materiais")
       .reduce((s, l) => s + Number(l.valor), 0)
 
     const totalDespesasGerais = lancamentos

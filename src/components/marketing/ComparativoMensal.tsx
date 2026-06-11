@@ -236,7 +236,7 @@ export function ComparativoMensal() {
         (l) => l.data_lancamento.slice(0, 7) === mes
       )
       d.totalReceitas = lancsDoMes
-        .filter((l) => l.tipo === "receita")
+        .filter((l) => l.tipo === "receita" && l.categoria !== "Reembolso Materiais")
         .reduce((s, l) => s + Number(l.valor), 0)
       d.totalDespesasGerais = lancsDoMes
         .filter((l) => l.tipo === "despesa" && !CATEGORIAS_INSTALADORES.has(l.categoria))

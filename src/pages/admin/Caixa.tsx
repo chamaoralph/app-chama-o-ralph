@@ -87,7 +87,10 @@ export default function Caixa() {
         .not("status", "eq", "cancelado");
 
       if (error) throw error;
-      const total = (data || []).reduce((sum, s) => sum + Number(s.valor_mao_obra_instalador) * 2, 0);
+      const total = (data || []).reduce((sum, s) => {
+        const maoObra = Number(s.valor_mao_obra_instalador || 0);
+        return sum + (maoObra === 0 ? Number(s.valor_total || 0) : maoObra * 2);
+      }, 0);
       setTotalProjecao(total);
     } catch (error) {
       console.error("Erro ao carregar projeção:", error);

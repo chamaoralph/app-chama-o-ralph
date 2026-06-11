@@ -180,7 +180,7 @@ export default function AdminDashboard() {
           }
         }
 
-        // Calcular lucro da empresa (desconta comissão do instalador + reembolso de material)
+        // Lucro da empresa = receita (mao_obra×2, ou valor_total quando mao_obra=0) − repasse ao instalador
         const valorTotal = Number(s.valor_total) || 0
         const comissaoInstalador = Number(s.valor_mao_obra_instalador) || 0
         const lucroEmpresa = comissaoInstalador === 0 ? valorTotal : comissaoInstalador
@@ -248,12 +248,12 @@ export default function AdminDashboard() {
       // Lançamentos do caixa do mês
       const { data: lancamentos } = await supabase
         .from('lancamentos_caixa')
-        .select('tipo, valor')
+        .select('tipo, valor, categoria')
         .eq('empresa_id', userData.empresa_id)
         .gte('data_lancamento', startOfMonth.toISOString().split('T')[0])
 
-      const receitaMes = lancamentos?.filter(l => l.tipo === 'receita').reduce((sum, l) => sum + Number(l.valor), 0) || 0
-      const despesasMes = lancamentos?.filter(l => l.tipo === 'despesa').reduce((sum, l) => sum + Number(l.valor), 0) || 0
+      const receitaMes = lancamentos?.filter(l => l.tipo === 'receita' && l.categoria !== 'Reembolso Materiais').reduce((sum, l) => sum + Number(l.valor), 0) || 0
+      const despesasMes = lancamentos?.filter(l => l.tipo === 'despesa' && l.categoria !== 'Reembolso Materiais').reduce((sum, l) => sum + Number(l.valor), 0) || 0
       const saldoCaixa = receitaMes - despesasMes
 
       // Serviços concluídos no mês
@@ -262,7 +262,7 @@ export default function AdminDashboard() {
         .select('id')
         .eq('empresa_id', userData.empresa_id)
         .eq('status', 'concluido')
-        .gte('updated_at', startOfMonth.toISOString())
+        .gte('data_conclusao', startOfMonth.toISOString())
 
       const servicosConcluidosMes = servicos?.length || 0
 

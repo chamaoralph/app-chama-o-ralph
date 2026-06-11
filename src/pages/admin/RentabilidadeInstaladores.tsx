@@ -59,8 +59,6 @@ interface LinhaInstalador {
   repasse: number
   // Receita = repasse (valor_mao_obra_instalador) * 2, ou valor_total quando repasse = 0.
   // Lucro = Receita − Repasse.
-  reembolso: number
-  custoSuporte: number
   lucro: number
   margem: number         // %
   retrabalhosAbertos: number  // serviços atualmente em 'correcao_solicitada'
@@ -123,7 +121,7 @@ export default function RentabilidadeInstaladores() {
       const { data, error } = await supabase
         .from("servicos")
         .select(
-          "id, instalador_id, valor_total, valor_mao_obra_instalador, valor_reembolso_despesas, custo_suporte, data_conclusao"
+          "id, instalador_id, valor_total, valor_mao_obra_instalador, data_conclusao"
         )
         .eq("empresa_id", empresaId!)
         .eq("status", "concluido")
@@ -207,8 +205,6 @@ export default function RentabilidadeInstaladores() {
           nServicos: 0,
           receita: 0,
           repasse: 0,
-          reembolso: 0,
-          custoSuporte: 0,
           lucro: 0,
           margem: 0,
           retrabalhosAbertos: correcoesPorInstalador[id] ?? 0,
@@ -221,8 +217,6 @@ export default function RentabilidadeInstaladores() {
       const receitaServico = repasseServico === 0 ? Number(s.valor_total ?? 0) : repasseServico * 2
       linha.receita += receitaServico
       linha.repasse += repasseServico
-      linha.reembolso += Number(s.valor_reembolso_despesas ?? 0)
-      linha.custoSuporte += Number(s.custo_suporte ?? 0)
     }
 
     const linhas: LinhaInstalador[] = Object.values(mapa).map((l) => {
@@ -327,7 +321,7 @@ export default function RentabilidadeInstaladores() {
               icon: DollarSign,
               title: "Receita Total",
               value: loading ? null : fmtBRL(totais?.totReceita ?? 0),
-              sub: "soma valor_total",
+              sub: "mão obra × 2 (ou valor_total se repasse=0)",
             },
             {
               icon: Users,

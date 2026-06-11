@@ -72,14 +72,14 @@ export default function Relatorios() {
       const endDate = new Date(parseInt(year), parseInt(month), 0)
       const endDateStr = `${year}-${month}-${String(endDate.getDate()).padStart(2, '0')}`
 
-      // Buscar serviços concluídos no mês (baseado em data_servico_agendada)
+      // Buscar serviços concluídos no mês (baseado em data_conclusao)
       const { data: servicosConcluidos } = await supabase
         .from('servicos')
         .select('valor_total, valor_mao_obra_instalador')
         .eq('empresa_id', userData.empresa_id)
         .eq('status', 'concluido')
-        .gte('data_servico_agendada', startDate)
-        .lte('data_servico_agendada', endDateStr + 'T23:59:59')
+        .gte('data_conclusao', startDate)
+        .lte('data_conclusao', endDateStr + 'T23:59:59')
 
       const receitaBruta = servicosConcluidos?.reduce((sum, s) => {
         if (Number(s.valor_mao_obra_instalador || 0) === 0) {
@@ -121,13 +121,13 @@ export default function Relatorios() {
           instalador_id,
           valor_mao_obra_instalador,
           status,
-          data_servico_agendada,
+          data_conclusao,
           instalador:usuarios!servicos_instalador_id_fkey(nome)
         `)
         .eq('empresa_id', userData.empresa_id)
         .eq('status', 'concluido')
-        .gte('data_servico_agendada', startDate)
-        .lte('data_servico_agendada', endDateStr + 'T23:59:59')
+        .gte('data_conclusao', startDate)
+        .lte('data_conclusao', endDateStr + 'T23:59:59')
 
       // Agrupar por instalador
       const instaladoresMap = new Map()
