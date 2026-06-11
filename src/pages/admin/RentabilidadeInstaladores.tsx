@@ -57,9 +57,8 @@ interface LinhaInstalador {
   nServicos: number
   receita: number
   repasse: number
-  // Lucro = Receita − Repasse − Reembolso despesas − Custo suporte.
-  // Além do repasse de mão de obra, custo_suporte e valor_reembolso_despesas
-  // são os únicos outros custos por serviço rastreados no schema atual.
+  // Receita = repasse (valor_mao_obra_instalador) * 2, ou valor_total quando repasse = 0.
+  // Lucro = Receita − Repasse.
   reembolso: number
   custoSuporte: number
   lucro: number
@@ -218,14 +217,16 @@ export default function RentabilidadeInstaladores() {
       }
       const linha = mapa[id]
       linha.nServicos += 1
-      linha.receita += Number(s.valor_total ?? 0)
-      linha.repasse += Number(s.valor_mao_obra_instalador ?? 0)
+      const repasseServico = Number(s.valor_mao_obra_instalador ?? 0)
+      const receitaServico = repasseServico === 0 ? Number(s.valor_total ?? 0) : repasseServico * 2
+      linha.receita += receitaServico
+      linha.repasse += repasseServico
       linha.reembolso += Number(s.valor_reembolso_despesas ?? 0)
       linha.custoSuporte += Number(s.custo_suporte ?? 0)
     }
 
     const linhas: LinhaInstalador[] = Object.values(mapa).map((l) => {
-      l.lucro = l.receita - l.repasse - l.reembolso - l.custoSuporte
+      l.lucro = l.receita - l.repasse
       l.margem = l.receita > 0 ? (l.lucro / l.receita) * 100 : 0
       l.capacidadeMes = l.nServicos / meses
       return l
@@ -473,8 +474,8 @@ export default function RentabilidadeInstaladores() {
 
         {/* Notas técnicas */}
         <p className="text-xs text-muted-foreground">
-          Lucro empresa = <code>valor_total</code> − <code>valor_mao_obra_instalador</code> −{" "}
-          <code>valor_reembolso_despesas</code> − <code>custo_suporte</code>. Período filtrado por{" "}
+          Receita = <code>valor_mao_obra_instalador</code> × 2, ou <code>valor_total</code> quando o repasse é 0.
+          Lucro empresa = Receita − Repasse. Período filtrado por{" "}
           <code>data_conclusao</code>. Donos aparecem com repasse = R$ 0,00 (
           <code>valor_mao_obra_instalador</code> salvo como 0 nos seus serviços).
         </p>
