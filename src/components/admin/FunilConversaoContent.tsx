@@ -862,7 +862,10 @@ export function FunilConversaoContent() {
               <div className="bg-green-500 text-white p-6 rounded-lg text-center relative">
                 <ExternalLink className="absolute top-3 right-3 h-4 w-4 opacity-60" />
                 <p className="text-lg font-semibold">Serviços Agendados</p>
-                <p className="text-4xl font-bold">{funnelData.agendados}</p>
+                <div className="flex items-center justify-center gap-3">
+                  <p className="text-4xl font-bold">{funnelData.agendados}</p>
+                  <p className="text-lg font-semibold opacity-80">{formatCurrency(funnelData.receita)}</p>
+                </div>
               </div>
             </div>
 
