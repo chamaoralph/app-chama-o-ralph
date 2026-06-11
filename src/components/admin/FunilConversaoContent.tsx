@@ -384,6 +384,7 @@ export function FunilConversaoContent() {
     clicks: 0, impressions: 0, ctr: 0,
   });
   const [dailyData, setDailyData] = useState<DailyData[]>([]);
+  const [adsMetricsDiarios, setAdsMetricsDiarios] = useState<any[]>([]);
   const [cotacoesTimestamps, setCotacoesTimestamps] = useState<string[]>([]);
   const [conversoesGoogle, setConversoesGoogle] = useState<number>(0);
   const [mesSelecionado, setMesSelecionado] = useState<string>("");
@@ -431,6 +432,7 @@ export function FunilConversaoContent() {
         .gte("data", dataInicioStr)
         .lte("data", dataFimStr);
       if (erroAds) throw erroAds;
+      setAdsMetricsDiarios(adsMetrics || []);
 
       let totalClicks = 0;
       let totalImpressions = 0;
@@ -963,17 +965,19 @@ export function FunilConversaoContent() {
               </thead>
               <tbody>
                 {dailyData.map((day, i) => {
+                  const dayAds = adsMetricsDiarios.filter(m => m.data === day.data);
+                  const dayInvest = dayAds.reduce((sum, m) => sum + Number(m.cost_micros || 0), 0) / 1_000_000;
                   const dayCtr = day.impressions > 0 ? (day.clicks / day.impressions) * 100 : 0;
-                  const dayCpl = day.leads > 0 ? day.investimento / day.leads : 0;
+                  const dayCpl = day.leads > 0 ? dayInvest / day.leads : 0;
                   const dayCliquesPorLead = day.leads > 0 ? day.clicks / day.leads : 0;
-                  const dayCustoPorAgendado = day.conversoes > 0 ? day.investimento / day.conversoes : 0;
+                  const dayCustoPorAgendado = day.conversoes > 0 ? dayInvest / day.conversoes : 0;
                   const dayCliquesPorAgendado = day.conversoes > 0 ? day.clicks / day.conversoes : 0;
-                  const dayRoasReceita = day.investimento > 0 ? day.receita / day.investimento : 0;
-                  const dayRoasAgendados = day.investimento > 0 ? day.totalAgendados / day.investimento : 0;
+                  const dayRoasReceita = dayInvest > 0 ? day.receita / dayInvest : 0;
+                  const dayRoasAgendados = dayInvest > 0 ? day.totalAgendados / dayInvest : 0;
                   return (
                     <tr key={day.data} className={cn("transition-colors", i % 2 === 0 ? "bg-background" : "bg-muted/10")}>
                       <td className="px-2 py-1.5 text-left tabular-nums whitespace-nowrap">{day.dataLabel}</td>
-                      <td className="px-2 py-1.5 text-right tabular-nums">{fmtCell(day.investimento, "brl")}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">{fmtCell(dayInvest, "brl")}</td>
                       <td className="px-2 py-1.5 text-right tabular-nums border-l">{fmtCell(day.impressions, "num")}</td>
                       <td className="px-2 py-1.5 text-right tabular-nums">{fmtCell(day.clicks, "num")}</td>
                       <td className="px-2 py-1.5 text-right tabular-nums">{fmtCell(dayCtr, "pct")}</td>
