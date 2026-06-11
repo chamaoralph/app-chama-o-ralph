@@ -159,12 +159,12 @@ export function AcompanhamentoDiario() {
 
         // 3. Recibos diários pagos no mês
         supabase
-          .from("recibos_diarios")
-          .select("id, valor_total, data_referencia")
+          .from("servicos")
+          .select("valor_mao_obra_instalador")
           .eq("empresa_id", userData.empresa_id)
-          .eq("status_pagamento", "pago")
-          .gte("data_referencia", startDate)
-          .lte("data_referencia", endDate),
+          .eq("status", "concluido")
+          .gte("data_conclusao", startDate)
+          .lte("data_conclusao", endDate + "T23:59:59"),
 
         // 4. Cotações criadas no mês
         supabase
@@ -219,7 +219,7 @@ export function AcompanhamentoDiario() {
       .filter((l) => l.tipo === "despesa" && !CATEGORIAS_INSTALADORES.has(l.categoria))
       .reduce((s, l) => s + Number(l.valor), 0)
 
-    const totalInstaladores = recibos.reduce((s, r) => s + Number(r.valor_total), 0)
+    const totalInstaladores = recibos.reduce((s, r) => s + Number(r.valor_mao_obra_instalador || 0), 0)
 
     const lucroLiquido = totalReceitas - totalDespesasGerais - totalInstaladores
 
