@@ -81,13 +81,13 @@ export default function Caixa() {
 
       const { data, error } = await supabase
         .from("servicos")
-        .select("valor_total")
+        .select("valor_total, valor_mao_obra_instalador")
         .gte("data_servico_agendada", primeiroDia)
         .lte("data_servico_agendada", ultimoDia + "T23:59:59")
         .not("status", "eq", "cancelado");
 
       if (error) throw error;
-      const total = (data || []).reduce((sum, s) => sum + Number(s.valor_total), 0);
+      const total = (data || []).reduce((sum, s) => sum + Number(s.valor_mao_obra_instalador) * 2, 0);
       setTotalProjecao(total);
     } catch (error) {
       console.error("Erro ao carregar projeção:", error);
