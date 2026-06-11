@@ -81,8 +81,12 @@ export default function Relatorios() {
         .gte('data_servico_agendada', startDate)
         .lte('data_servico_agendada', endDateStr + 'T23:59:59')
 
-      const receitaBruta = servicosConcluidos
-        ?.reduce((sum, s) => sum + Number(s.valor_total || 0), 0) || 0
+      const receitaBruta = servicosConcluidos?.reduce((sum, s) => {
+        if (Number(s.valor_mao_obra_instalador || 0) === 0) {
+          return sum + Number(s.valor_total || 0);
+        }
+        return sum + Number(s.valor_mao_obra_instalador || 0) * 2;
+      }, 0) || 0
 
       const pagamentoInstaladores = servicosConcluidos
         ?.reduce((sum, s) => sum + Number(s.valor_mao_obra_instalador || 0), 0) || 0
