@@ -7,10 +7,15 @@ const TZ = "America/Sao_Paulo"
 const CATEGORIAS_INSTALADORES = new Set(["Pagamento Instalador", "Reembolso Materiais"])
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-function toMes(dateInput: string): string {
-  // Returns YYYY-MM in SP timezone
+function toDateStr(dateInput: string): string {
+  // Returns YYYY-MM-DD in SP timezone
   const d = new Date(dateInput)
-  return d.toLocaleDateString("en-CA", { timeZone: TZ }).slice(0, 7)
+  return d.toLocaleDateString("en-CA", { timeZone: TZ })
+}
+
+function diaAtualSP(): number {
+  const hoje = new Date().toLocaleDateString("en-CA", { timeZone: TZ })
+  return parseInt(hoje.slice(8, 10))
 }
 
 function ultimos6Meses(): string[] {
@@ -132,6 +137,83 @@ function formatVal(v: number, fmt: Fmt): string {
   return String(v)
 }
 
+// ─── Cálculo por período (dataInicio/dataFim no formato YYYY-MM-DD) ─────────
+function calcularPeriodo(
+  mes: string,
+  dataInicio: string,
+  dataFim: string,
+  dadosBrutos: { servicos: any[]; lancamentos: any[]; recibos: any[]; cotacoes: any[]; cliques: any[] }
+): DadosMes {
+  const { servicos, lancamentos, recibos, cotacoes, cliques } = dadosBrutos
+  const d = dadosVazios(mes)
+
+  const noPeriodo = (data: string) => data >= dataInicio && data <= dataFim
+  const noPeriodoTS = (data: string) => {
+    const dia = toDateStr(data)
+    return dia >= dataInicio && dia <= dataFim
+  }
+
+  // Lançamentos do período
+  const lancsDoPeriodo = lancamentos.filter((l) => noPeriodo(l.data_lancamento))
+  d.totalReceitas = lancsDoPeriodo
+    .filter((l) => l.tipo === "receita" && l.categoria !== "Reembolso Materiais")
+    .reduce((s, l) => s + Number(l.valor), 0)
+  d.totalDespesasGerais = lancsDoPeriodo
+    .filter((l) => l.tipo === "despesa" && !CATEGORIAS_INSTALADORES.has(l.categoria))
+    .reduce((s, l) => s + Number(l.valor), 0)
+  d.investimentoAds = lancsDoPeriodo
+    .filter((l) => l.tipo === "despesa" && l.categoria === "Marketing")
+    .reduce((s, l) => s + Number(l.valor), 0)
+
+  // Custo instaladores do período
+  d.totalInstaladores = recibos
+    .filter((r) => noPeriodoTS(r.data_conclusao))
+    .reduce((s, r) => s + Number(r.valor_mao_obra_instalador || 0), 0)
+
+  // Lucro
+  d.lucroLiquido = d.totalReceitas - d.totalDespesasGerais - d.totalInstaladores
+  d.margemLucro = d.totalReceitas > 0 ? (d.lucroLiquido / d.totalReceitas) * 100 : 0
+
+  // Serviços do período
+  const svsPeriodo = servicos.filter((s) => noPeriodoTS(s.data_servico_agendada))
+  d.totalServicos = svsPeriodo.length
+  d.ticketMedio = d.totalServicos > 0 ? d.totalReceitas / d.totalServicos : 0
+
+  d.jobsGoogle = svsPeriodo.filter((s) => {
+    const origem = (s.clientes as any)?.origem_lead || ""
+    return origem.toLowerCase().includes("google")
+  }).length
+  d.jobsOrganico = d.totalServicos - d.jobsGoogle
+
+  // Instaladores ativos
+  d.instaladoresAtivos = new Set(
+    svsPeriodo.map((s) => s.instalador_id).filter(Boolean)
+  ).size
+
+  // Custo por serviço (instaladores)
+  d.custoPorServicoInstalador =
+    d.totalServicos > 0 ? d.totalInstaladores / d.totalServicos : 0
+
+  // Cotações do período
+  const cotsPeriodo = cotacoes.filter((c) => noPeriodoTS(c.created_at))
+  d.totalCotacoes = cotsPeriodo.length
+  d.taxaConversao =
+    d.totalCotacoes > 0 ? (d.totalServicos / d.totalCotacoes) * 100 : 0
+
+  // ADS
+  d.custoPorCotacao =
+    d.totalCotacoes > 0 ? d.investimentoAds / d.totalCotacoes : 0
+  d.custoPorServicoAds =
+    d.jobsGoogle > 0 ? d.investimentoAds / d.jobsGoogle : 0
+  d.roasReal =
+    d.investimentoAds > 0 ? d.totalReceitas / d.investimentoAds : 0
+
+  // Cliques do período
+  d.cliques = cliques.filter((c) => noPeriodoTS(c.created_at)).length
+
+  return d
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 export function ComparativoMensal() {
   const [loading, setLoading] = useState(true)
@@ -225,81 +307,21 @@ export function ComparativoMensal() {
     }
   }
 
-  const dadosPorMes = useMemo((): DadosMes[] => {
-    const { servicos, lancamentos, recibos, cotacoes, cliques } = dadosBrutos
+  const diaAtual = useMemo(() => diaAtualSP(), [])
 
+  const dadosPorMes = useMemo((): { mes: string; total: DadosMes; proporcional: DadosMes }[] => {
     return meses.map((mes) => {
-      const d = dadosVazios(mes)
+      const lastDay = new Date(parseInt(mes.slice(0, 4)), parseInt(mes.slice(5, 7)), 0).getDate()
+      const ultimoDiaMes = `${mes}-${String(lastDay).padStart(2, "0")}`
+      const diaProp = Math.min(diaAtual, lastDay)
+      const dataPropFim = `${mes}-${String(diaProp).padStart(2, "0")}`
 
-      // Lançamentos do mês
-      const lancsDoMes = lancamentos.filter(
-        (l) => l.data_lancamento.slice(0, 7) === mes
-      )
-      d.totalReceitas = lancsDoMes
-        .filter((l) => l.tipo === "receita" && l.categoria !== "Reembolso Materiais")
-        .reduce((s, l) => s + Number(l.valor), 0)
-      d.totalDespesasGerais = lancsDoMes
-        .filter((l) => l.tipo === "despesa" && !CATEGORIAS_INSTALADORES.has(l.categoria))
-        .reduce((s, l) => s + Number(l.valor), 0)
-      d.investimentoAds = lancsDoMes
-        .filter((l) => l.tipo === "despesa" && l.categoria === "Marketing")
-        .reduce((s, l) => s + Number(l.valor), 0)
+      const total = calcularPeriodo(mes, `${mes}-01`, ultimoDiaMes, dadosBrutos)
+      const proporcional = calcularPeriodo(mes, `${mes}-01`, dataPropFim, dadosBrutos)
 
-      // Custo instaladores do mês
-      d.totalInstaladores = recibos
-        .filter((r) => toMes(r.data_conclusao) === mes)
-        .reduce((s, r) => s + Number(r.valor_mao_obra_instalador || 0), 0)
-
-      // Lucro
-      d.lucroLiquido = d.totalReceitas - d.totalDespesasGerais - d.totalInstaladores
-      d.margemLucro = d.totalReceitas > 0 ? (d.lucroLiquido / d.totalReceitas) * 100 : 0
-
-      // Serviços do mês
-      const svsMes = servicos.filter(
-        (s) => toMes(s.data_servico_agendada) === mes
-      )
-      d.totalServicos = svsMes.length
-      d.ticketMedio = d.totalServicos > 0 ? d.totalReceitas / d.totalServicos : 0
-
-      d.jobsGoogle = svsMes.filter((s) => {
-        const origem = (s.clientes as any)?.origem_lead || ""
-        return origem.toLowerCase().includes("google")
-      }).length
-      d.jobsOrganico = d.totalServicos - d.jobsGoogle
-
-      // Instaladores ativos
-      d.instaladoresAtivos = new Set(
-        svsMes.map((s) => s.instalador_id).filter(Boolean)
-      ).size
-
-      // Custo por serviço (instaladores)
-      d.custoPorServicoInstalador =
-        d.totalServicos > 0 ? d.totalInstaladores / d.totalServicos : 0
-
-      // Cotações do mês
-      const cotsMes = cotacoes.filter(
-        (c) => toMes(c.created_at) === mes
-      )
-      d.totalCotacoes = cotsMes.length
-      d.taxaConversao =
-        d.totalCotacoes > 0 ? (d.totalServicos / d.totalCotacoes) * 100 : 0
-
-      // ADS
-      d.custoPorCotacao =
-        d.totalCotacoes > 0 ? d.investimentoAds / d.totalCotacoes : 0
-      d.custoPorServicoAds =
-        d.jobsGoogle > 0 ? d.investimentoAds / d.jobsGoogle : 0
-      d.roasReal =
-        d.investimentoAds > 0 ? d.totalReceitas / d.investimentoAds : 0
-
-      // Cliques do mês
-      d.cliques = cliques.filter(
-        (c) => toMes(c.created_at) === mes
-      ).length
-
-      return d
+      return { mes, total, proporcional }
     })
-  }, [dadosBrutos, meses])
+  }, [dadosBrutos, meses, diaAtual])
 
   // ─── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -307,23 +329,40 @@ export function ComparativoMensal() {
       <table className="w-full text-sm border-collapse">
         <thead>
           <tr className="border-b bg-muted/50">
-            <th className="sticky left-0 z-10 bg-muted/50 px-4 py-3 text-left font-semibold text-muted-foreground min-w-[190px]">
+            <th rowSpan={2} className="sticky left-0 z-10 bg-muted/50 px-4 py-3 text-left font-semibold text-muted-foreground min-w-[190px] align-bottom">
               Métrica
             </th>
             {loading
               ? Array.from({ length: 6 }).map((_, i) => (
-                  <th key={i} className="px-4 py-3 text-center min-w-[130px]">
+                  <th key={i} colSpan={2} className="px-4 py-3 text-center min-w-[180px] border-l">
                     <Skeleton className="h-4 w-16 mx-auto" />
                   </th>
                 ))
               : meses.map((mes) => (
                   <th
                     key={mes}
-                    className="px-4 py-3 text-center font-semibold min-w-[130px] text-foreground"
+                    colSpan={2}
+                    className="px-4 py-3 text-center font-semibold min-w-[180px] text-foreground border-l"
                   >
                     {labelMes(mes)}
                   </th>
                 ))}
+          </tr>
+          <tr className="border-b bg-muted/30">
+            {loading
+              ? Array.from({ length: 12 }).map((_, i) => (
+                  <th key={i} className="px-2 py-1.5 text-center min-w-[90px]">
+                    <Skeleton className="h-3 w-10 mx-auto" />
+                  </th>
+                ))
+              : meses.flatMap((mes) => [
+                  <th key={`${mes}-total`} className="px-2 py-1.5 text-center text-xs font-medium text-muted-foreground min-w-[90px] border-l">
+                    Total
+                  </th>,
+                  <th key={`${mes}-prop`} className="px-2 py-1.5 text-center text-xs font-medium text-muted-foreground min-w-[90px]">
+                    Prop.
+                  </th>,
+                ])}
           </tr>
         </thead>
         <tbody>
@@ -334,7 +373,7 @@ export function ComparativoMensal() {
                 {isFirstDaSecao && (
                   <tr key={`secao-${linha.secao}`} className="bg-muted/30 border-t-2 border-border">
                     <td
-                      colSpan={7}
+                      colSpan={13}
                       className="sticky left-0 px-4 py-1.5 text-xs font-bold tracking-widest uppercase text-muted-foreground bg-muted/30"
                     >
                       {linha.secao}
@@ -349,30 +388,45 @@ export function ComparativoMensal() {
                     {linha.label}
                   </td>
                   {loading
-                    ? Array.from({ length: 6 }).map((_, i) => (
-                        <td key={i} className="px-4 py-2.5 text-center">
-                          <Skeleton className="h-4 w-20 mx-auto" />
+                    ? Array.from({ length: 12 }).map((_, i) => (
+                        <td key={i} className="px-2 py-2.5 text-center">
+                          <Skeleton className="h-4 w-16 mx-auto" />
                         </td>
                       ))
-                    : dadosPorMes.map((dados, i) => {
-                        const val = dados[linha.key] as number
-                        const anterior = i > 0 ? (dadosPorMes[i - 1][linha.key] as number) : null
+                    : dadosPorMes.flatMap((dados, i) => {
+                        const valTotal = dados.total[linha.key] as number
+                        const valProp = dados.proporcional[linha.key] as number
+                        const anteriorTotal = i > 0 ? (dadosPorMes[i - 1].total[linha.key] as number) : null
+                        const anteriorProp = i > 0 ? (dadosPorMes[i - 1].proporcional[linha.key] as number) : null
                         const isPositivo = linha.isPositivo !== false
-                        return (
+                        return [
                           <td
-                            key={dados.mes}
-                            className="px-4 py-2.5 text-right tabular-nums"
+                            key={`${dados.mes}-total`}
+                            className="px-2 py-2.5 text-right tabular-nums border-l"
                           >
-                            <span>{formatVal(val, linha.fmt)}</span>
-                            {anterior !== null && (
+                            <span>{formatVal(valTotal, linha.fmt)}</span>
+                            {anteriorTotal !== null && (
                               <Tendencia
-                                atual={val}
-                                anterior={anterior}
+                                atual={valTotal}
+                                anterior={anteriorTotal}
                                 isPositivo={isPositivo}
                               />
                             )}
-                          </td>
-                        )
+                          </td>,
+                          <td
+                            key={`${dados.mes}-prop`}
+                            className="px-2 py-2.5 text-right tabular-nums"
+                          >
+                            <span>{formatVal(valProp, linha.fmt)}</span>
+                            {anteriorProp !== null && (
+                              <Tendencia
+                                atual={valProp}
+                                anterior={anteriorProp}
+                                isPositivo={isPositivo}
+                              />
+                            )}
+                          </td>,
+                        ]
                       })}
                 </tr>
               </>
