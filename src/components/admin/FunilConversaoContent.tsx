@@ -46,6 +46,8 @@ interface DailyData {
   receita: number;
   clicks: number;
   impressions: number;
+  conversoesGoogle: number;
+  totalAgendados: number;
 }
 
 interface CotacaoDetalhe {
@@ -559,10 +561,12 @@ export function FunilConversaoContent() {
         let dayInvestimento = 0;
         let dayClicks = 0;
         let dayImpressions = 0;
+        let dayConversoesGoogle = 0;
         if (adsMetrics && adsMetrics.length > 0) {
           const dayAds = adsMetrics.filter(m => m.data === dayStr);
           dayClicks = dayAds.reduce((sum, m) => sum + (m.clicks || 0), 0);
           dayImpressions = dayAds.reduce((sum, m) => sum + (m.impressions || 0), 0);
+          dayConversoesGoogle = dayAds.reduce((sum, m) => sum + Number(m.conversions || 0), 0);
           if (usandoGoogleAds) {
             dayInvestimento = dayAds.reduce((sum, m) => sum + Number(m.cost_micros || 0), 0) / 1_000_000;
           }
@@ -574,6 +578,9 @@ export function FunilConversaoContent() {
           s.cotacao_id && dayCotacaoIds.includes(s.cotacao_id) && s.status !== "cancelado"
         );
         const dayServicosConc = dayServicos.filter(s => s.status === "concluido");
+        const dayTotalAgendados = servicosEnriquecidos
+          .filter(s => s.data_servico_agendada?.startsWith(dayStr))
+          .reduce((sum, s) => sum + Number(s.valor_mao_obra || 0), 0);
         return {
           data: dayStr, dataLabel: dayLabel,
           investimento: dayInvestimento,
@@ -581,6 +588,8 @@ export function FunilConversaoContent() {
           conversoes: dayServicos.length,
           receita: dayServicosConc.reduce((sum, s) => sum + Number(cotacaoInfoMap[s.cotacao_id ?? ""]?.valor_mao_obra ?? 0), 0),
           clicks: dayClicks, impressions: dayImpressions,
+          conversoesGoogle: dayConversoesGoogle,
+          totalAgendados: dayTotalAgendados,
         };
       });
       setDailyData(dailyMetrics);
@@ -597,6 +606,16 @@ export function FunilConversaoContent() {
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
   const formatNumber = (value: number) =>
     new Intl.NumberFormat("pt-BR").format(value);
+  const fmtCell = (value: number, tipo: "brl" | "num" | "pct" | "ratio" | "roas") => {
+    if (!value) return "—";
+    switch (tipo) {
+      case "brl": return formatCurrency(value);
+      case "num": return formatNumber(Math.round(value));
+      case "pct": return `${value.toFixed(2)}%`;
+      case "ratio": return value.toFixed(1);
+      case "roas": return `${value.toFixed(2)}x`;
+    }
+  };
 
   // Resumo do funil - métricas derivadas
   const cliquesPorLead = funnelData.leads > 0 ? funnelData.clicks / funnelData.leads : 0;
@@ -896,50 +915,99 @@ export function FunilConversaoContent() {
         </CardContent>
       </Card>
 
-      {/* Resumo do Funil */}
+      {/* Resumo do Funil - tabela diária */}
       <Card>
         <CardHeader>
           <CardTitle>Resumo do Funil</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto rounded-lg border">
-            <table className="w-full text-sm border-collapse">
+            <table className="text-xs border-collapse table-fixed">
+              <colgroup>
+                <col className="w-16" />
+                <col className="w-[90px]" />
+                <col className="w-[90px]" />
+                <col className="w-20" />
+                <col className="w-[70px]" />
+                <col className="w-[90px]" />
+                <col className="w-[70px]" />
+                <col className="w-20" />
+                <col className="w-[90px]" />
+                <col className="w-20" />
+                <col className="w-[90px]" />
+                <col className="w-[90px]" />
+                <col className="w-[90px]" />
+                <col className="w-[90px]" />
+                <col className="w-[90px]" />
+                <col className="w-[90px]" />
+              </colgroup>
               <thead>
                 <tr className="bg-muted/50 border-b">
-                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Invest.</th>
-                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap border-l">Impressões</th>
-                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Cliques</th>
-                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">CTR</th>
-                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap border-l">Conv. Google</th>
-                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Leads</th>
-                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">CPL</th>
-                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Cliques/Lead</th>
-                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap border-l">Agendados</th>
-                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Valor Agend.</th>
-                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Custo/Agend.</th>
-                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">Cliques/Agend.</th>
-                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap border-l">Receita</th>
-                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">ROAS Receita</th>
-                  <th className="px-3 py-2 text-center font-semibold text-muted-foreground whitespace-nowrap">ROAS Agend.</th>
+                  <th className="px-2 py-2 text-left font-semibold text-muted-foreground whitespace-nowrap">Data</th>
+                  <th className="px-2 py-2 text-right font-semibold text-muted-foreground whitespace-nowrap">Invest.</th>
+                  <th className="px-2 py-2 text-right font-semibold text-muted-foreground whitespace-nowrap border-l">Impressões</th>
+                  <th className="px-2 py-2 text-right font-semibold text-muted-foreground whitespace-nowrap">Cliques</th>
+                  <th className="px-2 py-2 text-right font-semibold text-muted-foreground whitespace-nowrap">CTR</th>
+                  <th className="px-2 py-2 text-right font-semibold text-muted-foreground whitespace-nowrap border-l">Conv. Google</th>
+                  <th className="px-2 py-2 text-right font-semibold text-muted-foreground whitespace-nowrap">Leads</th>
+                  <th className="px-2 py-2 text-right font-semibold text-muted-foreground whitespace-nowrap">CPL</th>
+                  <th className="px-2 py-2 text-right font-semibold text-muted-foreground whitespace-nowrap">Cliques/Lead</th>
+                  <th className="px-2 py-2 text-right font-semibold text-muted-foreground whitespace-nowrap border-l">Agendados</th>
+                  <th className="px-2 py-2 text-right font-semibold text-muted-foreground whitespace-nowrap">Valor Agend.</th>
+                  <th className="px-2 py-2 text-right font-semibold text-muted-foreground whitespace-nowrap">Custo/Agend.</th>
+                  <th className="px-2 py-2 text-right font-semibold text-muted-foreground whitespace-nowrap">Cliques/Agend.</th>
+                  <th className="px-2 py-2 text-right font-semibold text-muted-foreground whitespace-nowrap border-l">Receita</th>
+                  <th className="px-2 py-2 text-right font-semibold text-muted-foreground whitespace-nowrap">ROAS Receita</th>
+                  <th className="px-2 py-2 text-right font-semibold text-muted-foreground whitespace-nowrap">ROAS Agend.</th>
                 </tr>
               </thead>
               <tbody>
-                <tr className="hover:bg-muted/20 transition-colors">
-                  <td className="px-3 py-2.5 text-center tabular-nums font-medium">{formatCurrency(funnelData.investimento)}</td>
-                  <td className="px-3 py-2.5 text-center tabular-nums border-l">{formatNumber(funnelData.impressions)}</td>
-                  <td className="px-3 py-2.5 text-center tabular-nums">{formatNumber(funnelData.clicks)}</td>
-                  <td className="px-3 py-2.5 text-center tabular-nums">{funnelData.ctr.toFixed(2)}%</td>
-                  <td className="px-3 py-2.5 text-center tabular-nums border-l">{conversoesGoogle.toFixed(0)}</td>
-                  <td className="px-3 py-2.5 text-center tabular-nums">{funnelData.leads}</td>
-                  <td className="px-3 py-2.5 text-center tabular-nums">{formatCurrency(funnelData.cpl)}</td>
-                  <td className="px-3 py-2.5 text-center tabular-nums">{cliquesPorLead.toFixed(1)}</td>
-                  <td className="px-3 py-2.5 text-center tabular-nums border-l">{funnelData.agendados}</td>
-                  <td className="px-3 py-2.5 text-center tabular-nums">{formatCurrency(funnelData.totalAgendados)}</td>
-                  <td className="px-3 py-2.5 text-center tabular-nums">{formatCurrency(custoPorAgendado)}</td>
-                  <td className="px-3 py-2.5 text-center tabular-nums">{cliquesPorAgendado.toFixed(1)}</td>
-                  <td className="px-3 py-2.5 text-center tabular-nums border-l">{formatCurrency(funnelData.receita)}</td>
-                  <td className="px-3 py-2.5 text-center tabular-nums">{funnelData.roas.toFixed(2)}x</td>
-                  <td className="px-3 py-2.5 text-center tabular-nums">{roasAgendados.toFixed(2)}x</td>
+                {dailyData.map((day, i) => {
+                  const dayCtr = day.impressions > 0 ? (day.clicks / day.impressions) * 100 : 0;
+                  const dayCpl = day.leads > 0 ? day.investimento / day.leads : 0;
+                  const dayCliquesPorLead = day.leads > 0 ? day.clicks / day.leads : 0;
+                  const dayCustoPorAgendado = day.conversoes > 0 ? day.investimento / day.conversoes : 0;
+                  const dayCliquesPorAgendado = day.conversoes > 0 ? day.clicks / day.conversoes : 0;
+                  const dayRoasReceita = day.investimento > 0 ? day.receita / day.investimento : 0;
+                  const dayRoasAgendados = day.investimento > 0 ? day.totalAgendados / day.investimento : 0;
+                  return (
+                    <tr key={day.data} className={cn("transition-colors", i % 2 === 0 ? "bg-background" : "bg-muted/10")}>
+                      <td className="px-2 py-1.5 text-left tabular-nums whitespace-nowrap">{day.dataLabel}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">{fmtCell(day.investimento, "brl")}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums border-l">{fmtCell(day.impressions, "num")}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">{fmtCell(day.clicks, "num")}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">{fmtCell(dayCtr, "pct")}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums border-l">{fmtCell(day.conversoesGoogle, "ratio")}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">{fmtCell(day.leads, "num")}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">{fmtCell(dayCpl, "brl")}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">{fmtCell(dayCliquesPorLead, "ratio")}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums border-l">{fmtCell(day.conversoes, "num")}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">{fmtCell(day.totalAgendados, "brl")}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">{fmtCell(dayCustoPorAgendado, "brl")}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">{fmtCell(dayCliquesPorAgendado, "ratio")}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums border-l">{fmtCell(day.receita, "brl")}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">{fmtCell(dayRoasReceita, "roas")}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">{fmtCell(dayRoasAgendados, "roas")}</td>
+                    </tr>
+                  );
+                })}
+                <tr className="font-bold bg-muted/60 border-t-2 border-border">
+                  <td className="px-2 py-1.5 text-left whitespace-nowrap">TOTAL</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums">{fmtCell(funnelData.investimento, "brl")}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums border-l">{fmtCell(funnelData.impressions, "num")}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums">{fmtCell(funnelData.clicks, "num")}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums">{fmtCell(funnelData.ctr, "pct")}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums border-l">{fmtCell(conversoesGoogle, "ratio")}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums">{fmtCell(funnelData.leads, "num")}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums">{fmtCell(funnelData.cpl, "brl")}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums">{fmtCell(cliquesPorLead, "ratio")}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums border-l">{fmtCell(funnelData.agendados, "num")}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums">{fmtCell(funnelData.totalAgendados, "brl")}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums">{fmtCell(custoPorAgendado, "brl")}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums">{fmtCell(cliquesPorAgendado, "ratio")}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums border-l">{fmtCell(funnelData.receita, "brl")}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums">{fmtCell(funnelData.roas, "roas")}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums">{fmtCell(roasAgendados, "roas")}</td>
                 </tr>
               </tbody>
             </table>
