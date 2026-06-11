@@ -61,8 +61,8 @@ export default function Caixa() {
         .from("servicos")
         .select("valor_mao_obra_instalador")
         .eq("status", "concluido")
-        .gte("data_servico_agendada", primeiroDia)
-        .lte("data_servico_agendada", ultimoDia + "T23:59:59");
+        .gte("data_conclusao", primeiroDia)
+        .lte("data_conclusao", ultimoDia + "T23:59:59");
 
       if (error) throw error;
       const total = (data || []).reduce((sum, s) => sum + Number(s.valor_mao_obra_instalador), 0);
