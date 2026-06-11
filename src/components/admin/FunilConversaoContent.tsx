@@ -571,6 +571,9 @@ export function FunilConversaoContent() {
             dayInvestimento = dayAds.reduce((sum, m) => sum + Number(m.cost_micros || 0), 0) / 1_000_000;
           }
         }
+        if (!usandoGoogleAds && investimentoManual > 0) {
+          dayInvestimento = investimentoManual / days.length;
+        }
         const dayCotacaoIds = (cotacoes || []).filter(c =>
           c.created_at && c.created_at.startsWith(dayStr)
         ).map(c => c.id);
