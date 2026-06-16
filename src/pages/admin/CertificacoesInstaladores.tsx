@@ -18,30 +18,14 @@ export default function CertificacoesInstaladores() {
   const { data: certificacoes } = useQuery({
     queryKey: ['admin-certificacoes', instaladorFiltro, statusFiltro],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      console.log('User:', user?.id);
-
       let query = supabase
         .from('certificacoes')
-        .select(`
-          *,
-          instalador:usuarios (
-            nome,
-            id
-          ),
-          questionario:questionarios (
-            titulo
-          ),
-          tentativa:tentativas (
-            nota_obtida
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (instaladorFiltro !== 'todos') {
         query = query.eq('instalador_id', instaladorFiltro);
       }
-
       if (statusFiltro === 'ativo') {
         query = query.eq('ativa', true);
       } else if (statusFiltro === 'expirado') {
@@ -49,8 +33,6 @@ export default function CertificacoesInstaladores() {
       }
 
       const { data, error } = await query;
-      console.log('Certificações data:', data);
-      console.log('Certificações error:', error);
       if (error) throw error;
       return data;
     },
@@ -70,6 +52,35 @@ export default function CertificacoesInstaladores() {
     },
   });
 
+  const tentativaIds = certificacoes?.map((c) => c.tentativa_id).filter(Boolean) ?? [];
+  const questionarioIds = certificacoes?.map((c) => c.questionario_id).filter(Boolean) ?? [];
+
+  const { data: tentativasData } = useQuery({
+    queryKey: ['tentativas-notas', tentativaIds.join(',')],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('tentativas')
+        .select('id, nota_obtida')
+        .in('id', tentativaIds);
+      if (error) throw error;
+      return data;
+    },
+    enabled: tentativaIds.length > 0,
+  });
+
+  const { data: questionariosData } = useQuery({
+    queryKey: ['questionarios-titulos', questionarioIds.join(',')],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('questionarios')
+        .select('id, titulo')
+        .in('id', questionarioIds);
+      if (error) throw error;
+      return data;
+    },
+    enabled: questionarioIds.length > 0,
+  });
+
   const totalCertificacoes = certificacoes?.length || 0;
   const certificacoesAtivas = certificacoes?.filter((c) => {
     const estaAtiva = c.ativa;
@@ -78,9 +89,12 @@ export default function CertificacoesInstaladores() {
   }).length || 0;
 
   const totalInstaladores = new Set(certificacoes?.map((c) => c.instalador_id)).size;
-  
-  const mediaNotas = certificacoes?.length
-    ? (certificacoes.reduce((sum, c) => sum + (c.tentativa?.nota_obtida ?? 0), 0) / certificacoes.length).toFixed(1)
+
+  const mediaNotas = certificacoes?.length && tentativasData?.length
+    ? (certificacoes.reduce((sum, c) => {
+        const tent = tentativasData.find((t) => t.id === c.tentativa_id);
+        return sum + (tent?.nota_obtida ?? 0);
+      }, 0) / certificacoes.length).toFixed(1)
     : 0;
 
   return (
@@ -189,11 +203,14 @@ export default function CertificacoesInstaladores() {
                   {certificacoes.map((cert) => {
                     const estaExpirada =
                       !cert.ativa || (cert.validade_ate && new Date(cert.validade_ate) < new Date());
+                    const instaladorNome = instaladores?.find((i) => i.id === cert.instalador_id)?.nome ?? '—';
+                    const questionarioTitulo = questionariosData?.find((q) => q.id === cert.questionario_id)?.titulo ?? '—';
+                    const nota = tentativasData?.find((t) => t.id === cert.tentativa_id)?.nota_obtida;
 
                     return (
                       <TableRow key={cert.id}>
-                        <TableCell className="font-medium">{cert.instalador?.nome ?? '—'}</TableCell>
-                        <TableCell>{cert.questionario?.titulo ?? '—'}</TableCell>
+                        <TableCell className="font-medium">{instaladorNome}</TableCell>
+                        <TableCell>{questionarioTitulo}</TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
                             {cert.tipos_servico_liberados.map((tipo) => (
@@ -209,15 +226,15 @@ export default function CertificacoesInstaladores() {
                         </TableCell>
                         <TableCell>
                           <span className="font-semibold text-primary">
-                            {cert.tentativa?.nota_obtida != null ? cert.tentativa.nota_obtida.toFixed(0) + '%' : '—'}
+                            {nota != null ? nota.toFixed(0) + '%' : '—'}
                           </span>
                         </TableCell>
                         <TableCell>
-                          {format(new Date(cert.created_at), "dd/MM/yyyy", { locale: ptBR })}
+                          {format(new Date(cert.created_at), 'dd/MM/yyyy', { locale: ptBR })}
                         </TableCell>
                         <TableCell>
                           {cert.validade_ate
-                            ? format(new Date(cert.validade_ate), "dd/MM/yyyy", { locale: ptBR })
+                            ? format(new Date(cert.validade_ate), 'dd/MM/yyyy', { locale: ptBR })
                             : 'Sem validade'}
                         </TableCell>
                         <TableCell>
