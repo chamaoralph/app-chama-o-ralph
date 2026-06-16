@@ -121,7 +121,7 @@ export default function ListaServicos() {
     try {
       const { error } = await supabase
         .from('servicos')
-        .update({ status: 'disponivel' })
+        .update({ status: 'disponivel', instalador_id: null })
         .eq('id', servicoId)
 
       if (error) throw error
@@ -250,9 +250,12 @@ export default function ListaServicos() {
     if (!servicoParaMudarStatus || !novoStatus) return
 
     try {
+      const updateData: any = { status: novoStatus }
+      if (novoStatus === 'disponivel') updateData.instalador_id = null
+
       const { error } = await supabase
         .from('servicos')
-        .update({ status: novoStatus })
+        .update(updateData)
         .eq('id', servicoParaMudarStatus.id)
 
       if (error) throw error
