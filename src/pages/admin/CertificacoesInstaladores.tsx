@@ -22,7 +22,7 @@ export default function CertificacoesInstaladores() {
         .from('certificacoes')
         .select(`
           *,
-          instalador:usuarios!inner (
+          instalador:usuarios (
             nome,
             id
           ),
