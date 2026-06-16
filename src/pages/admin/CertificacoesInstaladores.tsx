@@ -29,7 +29,7 @@ export default function CertificacoesInstaladores() {
           questionario:questionarios (
             titulo
           ),
-          tentativa:tentativas!certificacoes_tentativa_id_fkey (
+          tentativa:tentativas (
             nota_obtida
           )
         `)
@@ -75,7 +75,7 @@ export default function CertificacoesInstaladores() {
   const totalInstaladores = new Set(certificacoes?.map((c) => c.instalador_id)).size;
   
   const mediaNotas = certificacoes?.length
-    ? (certificacoes.reduce((sum, c) => sum + c.tentativa.nota_obtida, 0) / certificacoes.length).toFixed(1)
+    ? (certificacoes.reduce((sum, c) => sum + (c.tentativa?.nota_obtida ?? 0), 0) / certificacoes.length).toFixed(1)
     : 0;
 
   return (
@@ -187,8 +187,8 @@ export default function CertificacoesInstaladores() {
 
                     return (
                       <TableRow key={cert.id}>
-                        <TableCell className="font-medium">{cert.instalador.nome}</TableCell>
-                        <TableCell>{cert.questionario.titulo}</TableCell>
+                        <TableCell className="font-medium">{cert.instalador?.nome ?? '—'}</TableCell>
+                        <TableCell>{cert.questionario?.titulo ?? '—'}</TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
                             {cert.tipos_servico_liberados.map((tipo) => (
@@ -204,7 +204,7 @@ export default function CertificacoesInstaladores() {
                         </TableCell>
                         <TableCell>
                           <span className="font-semibold text-primary">
-                            {cert.tentativa.nota_obtida.toFixed(0)}%
+                            {cert.tentativa?.nota_obtida != null ? cert.tentativa.nota_obtida.toFixed(0) + '%' : '—'}
                           </span>
                         </TableCell>
                         <TableCell>
