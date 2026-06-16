@@ -18,6 +18,9 @@ export default function CertificacoesInstaladores() {
   const { data: certificacoes } = useQuery({
     queryKey: ['admin-certificacoes', instaladorFiltro, statusFiltro],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('User:', user?.id);
+
       let query = supabase
         .from('certificacoes')
         .select(`
@@ -46,6 +49,8 @@ export default function CertificacoesInstaladores() {
       }
 
       const { data, error } = await query;
+      console.log('Certificações data:', data);
+      console.log('Certificações error:', error);
       if (error) throw error;
       return data;
     },
