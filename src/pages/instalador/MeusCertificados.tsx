@@ -12,21 +12,29 @@ import { CertificadoBadge } from '@/components/CertificadoBadge';
 
 interface Certificacao {
   id: string;
+  questionario_id: string;
+  tentativa_id: string;
   tipos_servico_liberados: string[];
   created_at: string;
   validade_ate: string | null;
   ativa: boolean;
-  questionario: {
-    titulo: string;
-  };
-  tentativa: {
-    nota_obtida: number;
-  };
+}
+
+interface Questionario {
+  id: string;
+  titulo: string;
+}
+
+interface Tentativa {
+  id: string;
+  nota_obtida: number;
 }
 
 export default function MeusCertificados() {
   const { user } = useAuth();
   const [certificacoes, setCertificacoes] = useState<Certificacao[]>([]);
+  const [questionarios, setQuestionarios] = useState<Questionario[]>([]);
+  const [tentativas, setTentativas] = useState<Tentativa[]>([]);
   const [filtro, setFiltro] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -38,18 +46,34 @@ export default function MeusCertificados() {
     if (!user) return;
 
     try {
-      const { data, error } = await supabase
+      const { data: certs, error } = await supabase
         .from('certificacoes')
-        .select(`
-          *,
-          questionario:questionarios (titulo),
-          tentativa:tentativas (nota_obtida)
-        `)
+        .select('*')
         .eq('instalador_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setCertificacoes(data || []);
+      const lista = certs || [];
+      setCertificacoes(lista);
+
+      const questionarioIds = lista.map((c) => c.questionario_id).filter(Boolean);
+      const tentativaIds = lista.map((c) => c.tentativa_id).filter(Boolean);
+
+      if (questionarioIds.length) {
+        const { data: quests } = await supabase
+          .from('questionarios')
+          .select('id, titulo')
+          .in('id', questionarioIds);
+        setQuestionarios(quests || []);
+      }
+
+      if (tentativaIds.length) {
+        const { data: tents } = await supabase
+          .from('tentativas')
+          .select('id, nota_obtida')
+          .in('id', tentativaIds);
+        setTentativas(tents || []);
+      }
     } catch (error) {
       console.error('Erro ao carregar certificações:', error);
     } finally {
@@ -57,10 +81,16 @@ export default function MeusCertificados() {
     }
   }
 
+  const getTitulo = (cert: Certificacao) =>
+    questionarios.find((q) => q.id === cert.questionario_id)?.titulo ?? '—';
+
+  const getNota = (cert: Certificacao) =>
+    tentativas.find((t) => t.id === cert.tentativa_id)?.nota_obtida ?? null;
+
   const certificacoesFiltradas = certificacoes.filter((cert) =>
     cert.tipos_servico_liberados.some((tipo) =>
       tipo.toLowerCase().includes(filtro.toLowerCase())
-    ) || cert.questionario.titulo.toLowerCase().includes(filtro.toLowerCase())
+    ) || getTitulo(cert).toLowerCase().includes(filtro.toLowerCase())
   );
 
   const certificacoesAtivas = certificacoes.filter((c) => {
@@ -149,17 +179,18 @@ export default function MeusCertificados() {
             {certificacoesFiltradas.map((cert) => {
               const estaExpirada =
                 !cert.ativa || (cert.validade_ate && new Date(cert.validade_ate) < new Date());
+              const nota = getNota(cert);
 
               return (
                 <Card key={cert.id} className={estaExpirada ? 'opacity-60' : ''}>
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div className="space-y-1">
-                        <CardTitle className="text-lg">{cert.questionario.titulo}</CardTitle>
+                        <CardTitle className="text-lg">{getTitulo(cert)}</CardTitle>
                         <CardDescription>
                           <div className="flex items-center gap-2 text-xs">
                             <Calendar className="h-3 w-3" />
-                            Obtido em {format(new Date(cert.created_at), "dd/MM/yyyy", { locale: ptBR })}
+                            Obtido em {format(new Date(cert.created_at), 'dd/MM/yyyy', { locale: ptBR })}
                           </div>
                         </CardDescription>
                       </div>
@@ -189,7 +220,7 @@ export default function MeusCertificados() {
                     <div className="flex items-center justify-between text-sm border-t pt-3">
                       <span className="text-muted-foreground">Nota Obtida:</span>
                       <span className="font-bold text-primary">
-                        {cert.tentativa.nota_obtida.toFixed(0)}%
+                        {nota != null ? nota.toFixed(0) + '%' : '—'}
                       </span>
                     </div>
 
@@ -197,7 +228,7 @@ export default function MeusCertificados() {
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Válido até:</span>
                         <span>
-                          {format(new Date(cert.validade_ate), "dd/MM/yyyy", { locale: ptBR })}
+                          {format(new Date(cert.validade_ate), 'dd/MM/yyyy', { locale: ptBR })}
                         </span>
                       </div>
                     )}
