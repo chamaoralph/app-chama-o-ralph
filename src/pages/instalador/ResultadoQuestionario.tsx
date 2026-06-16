@@ -11,18 +11,20 @@ import { CertificadoBadge } from '@/components/CertificadoBadge';
 interface Tentativa {
   id: string;
   questionario_id: string;
+  instalador_id: string;
   nota_obtida: number;
   total_perguntas: number;
   acertos: number;
   aprovado: boolean;
   tempo_gasto_minutos: number;
-  questionario: {
-    id: string;
-    titulo: string;
-    nota_minima: number;
-    tentativas_maximas: number | null;
-    tipos_servico_liberados: string[];
-  };
+}
+
+interface Questionario {
+  id: string;
+  titulo: string;
+  nota_minima: number;
+  tentativas_maximas: number | null;
+  tipos_servico_liberados: string[];
 }
 
 interface Certificacao {
@@ -37,6 +39,7 @@ export default function ResultadoQuestionario() {
   const navigate = useNavigate();
 
   const [tentativa, setTentativa] = useState<Tentativa | null>(null);
+  const [questionario, setQuestionario] = useState<Questionario | null>(null);
   const [certificacao, setCertificacao] = useState<Certificacao | null>(null);
   const [tentativasRealizadas, setTentativasRealizadas] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -65,21 +68,27 @@ export default function ResultadoQuestionario() {
     try {
       const { data: tent, error: tentError } = await supabase
         .from('tentativas')
-        .select(`
-          *,
-          questionario:questionarios (
-            id,
-            titulo,
-            nota_minima,
-            tentativas_maximas,
-            tipos_servico_liberados
-          )
-        `)
+        .select('*')
         .eq('id', tentativaId)
         .single();
 
-      if (tentError) throw tentError;
+      if (tentError) {
+        console.error('Erro ao buscar tentativa:', tentError);
+        throw tentError;
+      }
       setTentativa(tent);
+
+      const { data: quest, error: questError } = await supabase
+        .from('questionarios')
+        .select('id, titulo, nota_minima, tentativas_maximas, tipos_servico_liberados')
+        .eq('id', tent.questionario_id)
+        .single();
+
+      if (questError) {
+        console.error('Erro ao buscar questionário:', questError);
+      } else {
+        setQuestionario(quest);
+      }
 
       if (tent.aprovado) {
         const found = await buscarCertificacao(tentativaId);
@@ -126,8 +135,8 @@ export default function ResultadoQuestionario() {
   }
 
   const podeRefazer =
-    !tentativa.questionario.tentativas_maximas ||
-    tentativasRealizadas < tentativa.questionario.tentativas_maximas;
+    !questionario?.tentativas_maximas ||
+    tentativasRealizadas < questionario.tentativas_maximas;
 
   return (
     <InstaladorLayout>
@@ -148,7 +157,7 @@ export default function ResultadoQuestionario() {
             <CardTitle className="text-2xl">
               {tentativa.aprovado ? '🎉 APROVADO!' : '😔 REPROVADO'}
             </CardTitle>
-            <CardDescription>{tentativa.questionario.titulo}</CardDescription>
+            <CardDescription>{questionario?.titulo}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-2 gap-4 text-center">
@@ -158,7 +167,7 @@ export default function ResultadoQuestionario() {
                 </div>
                 <div className="text-sm text-muted-foreground">Nota Obtida</div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  (Mínimo: {tentativa.questionario.nota_minima}%)
+                  (Mínimo: {questionario?.nota_minima}%)
                 </div>
               </div>
 
@@ -219,9 +228,9 @@ export default function ResultadoQuestionario() {
                 <p className="text-sm text-center">
                   Não foi dessa vez. Revise o conteúdo e tente novamente!
                 </p>
-                {tentativa.questionario.tentativas_maximas && (
+                {questionario?.tentativas_maximas && (
                   <p className="text-xs text-center text-muted-foreground">
-                    Tentativas: {tentativasRealizadas}/{tentativa.questionario.tentativas_maximas}
+                    Tentativas: {tentativasRealizadas}/{questionario.tentativas_maximas}
                   </p>
                 )}
               </div>
