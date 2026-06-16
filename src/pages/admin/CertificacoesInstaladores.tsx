@@ -29,7 +29,7 @@ export default function CertificacoesInstaladores() {
           questionario:questionarios (
             titulo
           ),
-          tentativa:tentativas (
+          tentativa:tentativas!certificacoes_tentativa_id_fkey (
             nota_obtida
           )
         `)
