@@ -420,23 +420,6 @@ export default function NovaCotacao() {
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Valor do Material</label>
-                <input 
-                  type="number" 
-                  step="0.01" 
-                  value={formData.origem_suporte === 'empresa' ? '' : formData.valor_material} 
-                  onChange={(e) => setFormData({...formData, valor_material: e.target.value})} 
-                  className="w-full px-3 py-2 border rounded-md disabled:opacity-50 disabled:cursor-not-allowed" 
-                  placeholder="R$ 0,00"
-                  disabled={formData.origem_suporte === 'empresa'}
-                />
-                {formData.origem_suporte === 'empresa' && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    💡 Sem reembolso de material quando a empresa fornece o suporte
-                  </p>
-                )}
-              </div>
-              <div>
                 <label className="block text-sm font-medium mb-2">Horário Início</label>
                 <select 
                   value={formData.horario_inicio} 
@@ -568,70 +551,6 @@ export default function NovaCotacao() {
                 />
               </div>
               
-              {/* Seção Suporte */}
-              <div className="col-span-2 border-t pt-4">
-                <h3 className="text-lg font-semibold mb-3">Suporte de TV</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Origem do Suporte</label>
-                    <select 
-                      value={formData.origem_suporte} 
-                      onChange={async (e) => {
-                        const novaOrigem = e.target.value
-                        setFormData({...formData, origem_suporte: novaOrigem, custo_suporte: '', valor_material: novaOrigem === 'empresa' ? '' : formData.valor_material})
-                        
-                        // Se selecionou "Empresa fornece", buscar último valor unitário
-                        if (novaOrigem === 'empresa') {
-                          try {
-                            const { data } = await supabase
-                              .from('movimentacoes_suportes')
-                              .select('valor_unitario')
-                              .eq('tipo_movimento', 'entrega')
-                              .gt('valor_unitario', 0)
-                              .order('created_at', { ascending: false })
-                              .limit(1)
-                              .maybeSingle()
-                            
-                            if (data?.valor_unitario) {
-                              setFormData(prev => ({
-                                ...prev, 
-                                origem_suporte: novaOrigem,
-                                custo_suporte: data.valor_unitario.toString()
-                              }))
-                            }
-                          } catch (err) {
-                            console.error('Erro ao buscar valor do suporte:', err)
-                          }
-                        }
-                      }} 
-                      className="w-full px-3 py-2 border rounded-md bg-background"
-                    >
-                      <option value="">Não aplicável</option>
-                      <option value="empresa">Empresa fornece</option>
-                      <option value="instalador">Instalador compra (reembolso)</option>
-                      <option value="cliente">Cliente já tem</option>
-                    </select>
-                  </div>
-                  {formData.origem_suporte && formData.origem_suporte !== 'cliente' && (
-                    <div>
-                      <label className="block text-sm font-medium mb-2">Custo do Suporte (R$)</label>
-                      <input 
-                        type="number" 
-                        step="0.01" 
-                        value={formData.custo_suporte} 
-                        onChange={(e) => setFormData({...formData, custo_suporte: e.target.value})} 
-                        className="w-full px-3 py-2 border rounded-md" 
-                        placeholder="0,00" 
-                      />
-                      {formData.origem_suporte === 'empresa' && formData.custo_suporte && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          💡 Valor sugerido da última entrega
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
             </div>
           </div>
 
