@@ -37,9 +37,7 @@ export default function NovaCotacao() {
   const [tvItens, setTvItens] = useState<TVItem[]>([novoItemTV()])
   const [tvIndisponivel, setTvIndisponivel] = useState(false)
   const [itensExtras, setItensExtras] = useState<ItemExtra[]>([])
-  const totalItensExtras = itensExtras.reduce((s, i) => s + (parseFloat(i.valor) || 0), 0)
-  const valorTotalComExtras = (parseFloat(formData.valor_mao_obra) || 0) + totalItensExtras
-  
+
   const [formData, setFormData] = useState({
     cliente_nome: '',
     cliente_telefone: '',
@@ -61,6 +59,9 @@ export default function NovaCotacao() {
     origem_suporte: '',
     custo_suporte: ''
   })
+
+  const totalItensExtras = itensExtras.reduce((s, i) => s + (parseFloat(i.valor) || 0), 0)
+  const valorTotalComExtras = (parseFloat(formData.valor_mao_obra) || 0) + totalItensExtras
 
   useEffect(() => {
     async function fetchTiposServico() {
