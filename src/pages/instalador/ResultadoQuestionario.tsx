@@ -40,16 +40,29 @@ export default function ResultadoQuestionario() {
   const [certificacao, setCertificacao] = useState<Certificacao | null>(null);
   const [tentativasRealizadas, setTentativasRealizadas] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [certificadoPendente, setCertificadoPendente] = useState(false);
 
   useEffect(() => {
     carregarResultado();
   }, [tentativaId]);
 
+  async function buscarCertificacao(tentId: string): Promise<boolean> {
+    const { data: cert } = await supabase
+      .from('certificacoes')
+      .select('*')
+      .eq('tentativa_id', tentId)
+      .maybeSingle();
+    if (cert) {
+      setCertificacao(cert);
+      return true;
+    }
+    return false;
+  }
+
   async function carregarResultado() {
     if (!tentativaId) return;
 
     try {
-      // Buscar tentativa com dados do questionário
       const { data: tent, error: tentError } = await supabase
         .from('tentativas')
         .select(`
@@ -68,18 +81,16 @@ export default function ResultadoQuestionario() {
       if (tentError) throw tentError;
       setTentativa(tent);
 
-      // Se aprovado, buscar certificação
       if (tent.aprovado) {
-        const { data: cert } = await supabase
-          .from('certificacoes')
-          .select('*')
-          .eq('tentativa_id', tentativaId)
-          .single();
-
-        if (cert) setCertificacao(cert);
+        const found = await buscarCertificacao(tentativaId);
+        if (!found) {
+          // trigger pode ter delay — tenta novamente após 2s
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          const foundRetry = await buscarCertificacao(tentativaId);
+          if (!foundRetry) setCertificadoPendente(true);
+        }
       }
 
-      // Contar tentativas do questionário
       const { count } = await supabase
         .from('tentativas')
         .select('*', { count: 'exact', head: true })
@@ -181,6 +192,25 @@ export default function ResultadoQuestionario() {
                     />
                   ))}
                 </div>
+              </div>
+            )}
+
+            {tentativa.aprovado && !certificacao && certificadoPendente && (
+              <div className="space-y-2 p-4 bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-200 dark:border-amber-900">
+                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                  <Award className="h-5 w-5" />
+                  <span className="font-semibold">Certificado sendo gerado</span>
+                </div>
+                <p className="text-sm text-amber-700 dark:text-amber-400">
+                  Seu certificado está sendo processado. Verifique em{' '}
+                  <button
+                    onClick={() => navigate('/instalador/meus-certificados')}
+                    className="underline font-semibold"
+                  >
+                    Meus Certificados
+                  </button>{' '}
+                  em alguns instantes.
+                </p>
               </div>
             )}
 

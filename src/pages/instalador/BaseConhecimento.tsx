@@ -97,16 +97,18 @@ export default function BaseConhecimento() {
     }
   });
 
-  // Buscar certificações do usuário
+  // Buscar certificações do usuário (válidas e não expiradas)
   const { data: certificacoes } = useQuery({
     queryKey: ["minhas-certificacoes-base", user?.id],
     queryFn: async () => {
       if (!user) return [];
+      const hoje = new Date().toISOString();
       const { data, error } = await supabase
         .from("certificacoes")
         .select("questionario_id")
         .eq("instalador_id", user.id)
-        .eq("ativa", true);
+        .eq("ativa", true)
+        .or(`validade_ate.is.null,validade_ate.gt.${hoje}`);
       if (error) throw error;
       return data?.map(c => c.questionario_id) || [];
     },

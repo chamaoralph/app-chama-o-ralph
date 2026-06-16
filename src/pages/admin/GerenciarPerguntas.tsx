@@ -71,10 +71,17 @@ export default function GerenciarPerguntas() {
         throw new Error('Marque pelo menos uma alternativa como correta');
       }
 
-      // Salvar pergunta
       let perguntaId = dados.id;
+      let oldAltIds: string[] = [];
+
       if (dados.id) {
-        // Atualizar
+        // Guardar IDs antigos ANTES de qualquer mudança
+        const { data: oldAlts } = await supabase
+          .from('alternativas')
+          .select('id')
+          .eq('pergunta_id', dados.id);
+        oldAltIds = oldAlts?.map(a => a.id) || [];
+
         const { error } = await supabase
           .from('perguntas')
           .update({
@@ -84,11 +91,7 @@ export default function GerenciarPerguntas() {
           })
           .eq('id', dados.id);
         if (error) throw error;
-
-        // Deletar alternativas antigas
-        await supabase.from('alternativas').delete().eq('pergunta_id', dados.id);
       } else {
-        // Inserir nova
         const { data: newPergunta, error } = await supabase
           .from('perguntas')
           .insert({
@@ -103,7 +106,7 @@ export default function GerenciarPerguntas() {
         perguntaId = newPergunta.id;
       }
 
-      // Inserir alternativas
+      // Inserir novas alternativas PRIMEIRO — se falhar, dados antigos continuam intactos
       const alternativasParaInserir = dados.alternativas.map((alt, idx) => ({
         pergunta_id: perguntaId,
         texto: alt.texto,
@@ -113,6 +116,11 @@ export default function GerenciarPerguntas() {
 
       const { error: altError } = await supabase.from('alternativas').insert(alternativasParaInserir);
       if (altError) throw altError;
+
+      // Só apaga as antigas após o insert ter sido bem-sucedido
+      if (oldAltIds.length > 0) {
+        await supabase.from('alternativas').delete().in('id', oldAltIds);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['perguntas', id] });

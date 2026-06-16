@@ -76,6 +76,20 @@ export default function Questionarios() {
 
   const salvarMutation = useMutation({
     mutationFn: async (dados: typeof form) => {
+      // Bloqueia ativar questionário sem perguntas
+      if (dados.ativo) {
+        if (!dados.id) {
+          throw new Error('Salve o questionário como inativo primeiro, adicione perguntas e depois ative-o');
+        }
+        const { count } = await supabase
+          .from('perguntas')
+          .select('*', { count: 'exact', head: true })
+          .eq('questionario_id', dados.id);
+        if (!count || count === 0) {
+          throw new Error('Adicione pelo menos uma pergunta antes de ativar o questionário');
+        }
+      }
+
       const { data: userData } = await supabase.from('usuarios').select('empresa_id').eq('id', (await supabase.auth.getUser()).data.user?.id).single();
       if (!userData) throw new Error('Usuário não encontrado');
 
