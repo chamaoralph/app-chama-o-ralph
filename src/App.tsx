@@ -47,6 +47,7 @@ const InstaladorCertificados = lazy(() => import('./pages/instalador/MeusCertifi
 const InstaladorArtigoDetalhe = lazy(() => import('./pages/instalador/ArtigoDetalhe'));
 const InstaladorTreinamentoDetalhe = lazy(() => import('./pages/instalador/TreinamentoDetalhe'));
 const AceiteTermo = lazy(() => import('./pages/AceiteTermo'));
+const InstaladorOrcamentoNaHora = lazy(() => import('./pages/instalador/OrcamentoNaHora'));
 
 const queryClient = new QueryClient();
 
@@ -117,6 +118,7 @@ function App() {
               <Route path="meus-certificados" element={<Suspense><InstaladorCertificados /></Suspense>} />
               <Route path="conhecimento/artigo/:id" element={<Suspense><InstaladorArtigoDetalhe /></Suspense>} />
               <Route path="conhecimento/treinamento/:id" element={<Suspense><InstaladorTreinamentoDetalhe /></Suspense>} />
+              <Route path="servico/:servicoId/orcamento" element={<Suspense><InstaladorOrcamentoNaHora /></Suspense>} />
             </Route>
 
             <Route path="*" element={<NotFound />} />

@@ -1,10 +1,12 @@
+CREATE EXTENSION IF NOT EXISTS pgcrypto SCHEMA extensions;
+
 -- Create user_invitations table for invitation-only signups
 CREATE TABLE public.user_invitations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   empresa_id UUID NOT NULL REFERENCES empresas(id) ON DELETE CASCADE,
   email TEXT NOT NULL,
   role app_role NOT NULL DEFAULT 'instalador',
-  token TEXT UNIQUE NOT NULL DEFAULT encode(gen_random_bytes(32), 'hex'),
+token TEXT UNIQUE NOT NULL DEFAULT encode(extensions.gen_random_bytes(32), 'hex'),
   invited_by UUID REFERENCES usuarios(id) ON DELETE SET NULL,
   expires_at TIMESTAMPTZ NOT NULL DEFAULT (now() + interval '7 days'),
   used_at TIMESTAMPTZ,

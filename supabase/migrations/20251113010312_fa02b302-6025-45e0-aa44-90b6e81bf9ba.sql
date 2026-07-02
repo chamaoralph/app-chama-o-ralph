@@ -1,10 +1,11 @@
 -- Criar bucket público para fotos de serviços
 INSERT INTO storage.buckets (id, name, public)
-VALUES ('fotos-servicos', 'fotos-servicos', true);
+VALUES ('fotos-servicos', 'fotos-servicos', true) 
+ON CONFLICT (id) DO NOTHING;
 
 -- Criar bucket privado para notas fiscais
 INSERT INTO storage.buckets (id, name, public)
-VALUES ('notas-fiscais', 'notas-fiscais', false);
+VALUES ('notas-fiscais', 'notas-fiscais', false) ON CONFLICT (id) DO NOTHING;
 
 -- Políticas RLS para fotos-servicos (público)
 CREATE POLICY "Fotos de serviços são visíveis publicamente"

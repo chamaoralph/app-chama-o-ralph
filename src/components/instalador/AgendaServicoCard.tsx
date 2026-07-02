@@ -1,7 +1,8 @@
-import { Phone, MapPin, Play, CheckCircle, Clock, User } from "lucide-react";
+import { Phone, MapPin, Play, CheckCircle, Clock, User, Zap } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useNavigate } from "react-router-dom";
 
 interface Cliente {
   nome: string;
@@ -43,6 +44,7 @@ function formatarDataServico(dataString: string): string {
 }
 
 export function AgendaServicoCard({ servico, onIniciar, onFinalizar }: AgendaServicoCardProps) {
+  const navigate = useNavigate();
   const horario = formatarHorario(servico.data_servico_agendada);
 
   const getStatusConfig = (status: string) => {
@@ -181,6 +183,15 @@ export function AgendaServicoCard({ servico, onIniciar, onFinalizar }: AgendaSer
               📞 Ligar
             </Button>
           </div>
+
+          <Button
+            variant="outline"
+            className="w-full gap-2 border-primary/40 text-primary hover:bg-primary/5"
+            onClick={() => navigate(`/instalador/servico/${servico.id}/orcamento`)}
+          >
+            <Zap className="h-4 w-4" />
+            Orçamento na hora
+          </Button>
 
           {/* Botões de Status */}
           {servico.status === "solicitado" && (
