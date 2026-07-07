@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/table'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 
 interface TipoServico {
   id: string
@@ -309,203 +310,215 @@ export default function Configuracoes() {
       <div className="max-w-4xl">
         <h1 className="text-3xl font-bold text-gray-900 mb-6">⚙️ Configurações</h1>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Tipos de Serviço</CardTitle>
-                <CardDescription>
-                  Gerencie os tipos de serviço disponíveis para cotações
-                </CardDescription>
-              </div>
-              <Button onClick={openAddDialog}>
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar
-              </Button>
+        <Tabs defaultValue="geral" className="w-full">
+          <TabsList className="w-full justify-start overflow-x-auto">
+            <TabsTrigger value="geral">Geral</TabsTrigger>
+            <TabsTrigger value="catalogo">Catálogo de Orçamento</TabsTrigger>
+            <TabsTrigger value="estoque">Estoque de Acessórios</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="geral" className="mt-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Tipos de Serviço</CardTitle>
+                    <CardDescription>
+                      Gerencie os tipos de serviço disponíveis para cotações
+                    </CardDescription>
+                  </div>
+                  <Button onClick={openAddDialog}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Adicionar
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <p className="text-muted-foreground">Carregando...</p>
+                ) : tiposServico.length === 0 ? (
+                  <p className="text-muted-foreground">Nenhum tipo de serviço cadastrado</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12"></TableHead>
+                        <TableHead>Nome</TableHead>
+                        <TableHead className="w-32 text-center">Exige termo</TableHead>
+                        <TableHead className="w-24 text-center">Ativo</TableHead>
+                        <TableHead className="w-24 text-right">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {tiposServico.map((tipo) => (
+                        <TableRow key={tipo.id} className={!tipo.ativo ? 'opacity-50' : ''}>
+                          <TableCell>
+                            <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
+                          </TableCell>
+                          <TableCell className="font-medium">{tipo.nome}</TableCell>
+                          <TableCell className="text-center">
+                            <Switch
+                              checked={tipo.exige_termo}
+                              onCheckedChange={() => handleToggleExigeTermo(tipo)}
+                            />
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Switch
+                              checked={tipo.ativo}
+                              onCheckedChange={() => handleToggleAtivo(tipo)}
+                            />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openEditDialog(tipo)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDelete(tipo)}
+                              >
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Percentual dos Instaladores */}
+            <Card className="mt-6">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <CardTitle>Percentual dos Instaladores</CardTitle>
+                    <CardDescription>
+                      Defina o percentual da mão de obra que cada instalador recebe ao aceitar um serviço
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {instaladores.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">Nenhum instalador ativo encontrado</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Instalador</TableHead>
+                        <TableHead className="w-40 text-center">Percentual</TableHead>
+                        <TableHead className="w-24 text-right">Ação</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {instaladores.map((inst) => (
+                        <TableRow key={inst.id}>
+                          <TableCell className="font-medium">{inst.nome}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center justify-center gap-2">
+                              <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={percentuais[inst.id] ?? 50}
+                                onChange={(e) => setPercentuais(prev => ({
+                                  ...prev,
+                                  [inst.id]: Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
+                                }))}
+                                className="w-20 text-center"
+                              />
+                              <Percent className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              size="sm"
+                              onClick={() => salvarPercentual(inst.id)}
+                              disabled={savingPercentual === inst.id || percentuais[inst.id] === inst.percentual_mao_obra}
+                            >
+                              {savingPercentual === inst.id ? 'Salvando...' : 'Salvar'}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+                <p className="text-xs text-muted-foreground mt-4">
+                  💡 O valor será recalculado automaticamente quando o instalador aceitar um serviço.
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Tabela de Preços TV */}
+            <div className="mt-6">
+              <TabelaPrecosTVCard />
             </div>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <p className="text-muted-foreground">Carregando...</p>
-            ) : tiposServico.length === 0 ? (
-              <p className="text-muted-foreground">Nenhum tipo de serviço cadastrado</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12"></TableHead>
-                    <TableHead>Nome</TableHead>
-                    <TableHead className="w-32 text-center">Exige termo</TableHead>
-                    <TableHead className="w-24 text-center">Ativo</TableHead>
-                    <TableHead className="w-24 text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {tiposServico.map((tipo) => (
-                    <TableRow key={tipo.id} className={!tipo.ativo ? 'opacity-50' : ''}>
-                      <TableCell>
-                        <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
-                      </TableCell>
-                      <TableCell className="font-medium">{tipo.nome}</TableCell>
-                      <TableCell className="text-center">
-                        <Switch
-                          checked={tipo.exige_termo}
-                          onCheckedChange={() => handleToggleExigeTermo(tipo)}
-                        />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Switch
-                          checked={tipo.ativo}
-                          onCheckedChange={() => handleToggleAtivo(tipo)}
-                        />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEditDialog(tipo)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(tipo)}
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
 
-        {/* Percentual dos Instaladores */}
-        <Card className="mt-6">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <CardTitle>Percentual dos Instaladores</CardTitle>
-                <CardDescription>
-                  Defina o percentual da mão de obra que cada instalador recebe ao aceitar um serviço
-                </CardDescription>
-              </div>
+            {/* Critérios RFM */}
+            <div className="mt-6">
+              <RFMConfigCard />
             </div>
-          </CardHeader>
-          <CardContent>
-            {instaladores.length === 0 ? (
-              <p className="text-muted-foreground text-sm">Nenhum instalador ativo encontrado</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Instalador</TableHead>
-                    <TableHead className="w-40 text-center">Percentual</TableHead>
-                    <TableHead className="w-24 text-right">Ação</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {instaladores.map((inst) => (
-                    <TableRow key={inst.id}>
-                      <TableCell className="font-medium">{inst.nome}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-center gap-2">
-                          <Input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={percentuais[inst.id] ?? 50}
-                            onChange={(e) => setPercentuais(prev => ({
-                              ...prev,
-                              [inst.id]: Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
-                            }))}
-                            className="w-20 text-center"
-                          />
-                          <Percent className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          onClick={() => salvarPercentual(inst.id)}
-                          disabled={savingPercentual === inst.id || percentuais[inst.id] === inst.percentual_mao_obra}
-                        >
-                          {savingPercentual === inst.id ? 'Salvando...' : 'Salvar'}
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-            <p className="text-xs text-muted-foreground mt-4">
-              💡 O valor será recalculado automaticamente quando o instalador aceitar um serviço.
-            </p>
-          </CardContent>
-        </Card>
 
-        {/* Tabela de Preços TV */}
-        <div className="mt-6">
-          <TabelaPrecosTVCard />
-        </div>
+            {/* Telefones Bloqueados */}
+            <div className="mt-6">
+              <TelefonesBloqueadosCard />
+            </div>
 
-        {/* Catálogo de Orçamento */}
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Catálogo de Orçamento</CardTitle>
-            <CardDescription>
-              Preços e itens usados no orçamento na hora do instalador, além do
-              desconto padrão de "fechar agora"
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <CatalogoPrecos />
-          </CardContent>
-        </Card>
+            {/* Backup e Storage */}
+            <div className="mt-6">
+              <BackupStorageCard />
+            </div>
 
-        {/* Estoque de Acessórios */}
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Estoque de Acessórios</CardTitle>
-            <CardDescription>
-              Compras, saldo atual e histórico de movimentos dos acessórios
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <EstoqueAcessorios />
-          </CardContent>
-        </Card>
+            {/* Espaço para futuras configurações */}
+            <Card className="mt-6 opacity-50">
+              <CardHeader>
+                <CardTitle className="text-muted-foreground">Outras Configurações</CardTitle>
+                <CardDescription>
+                  Em breve: Origens de Lead, Ocasiões e mais opções de personalização
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </TabsContent>
 
-        {/* Critérios RFM */}
-        <div className="mt-6">
-          <RFMConfigCard />
-        </div>
+          <TabsContent value="catalogo" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Catálogo de Orçamento</CardTitle>
+                <CardDescription>
+                  Preços e itens usados no orçamento na hora do instalador, além do
+                  desconto padrão de "fechar agora"
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <CatalogoPrecos />
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        {/* Telefones Bloqueados */}
-        <div className="mt-6">
-          <TelefonesBloqueadosCard />
-        </div>
-
-        {/* Backup e Storage */}
-        <div className="mt-6">
-          <BackupStorageCard />
-        </div>
-
-        {/* Espaço para futuras configurações */}
-        <Card className="mt-6 opacity-50">
-          <CardHeader>
-            <CardTitle className="text-muted-foreground">Outras Configurações</CardTitle>
-            <CardDescription>
-              Em breve: Origens de Lead, Ocasiões e mais opções de personalização
-            </CardDescription>
-          </CardHeader>
-        </Card>
+          <TabsContent value="estoque" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Estoque de Acessórios</CardTitle>
+                <CardDescription>
+                  Compras, saldo atual e histórico de movimentos dos acessórios
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <EstoqueAcessorios />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
