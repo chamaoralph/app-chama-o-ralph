@@ -14,7 +14,7 @@
 
 import { useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useQueries, useMutation } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Check,
@@ -70,6 +70,8 @@ export default function OrcamentoNaHora() {
   const [fornecedores, setFornecedores] = useState<
     Record<string, "empresa" | "instalador">
   >({});
+  // Custo digitado pelo instalador quando ele forneceu o acessório (catalogo_id -> string do input)
+  const [custosInstalador, setCustosInstalador] = useState<Record<string, string>>({});
 
   // Depois de gerar: guardamos a cotação criada + o resultado congelado
   const [gerado, setGerado] = useState<{
@@ -133,6 +135,26 @@ export default function OrcamentoNaHora() {
     },
   });
 
+  // Saldo de estoque de todos os acessórios (carregado de uma vez só)
+  const { data: saldosEstoque } = useQuery({
+    queryKey: ["estoque-saldo"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("estoque_saldo")
+        .select("catalogo_id, saldo");
+      if (error) throw error;
+      return (data || []) as { catalogo_id: string; saldo: number }[];
+    },
+  });
+
+  const saldoPorId = useMemo(() => {
+    const mapa: Record<string, number> = {};
+    (saldosEstoque ?? []).forEach((s) => {
+      mapa[s.catalogo_id] = s.saldo;
+    });
+    return mapa;
+  }, [saldosEstoque]);
+
   // -------------------------------------------------------------------
   // Cálculo ao vivo
   // -------------------------------------------------------------------
@@ -156,16 +178,75 @@ export default function OrcamentoNaHora() {
     [itensSelecionados, config, fecharAgora, descontoPct]
   );
 
+  // catalogo_id dos acessórios selecionados com fornecedor "empresa" — só esses
+  // precisam do custo FIFO do estoque (custo_atual_acessorio via RPC)
+  const acessoriosEmpresaIds = useMemo(() => {
+    if (!catalogo) return [];
+    return catalogo
+      .filter(
+        (c) =>
+          quantidades[c.id] != null &&
+          ehAcessorio(c.categoria) &&
+          fornecedores[c.id] === "empresa"
+      )
+      .map((c) => c.id);
+  }, [catalogo, quantidades, fornecedores]);
+
+  const custoEstoqueQueries = useQueries({
+    queries: acessoriosEmpresaIds.map((catalogoId) => ({
+      queryKey: ["custo-atual-acessorio", catalogoId],
+      queryFn: async () => {
+        const { data, error } = await supabase.rpc("custo_atual_acessorio", {
+          p_catalogo_id: catalogoId,
+        });
+        if (error) throw error;
+        return data as number | null;
+      },
+    })),
+  });
+
+  // catalogo_id -> { valor: custo FIFO (null se sem estoque/ainda não veio), carregando }
+  const custoEstoquePorId = useMemo(() => {
+    const mapa: Record<string, { valor: number | null; carregando: boolean }> = {};
+    acessoriosEmpresaIds.forEach((catalogoId, idx) => {
+      const q = custoEstoqueQueries[idx];
+      mapa[catalogoId] = { valor: q?.data ?? null, carregando: q?.isLoading ?? false };
+    });
+    return mapa;
+  }, [acessoriosEmpresaIds, custoEstoqueQueries]);
+
   const acessoriosSelecionados = useMemo<AcessorioSelecionado[]>(() => {
     if (!catalogo) return [];
     return catalogo
       .filter((c) => quantidades[c.id] != null && ehAcessorio(c.categoria))
-      .map((c) => ({
-        ...montarItem(c, quantidades[c.id] ?? 1),
-        custo: c.custo ?? 0,
-        fornecedor: fornecedores[c.id] as Fornecedor,
-      }));
-  }, [catalogo, quantidades, fornecedores]);
+      .map((c) => {
+        const fornecedor = fornecedores[c.id] as Fornecedor;
+        const custo =
+          fornecedor === "instalador"
+            ? parseFloat(custosInstalador[c.id] || "0") || 0
+            : custoEstoquePorId[c.id]?.valor ?? 0;
+        return {
+          ...montarItem(c, quantidades[c.id] ?? 1),
+          custo,
+          fornecedor,
+        };
+      });
+  }, [catalogo, quantidades, fornecedores, custosInstalador, custoEstoquePorId]);
+
+  // Acessório "empresa" sem estoque, ou "empresa"/"instalador" sem custo definido — bloqueia gerar
+  const acessorioComProblema = acessoriosSelecionados.some((a) => {
+    if (!a.fornecedor) return true;
+    if (a.fornecedor === "empresa") {
+      return (
+        (saldoPorId[a.catalogo_id] ?? 0) <= 0 ||
+        custoEstoquePorId[a.catalogo_id]?.valor == null
+      );
+    }
+    if (a.fornecedor === "instalador") {
+      return !custosInstalador[a.catalogo_id]?.trim();
+    }
+    return false;
+  });
 
   const repasse = useMemo(
     () =>
@@ -187,6 +268,11 @@ export default function OrcamentoNaHora() {
     mutationFn: async () => {
       if (!servicoId || !resultado || !config) throw new Error("Dados incompletos.");
       if (resultado.itens.length === 0) throw new Error("Selecione ao menos um item.");
+      if (acessorioComProblema) {
+        throw new Error(
+          "Resolva o estoque/custo dos acessórios antes de gerar o orçamento."
+        );
+      }
 
       const itensExtras = resultado.itens.map((item) => {
         const descricao =
@@ -196,10 +282,12 @@ export default function OrcamentoNaHora() {
           return { descricao, valor: item.subtotal };
         }
 
-        const catalogoItem = catalogo?.find((c) => c.id === item.catalogo_id);
-        const custoUnitario = catalogoItem?.custo ?? 0;
         const fornecedor = fornecedores[item.catalogo_id] as Fornecedor;
-        const repasse = calcularRepasseAcessorio(
+        const custoUnitario =
+          fornecedor === "instalador"
+            ? parseFloat(custosInstalador[item.catalogo_id] || "0") || 0
+            : custoEstoquePorId[item.catalogo_id]?.valor ?? 0;
+        const repasseCalc = calcularRepasseAcessorio(
           item.subtotal,
           custoUnitario * item.quantidade,
           fornecedor
@@ -213,8 +301,8 @@ export default function OrcamentoNaHora() {
           quantidade: item.quantidade,
           custo_unitario: custoUnitario,
           fornecedor,
-          repasse_instalador: repasse.repasse_instalador,
-          repasse_empresa: repasse.repasse_empresa,
+          repasse_instalador: repasseCalc.repasse_instalador,
+          repasse_empresa: repasseCalc.repasse_empresa,
         };
       });
       if (resultado.fechar_agora && resultado.desconto_valor > 0) {
@@ -449,13 +537,20 @@ export default function OrcamentoNaHora() {
   // -------------------------------------------------------------------
   // TELA DE MONTAGEM (selecionar itens)
   // -------------------------------------------------------------------
-  const removerFornecedor = (itemId: string) =>
+  const removerFornecedor = (itemId: string) => {
     setFornecedores((f) => {
       if (f[itemId] == null) return f;
       const next = { ...f };
       delete next[itemId];
       return next;
     });
+    setCustosInstalador((c) => {
+      if (c[itemId] == null) return c;
+      const next = { ...c };
+      delete next[itemId];
+      return next;
+    });
+  };
 
   const toggleItem = (item: CatalogoItem) =>
     setQuantidades((q) => {
@@ -558,6 +653,8 @@ export default function OrcamentoNaHora() {
                   const selecionado = qtd != null;
                   const acessorio = ehAcessorio(item.categoria);
                   const fornecedorEscolhido = fornecedores[item.id];
+                  const semEstoque = (saldoPorId[item.id] ?? 0) <= 0;
+                  const custoEmpresaInfo = custoEstoquePorId[item.id];
                   return (
                     <div key={item.id}>
                     <div
@@ -630,39 +727,85 @@ export default function OrcamentoNaHora() {
                     </div>
 
                     {acessorio && selecionado && (
-                      <div className="mt-1.5 flex items-center gap-2 px-1">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant={
-                            fornecedorEscolhido === "empresa"
-                              ? "default"
-                              : "outline"
-                          }
-                          className="h-7 px-3 text-xs"
-                          onClick={() => escolherFornecedor(item.id, "empresa")}
-                        >
-                          Empresa
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant={
-                            fornecedorEscolhido === "instalador"
-                              ? "default"
-                              : "outline"
-                          }
-                          className="h-7 px-3 text-xs"
-                          onClick={() =>
-                            escolherFornecedor(item.id, "instalador")
-                          }
-                        >
-                          Eu
-                        </Button>
-                        {!fornecedorEscolhido && (
-                          <span className="text-xs text-amber-600">
-                            Escolha quem forneceu
-                          </span>
+                      <div className="mt-1.5 space-y-1.5 px-1">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={
+                              fornecedorEscolhido === "empresa"
+                                ? "default"
+                                : "outline"
+                            }
+                            className="h-7 px-3 text-xs"
+                            disabled={semEstoque}
+                            onClick={() => escolherFornecedor(item.id, "empresa")}
+                          >
+                            Empresa
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={
+                              fornecedorEscolhido === "instalador"
+                                ? "default"
+                                : "outline"
+                            }
+                            className="h-7 px-3 text-xs"
+                            onClick={() =>
+                              escolherFornecedor(item.id, "instalador")
+                            }
+                          >
+                            Eu
+                          </Button>
+                          {!fornecedorEscolhido && (
+                            <span className="text-xs text-amber-600">
+                              Escolha quem forneceu
+                            </span>
+                          )}
+                        </div>
+
+                        {semEstoque && (
+                          <p className="text-xs text-amber-600">
+                            Sem estoque — venda apenas se o instalador fornecer
+                          </p>
+                        )}
+
+                        {fornecedorEscolhido === "empresa" && !semEstoque && (
+                          <p className="text-xs text-muted-foreground">
+                            {custoEmpresaInfo?.carregando
+                              ? "Buscando custo…"
+                              : custoEmpresaInfo?.valor != null
+                              ? `custo ${formatarBRL(custoEmpresaInfo.valor)} — do estoque`
+                              : "Custo indisponível — tente novamente"}
+                          </p>
+                        )}
+
+                        {fornecedorEscolhido === "instalador" && (
+                          <div className="flex items-center gap-2">
+                            <label
+                              htmlFor={`custo-instalador-${item.id}`}
+                              className="text-xs text-muted-foreground"
+                            >
+                              Custo que você pagou (R$)
+                            </label>
+                            <input
+                              id={`custo-instalador-${item.id}`}
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              inputMode="decimal"
+                              className="h-7 w-24 rounded-md border bg-background px-2 text-right text-sm"
+                              value={custosInstalador[item.id] ?? ""}
+                              onChange={(e) =>
+                                setCustosInstalador((c) => ({
+                                  ...c,
+                                  [item.id]: e.target.value,
+                                }))
+                              }
+                              placeholder="0,00"
+                            />
+                          </div>
                         )}
                       </div>
                     )}
@@ -691,10 +834,16 @@ export default function OrcamentoNaHora() {
                 </span>
               </p>
             )}
-            {faltaFornecedor && (
+            {faltaFornecedor ? (
               <p className="mb-2 text-center text-xs text-amber-600">
                 Escolha quem forneceu cada acessório
               </p>
+            ) : (
+              acessorioComProblema && (
+                <p className="mb-2 text-center text-xs text-amber-600">
+                  Resolva o estoque/custo dos acessórios antes de gerar
+                </p>
+              )
             )}
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -717,7 +866,7 @@ export default function OrcamentoNaHora() {
                 disabled={
                   resultado.itens.length === 0 ||
                   gerar.isPending ||
-                  faltaFornecedor
+                  acessorioComProblema
                 }
                 onClick={() => gerar.mutate()}
               >

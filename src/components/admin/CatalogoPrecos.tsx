@@ -52,7 +52,6 @@ type FormItem = {
   descricao: string;
   categoria: CatalogoItem["categoria"];
   preco: string; // string no input, converte na hora de salvar
-  custo: string; // string no input, converte na hora de salvar
   por_quantidade: boolean;
   ativo: boolean;
 };
@@ -62,7 +61,6 @@ const FORM_VAZIO: FormItem = {
   descricao: "",
   categoria: "tv",
   preco: "",
-  custo: "",
   por_quantidade: false,
   ativo: true,
 };
@@ -140,7 +138,6 @@ export default function CatalogoPrecos() {
         descricao: form.descricao.trim() || null,
         categoria: form.categoria,
         preco,
-        custo: Number(form.custo.replace(",", ".")) || 0,
         por_quantidade: form.por_quantidade,
         ativo: form.ativo,
       };
@@ -222,7 +219,6 @@ export default function CatalogoPrecos() {
       descricao: item.descricao ?? "",
       categoria: item.categoria,
       preco: String(item.preco),
-      custo: String(item.custo ?? 0),
       por_quantidade: item.por_quantidade,
       ativo: item.ativo,
     });
@@ -237,7 +233,7 @@ export default function CatalogoPrecos() {
   // Formulário inline reutilizável (novo e edição)
   const Formulario = () => (
     <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1">
           <Label className="text-xs">Nome</Label>
           <Input
@@ -253,15 +249,6 @@ export default function CatalogoPrecos() {
             value={form.preco}
             onChange={(e) => setForm({ ...form, preco: e.target.value })}
             placeholder="239"
-          />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs">Custo (só acessórios)</Label>
-          <Input
-            inputMode="decimal"
-            value={form.custo}
-            onChange={(e) => setForm({ ...form, custo: e.target.value })}
-            placeholder="0"
           />
         </div>
       </div>
@@ -434,11 +421,6 @@ export default function CatalogoPrecos() {
                               <p className="text-sm text-muted-foreground">
                                 {formatarBRL(item.preco)}
                               </p>
-                              {item.categoria === "acessorios" && (
-                                <p className="text-xs text-muted-foreground/70">
-                                  custo {formatarBRL(item.custo ?? 0)}
-                                </p>
-                              )}
                             </div>
                             <div className="flex items-center gap-1">
                               <Switch
