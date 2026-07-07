@@ -102,6 +102,22 @@ export default function CatalogoPrecos() {
     },
   });
 
+  // id do item em edição (null se criando um novo ou se nada estiver aberto)
+  const editandoId = editando && editando !== "novo" ? editando : null;
+
+  // Custo atual do acessório, direto do lote FIFO com saldo (só informativo)
+  const { data: custoEstoque, isLoading: carregandoCustoEstoque } = useQuery({
+    queryKey: ["custo-atual-acessorio", editandoId],
+    enabled: !!editandoId && form.categoria === "acessorios",
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("custo_atual_acessorio", {
+        p_catalogo_id: editandoId,
+      });
+      if (error) throw error;
+      return data as number | null;
+    },
+  });
+
   // -------------------------------------------------------------------
   // Salvar % de desconto
   // -------------------------------------------------------------------
@@ -252,6 +268,22 @@ export default function CatalogoPrecos() {
           />
         </div>
       </div>
+
+      {form.categoria === "acessorios" && editandoId && (
+        <div className="space-y-1">
+          <Label className="text-xs">Custo (do estoque)</Label>
+          <Input
+            disabled
+            value={
+              carregandoCustoEstoque
+                ? "Carregando…"
+                : custoEstoque != null
+                ? `${formatarBRL(custoEstoque)} (do estoque)`
+                : "Sem estoque"
+            }
+          />
+        </div>
+      )}
 
       <div className="space-y-1">
         <Label className="text-xs">Descrição (opcional)</Label>
