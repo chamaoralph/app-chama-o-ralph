@@ -1,8 +1,16 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { InstaladorLayout } from "@/components/layout/InstaladorLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+
+interface ItemEstoqueDevolver {
+  servico_id: string;
+  catalogo_id: string;
+  acessorio: string;
+  qtd_fora: number;
+}
 
 // Função para comprimir imagens antes do upload
 async function comprimirImagem(file: File, qualidade = 0.7): Promise<File> {
@@ -62,6 +70,7 @@ export default function FinalizarServico() {
   const { id: servicoId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [servico, setServico] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [enviando, setEnviando] = useState(false);
@@ -74,6 +83,42 @@ export default function FinalizarServico() {
   const [comprimindo, setComprimindo] = useState(false);
   const [recebimentoCliente, setRecebimentoCliente] = useState<'empresa' | 'instalador'>('empresa');
   const [valorRecebidoCliente, setValorRecebidoCliente] = useState("");
+  const [quantidadesDevolver, setQuantidadesDevolver] = useState<Record<string, number>>({});
+
+  const { data: itensParaDevolver } = useQuery({
+    queryKey: ["estoque-a-devolver", servicoId],
+    enabled: !!servicoId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("estoque_a_devolver")
+        .select("servico_id, catalogo_id, acessorio, qtd_fora")
+        .eq("servico_id", servicoId);
+      if (error) throw error;
+      return (data || []) as ItemEstoqueDevolver[];
+    },
+  });
+
+  const devolverEstoque = useMutation({
+    mutationFn: async ({ catalogoId, quantidade }: { catalogoId: string; quantidade: number }) => {
+      const { error } = await supabase.rpc("devolver_estoque_item", {
+        p_servico_id: servicoId,
+        p_catalogo_id: catalogoId,
+        p_quantidade: quantidade,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["estoque-a-devolver", servicoId] });
+      toast({ title: "✅ Devolvido ao estoque" });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "❌ Erro ao devolver",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   useEffect(() => {
     console.log("servicoId da URL:", servicoId);
@@ -259,6 +304,60 @@ export default function FinalizarServico() {
           <p className="text-gray-600">Serviço: {servico.tipo_servico?.join(", ")}</p>
           <p className="text-green-600 font-bold">Valor: R$ {servico.valor_mao_obra_instalador?.toFixed(2)}</p>
         </div>
+
+        {itensParaDevolver && itensParaDevolver.length > 0 && (
+          <div className="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 className="text-lg font-semibold mb-1">Sobrou algum acessório?</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Devolução ao estoque é opcional e não impede a conclusão do serviço.
+            </p>
+            <div className="space-y-3">
+              {itensParaDevolver.map((item) => {
+                const quantidade = quantidadesDevolver[item.catalogo_id] ?? item.qtd_fora;
+                const devolvendoEsteItem =
+                  devolverEstoque.isPending &&
+                  devolverEstoque.variables?.catalogoId === item.catalogo_id;
+                return (
+                  <div
+                    key={item.catalogo_id}
+                    className="flex items-center justify-between gap-3 border rounded-md p-3"
+                  >
+                    <div>
+                      <p className="text-sm font-medium">{item.acessorio}</p>
+                      <p className="text-xs text-muted-foreground">{item.qtd_fora} fora do estoque</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={quantidade}
+                        onChange={(e) =>
+                          setQuantidadesDevolver((prev) => ({
+                            ...prev,
+                            [item.catalogo_id]: Number(e.target.value),
+                          }))
+                        }
+                        className="px-2 py-1 border rounded-md text-sm"
+                      >
+                        {Array.from({ length: item.qtd_fora + 1 }, (_, n) => n).map((n) => (
+                          <option key={n} value={n}>{n}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        disabled={quantidade === 0 || devolvendoEsteItem}
+                        onClick={() =>
+                          devolverEstoque.mutate({ catalogoId: item.catalogo_id, quantidade })
+                        }
+                        className="px-3 py-1.5 bg-emerald-600 text-white rounded-md text-sm hover:bg-emerald-700 disabled:bg-gray-300"
+                      >
+                        {devolvendoEsteItem ? "Devolvendo..." : "Devolver ao estoque"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow p-6 space-y-6">
           <div>

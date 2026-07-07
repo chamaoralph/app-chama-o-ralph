@@ -18,6 +18,7 @@ import { CalendarioCotacoesSemanal } from '@/components/admin/CalendarioCotacoes
 import { CalendarioCotacoesMensal } from '@/components/admin/CalendarioCotacoesMensal'
 import { SelectorPrecoTV, type TVItem, type TotaisTV, novoItemTV } from '@/components/admin/SelectorPrecoTV'
 import { ehInstalacaoTV } from '@/lib/precosTV'
+import { Fornecedor, calcularRepasseAcessorio, formatarBRL } from '@/lib/orcamento'
 import { TermoAceiteCard } from '@/components/admin/TermoAceiteCard'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
@@ -201,7 +202,16 @@ export default function ListaCotacoes() {
   const [empresaIdAtual, setEmpresaIdAtual] = useState<string | null>(null)
   const [tvItensEdit, setTvItensEdit] = useState<TVItem[]>([novoItemTV()])
   const [tvIndisponivelEdit, setTvIndisponivelEdit] = useState(false)
-  const [itensExtrasEdit, setItensExtrasEdit] = useState<{ id: string; descricao: string; valor: string }[]>([])
+  const [itensExtrasEdit, setItensExtrasEdit] = useState<{
+    id: string
+    descricao: string
+    valor: string
+    // Presentes só quando o item veio do catálogo de acessórios (permite repasse 70/30)
+    catalogoId?: string
+    custoUnitario?: number
+    quantidade?: number
+    fornecedor?: Fornecedor
+  }[]>([])
   const totalItensExtrasEdit = itensExtrasEdit.reduce((s, i) => s + (parseFloat(i.valor) || 0), 0)
 
   useEffect(() => {
@@ -372,7 +382,15 @@ export default function ListaCotacoes() {
     const itensExistentes = (cotacao as any).itens_extras
     setItensExtrasEdit(
       Array.isArray(itensExistentes)
-        ? itensExistentes.map((i: any, idx: number) => ({ id: `${idx}`, descricao: String(i.descricao || ''), valor: String(i.valor || '') }))
+        ? itensExistentes.map((i: any, idx: number) => ({
+            id: `${idx}`,
+            descricao: String(i.descricao || ''),
+            valor: String(i.valor || ''),
+            catalogoId: i.catalogo_id ?? undefined,
+            custoUnitario: i.custo_unitario ?? undefined,
+            quantidade: i.quantidade ?? undefined,
+            fornecedor: i.fornecedor ?? undefined,
+          }))
         : []
     )
     setCotacaoParaEditar(cotacao)
@@ -391,6 +409,12 @@ export default function ListaCotacoes() {
 
   async function salvarEdicao() {
     if (!cotacaoParaEditar) return
+
+    if (itensExtrasEdit.some(i => i.catalogoId && !i.fornecedor)) {
+      toast({ title: "Escolha o fornecedor de cada acessório", description: "Empresa ou Instalador, para calcular o repasse.", variant: "destructive" })
+      return
+    }
+
     setEditLoading(true)
 
     try {
@@ -428,7 +452,25 @@ export default function ListaCotacoes() {
           horario_fim: horarioFim,
           created_at: editForm.data_criacao ? new Date(editForm.data_criacao).toISOString() : undefined,
           valor_estimado: (() => { const base = parseFloat(editForm.valor_estimado) || 0; const total = base + totalItensExtrasEdit; return total > 0 ? total : null })(),
-          itens_extras: itensExtrasEdit.filter(i => i.descricao.trim() && parseFloat(i.valor) > 0).map(i => ({ descricao: i.descricao.trim(), valor: parseFloat(i.valor) })) as any,
+          itens_extras: itensExtrasEdit
+            .filter(i => i.descricao.trim() && parseFloat(i.valor) > 0)
+            .map(i => {
+              const descricao = i.descricao.trim()
+              const valor = parseFloat(i.valor)
+              if (!i.catalogoId || !i.fornecedor) return { descricao, valor }
+              const repasse = calcularRepasseAcessorio(valor, (i.custoUnitario ?? 0) * (i.quantidade ?? 1), i.fornecedor)
+              return {
+                descricao,
+                valor,
+                eh_acessorio: true,
+                catalogo_id: i.catalogoId,
+                quantidade: i.quantidade ?? 1,
+                custo_unitario: i.custoUnitario ?? 0,
+                fornecedor: i.fornecedor,
+                repasse_instalador: repasse.repasse_instalador,
+                repasse_empresa: repasse.repasse_empresa,
+              }
+            }) as any,
           valor_material: editForm.origem_suporte === 'empresa' ? 0 : (editForm.valor_material ? parseFloat(editForm.valor_material) : null),
           origem_lead: editForm.origem_lead || null,
           ocasiao: editForm.ocasiao || null,
@@ -1518,29 +1560,57 @@ export default function ListaCotacoes() {
                     <p className="text-xs text-muted-foreground">Ex: suporte extra, material adicional, bronca...</p>
                   )}
                   {itensExtrasEdit.map((item) => (
-                    <div key={item.id} className="flex gap-2 items-center">
-                      <Input
-                        placeholder="Descrição do item"
-                        value={item.descricao}
-                        onChange={(e) => setItensExtrasEdit(prev => prev.map(i => i.id === item.id ? { ...i, descricao: e.target.value } : i))}
-                        className="flex-1"
-                      />
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="0,00"
-                        value={item.valor}
-                        onChange={(e) => setItensExtrasEdit(prev => prev.map(i => i.id === item.id ? { ...i, valor: e.target.value } : i))}
-                        className="w-28"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setItensExtrasEdit(prev => prev.filter(i => i.id !== item.id))}
-                      >
-                        <Trash2 className="w-4 h-4 text-muted-foreground" />
-                      </Button>
+                    <div key={item.id} className="space-y-1">
+                      <div className="flex gap-2 items-center">
+                        <Input
+                          placeholder="Descrição do item"
+                          value={item.descricao}
+                          onChange={(e) => setItensExtrasEdit(prev => prev.map(i => i.id === item.id ? { ...i, descricao: e.target.value } : i))}
+                          className="flex-1"
+                        />
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="0,00"
+                          value={item.valor}
+                          onChange={(e) => setItensExtrasEdit(prev => prev.map(i => i.id === item.id ? { ...i, valor: e.target.value } : i))}
+                          className="w-28"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setItensExtrasEdit(prev => prev.filter(i => i.id !== item.id))}
+                        >
+                          <Trash2 className="w-4 h-4 text-muted-foreground" />
+                        </Button>
+                      </div>
+                      {item.catalogoId && (
+                        <div className="flex items-center gap-2 pl-1">
+                          <span className="text-xs text-muted-foreground">Acessório · Fornecedor:</span>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={item.fornecedor === 'empresa' ? 'default' : 'outline'}
+                            className="h-6 px-2 text-xs"
+                            onClick={() => setItensExtrasEdit(prev => prev.map(i => i.id === item.id ? { ...i, fornecedor: 'empresa' } : i))}
+                          >
+                            Empresa
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={item.fornecedor === 'instalador' ? 'default' : 'outline'}
+                            className="h-6 px-2 text-xs"
+                            onClick={() => setItensExtrasEdit(prev => prev.map(i => i.id === item.id ? { ...i, fornecedor: 'instalador' } : i))}
+                          >
+                            Instalador
+                          </Button>
+                          {!item.fornecedor && (
+                            <span className="text-xs text-amber-600">Escolha quem forneceu</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                   {itensExtrasEdit.length > 0 && (
@@ -1548,6 +1618,20 @@ export default function ListaCotacoes() {
                       Mão de obra: R$ {(parseFloat(editForm.valor_estimado) || 0).toFixed(2)}
                       {totalItensExtrasEdit > 0 && <> + Itens extras: R$ {totalItensExtrasEdit.toFixed(2)}</>}
                       <span className="font-semibold text-foreground ml-2">= R$ {((parseFloat(editForm.valor_estimado) || 0) + totalItensExtrasEdit).toFixed(2)}</span>
+                      {(() => {
+                        const totais = itensExtrasEdit
+                          .filter(i => i.catalogoId && i.fornecedor)
+                          .reduce((acc, i) => {
+                            const r = calcularRepasseAcessorio(parseFloat(i.valor) || 0, (i.custoUnitario ?? 0) * (i.quantidade ?? 1), i.fornecedor!)
+                            return { instalador: acc.instalador + r.repasse_instalador, empresa: acc.empresa + r.repasse_empresa }
+                          }, { instalador: 0, empresa: 0 })
+                        if (totais.instalador === 0 && totais.empresa === 0) return null
+                        return (
+                          <div className="text-xs mt-1">
+                            Repasse acessórios — Instalador: {formatarBRL(totais.instalador)} · Empresa: {formatarBRL(totais.empresa)}
+                          </div>
+                        )
+                      })()}
                     </div>
                   )}
                 </div>
@@ -1634,7 +1718,7 @@ export default function ListaCotacoes() {
             <Button variant="outline" onClick={() => setCotacaoParaEditar(null)}>
               Cancelar
             </Button>
-            <Button onClick={salvarEdicao} disabled={editLoading || tvIndisponivelEdit}>
+            <Button onClick={salvarEdicao} disabled={editLoading || tvIndisponivelEdit || itensExtrasEdit.some(i => i.catalogoId && !i.fornecedor)}>
               {editLoading ? 'Salvando...' : tvIndisponivelEdit ? 'Combinação indisponível' : 'Salvar Alterações'}
             </Button>
           </DialogFooter>

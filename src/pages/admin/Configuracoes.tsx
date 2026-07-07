@@ -7,6 +7,8 @@ import { RFMConfigCard } from '@/components/admin/RFMConfigCard'
 import { TelefonesBloqueadosCard } from '@/components/admin/TelefonesBloqueadosCard'
 import { BackupStorageCard } from '@/components/admin/BackupStorageCard'
 import { TabelaPrecosTVCard } from '@/components/admin/TabelaPrecosTVCard'
+import CatalogoPrecos from '@/components/admin/CatalogoPrecos'
+import EstoqueAcessorios from '@/components/admin/EstoqueAcessorios'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -452,6 +454,33 @@ export default function Configuracoes() {
         <div className="mt-6">
           <TabelaPrecosTVCard />
         </div>
+
+        {/* Catálogo de Orçamento */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Catálogo de Orçamento</CardTitle>
+            <CardDescription>
+              Preços e itens usados no orçamento na hora do instalador, além do
+              desconto padrão de "fechar agora"
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <CatalogoPrecos />
+          </CardContent>
+        </Card>
+
+        {/* Estoque de Acessórios */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Estoque de Acessórios</CardTitle>
+            <CardDescription>
+              Compras, saldo atual e histórico de movimentos dos acessórios
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <EstoqueAcessorios />
+          </CardContent>
+        </Card>
 
         {/* Critérios RFM */}
         <div className="mt-6">

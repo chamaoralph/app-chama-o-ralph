@@ -14,8 +14,9 @@ export interface CatalogoItem {
   id: string;
   nome: string;
   descricao: string | null;
-  categoria: 'tv' | 'adicional' | 'outros';
+  categoria: 'tv' | 'adicional' | 'outros' | 'acessorios';
   preco: number;
+  custo: number;
   por_quantidade: boolean;
   ativo: boolean;
   ordem: number;
@@ -32,19 +33,27 @@ export interface ConfigOrcamento {
 export interface ItemSelecionado {
   catalogo_id: string;
   nome: string;
+  categoria: CatalogoItem['categoria'];
   preco: number;
   quantidade: number;
   subtotal: number; // preco * quantidade
 }
 
+/** Acessórios NÃO recebem desconto — só serviços. */
+export function ehAcessorio(categoria: CatalogoItem['categoria']): boolean {
+  return categoria === 'acessorios';
+}
+
 /** Resultado final do orçamento (o que a tela mostra e o que grava no banco). */
 export interface ResultadoOrcamento {
   itens: ItemSelecionado[];
-  subtotal: number;        // soma dos itens, sem desconto
-  fechar_agora: boolean;   // se aplicou o desconto relâmpago
-  desconto_pct: number;    // % aplicado (0 se fechar_agora = false)
-  desconto_valor: number;  // quanto foi abatido em R$
-  total: number;           // subtotal - desconto_valor
+  subtotal: number;             // soma de TODOS os itens, sem desconto
+  subtotal_servicos: number;    // soma só dos serviços (base do desconto)
+  subtotal_acessorios: number;  // soma só dos acessórios (nunca descontam)
+  fechar_agora: boolean;        // se aplicou o desconto relâmpago
+  desconto_pct: number;         // % aplicado (0 se fechar_agora = false)
+  desconto_valor: number;       // R$ abatido — incide SÓ sobre serviços
+  total: number;                // subtotal - desconto_valor
 }
 
 // ---------------------------------------------------------------------
@@ -54,6 +63,12 @@ export interface ResultadoOrcamento {
 /** Arredonda para 2 casas de forma estável (trabalha em centavos). */
 export function arredondar2(valor: number): number {
   return Math.round((valor + Number.EPSILON) * 100) / 100;
+}
+
+/** Garante que o percentual fique entre 0 e 100. */
+export function clampPct(pct: number): number {
+  if (Number.isNaN(pct)) return 0;
+  return Math.min(100, Math.max(0, pct));
 }
 
 /** Formata em Real: 239 -> "R$ 239,00". */
@@ -77,6 +92,7 @@ export function montarItem(item: CatalogoItem, quantidade: number): ItemSelecion
   return {
     catalogo_id: item.id,
     nome: item.nome,
+    categoria: item.categoria,
     preco: item.preco,
     quantidade: qtd,
     subtotal: arredondar2(item.preco * qtd),
@@ -87,24 +103,38 @@ export function montarItem(item: CatalogoItem, quantidade: number): ItemSelecion
  * Calcula o orçamento completo a partir dos itens escolhidos.
  * @param itens         itens já selecionados (use montarItem para criar cada um)
  * @param config        config da empresa (desconto, validade, garantia)
- * @param fecharAgora   se true, aplica o desconto relâmpago único
+ * @param fecharAgora   se true, aplica o desconto
+ * @param descontoPctManual (opcional) % digitado na mão; se ausente usa o padrão
  */
 export function calcularOrcamento(
   itens: ItemSelecionado[],
   config: ConfigOrcamento,
   fecharAgora: boolean,
+  descontoPctManual?: number, // se informado, sobrepõe o % padrão (10%)
 ): ResultadoOrcamento {
   const subtotal = arredondar2(
     itens.reduce((soma, it) => soma + it.subtotal, 0),
   );
 
-  const desconto_pct = fecharAgora ? config.desconto_fechar_agora_pct : 0;
-  const desconto_valor = arredondar2(subtotal * (desconto_pct / 100));
+  // Separa a base: só serviços entram no desconto; acessórios ficam de fora.
+  const subtotal_acessorios = arredondar2(
+    itens
+      .filter((it) => ehAcessorio(it.categoria))
+      .reduce((soma, it) => soma + it.subtotal, 0),
+  );
+  const subtotal_servicos = arredondar2(subtotal - subtotal_acessorios);
+
+  const pctBase = descontoPctManual ?? config.desconto_fechar_agora_pct;
+  const desconto_pct = fecharAgora ? clampPct(pctBase) : 0;
+  // desconto aplicado APENAS sobre a base de serviços
+  const desconto_valor = arredondar2(subtotal_servicos * (desconto_pct / 100));
   const total = arredondar2(subtotal - desconto_valor);
 
   return {
     itens,
     subtotal,
+    subtotal_servicos,
+    subtotal_acessorios,
     fechar_agora: fecharAgora,
     desconto_pct,
     desconto_valor,
@@ -190,4 +220,101 @@ export function paraItensExtras(resultado: ResultadoOrcamento): ItemExtraCotacao
     descricao: it.quantidade > 1 ? `${it.nome} (x${it.quantidade})` : it.nome,
     valor: it.subtotal,
   }));
+}
+
+// =====================================================================
+// Repasse de acessórios (split 70/30 sobre o lucro)
+// Regra: fornecedor recebe (custo de volta + 70% do lucro);
+//        o outro lado recebe 30% do lucro.
+//        lucro = venda - custo.  Se venda < custo, lucro é tratado como 0.
+// =====================================================================
+
+/** Quem forneceu (comprou) a peça. */
+export type Fornecedor = 'empresa' | 'instalador';
+
+/** Percentual do lucro que fica com quem forneceu (o resto vai pro outro). */
+export const PCT_LUCRO_FORNECEDOR = 70;
+
+/** Resultado do repasse de UM acessório (já com quantidade embutida). */
+export interface RepasseAcessorio {
+  fornecedor: Fornecedor;
+  venda: number;               // preço de venda total (preco * quantidade)
+  custo: number;               // custo total (custo unitário * quantidade)
+  lucro: number;               // venda - custo (nunca negativo)
+  repasse_instalador: number;  // quanto o instalador recebe
+  repasse_empresa: number;     // quanto a empresa recebe
+}
+
+/**
+ * Calcula o repasse de um acessório.
+ * @param vendaTotal  preço de venda já multiplicado pela quantidade
+ * @param custoTotal  custo já multiplicado pela quantidade
+ * @param fornecedor  'empresa' ou 'instalador' (quem comprou a peça)
+ */
+export function calcularRepasseAcessorio(
+  vendaTotal: number,
+  custoTotal: number,
+  fornecedor: Fornecedor,
+): RepasseAcessorio {
+  const venda = arredondar2(vendaTotal);
+  const custo = arredondar2(custoTotal);
+  const lucro = arredondar2(Math.max(0, venda - custo));
+
+  const parteFornecedor = arredondar2(lucro * (PCT_LUCRO_FORNECEDOR / 100));
+  const parteOutro = arredondar2(lucro - parteFornecedor); // 30% (evita centavo perdido)
+
+  let repasse_instalador: number;
+  let repasse_empresa: number;
+
+  if (fornecedor === 'instalador') {
+    // instalador recupera o custo + fica com 70% do lucro
+    repasse_instalador = arredondar2(custo + parteFornecedor);
+    repasse_empresa = parteOutro;
+  } else {
+    // empresa forneceu: empresa recupera custo + 70%; instalador leva 30%
+    repasse_empresa = arredondar2(custo + parteFornecedor);
+    repasse_instalador = parteOutro;
+  }
+
+  return { fornecedor, venda, custo, lucro, repasse_instalador, repasse_empresa };
+}
+
+/** Um acessório escolhido, já com custo e fornecedor definidos. */
+export interface AcessorioSelecionado extends ItemSelecionado {
+  custo: number;          // custo unitário
+  fornecedor: Fornecedor;
+}
+
+/** Soma do repasse de vários acessórios (o que "vem pronto pra pagamento"). */
+export interface ResumoRepasse {
+  total_instalador: number;
+  total_empresa: number;
+  itens: (RepasseAcessorio & { nome: string; quantidade: number })[];
+}
+
+/**
+ * Consolida o repasse de todos os acessórios do orçamento.
+ * Cada acessório usa seu custo unitário * quantidade e o fornecedor marcado.
+ */
+export function resumirRepasseAcessorios(
+  acessorios: AcessorioSelecionado[],
+): ResumoRepasse {
+  const itens = acessorios.map((a) => {
+    const r = calcularRepasseAcessorio(
+      a.subtotal,                       // venda total (preco * qtd)
+      arredondar2(a.custo * a.quantidade), // custo total
+      a.fornecedor,
+    );
+    return { ...r, nome: a.nome, quantidade: a.quantidade };
+  });
+
+  return {
+    total_instalador: arredondar2(
+      itens.reduce((s, i) => s + i.repasse_instalador, 0),
+    ),
+    total_empresa: arredondar2(
+      itens.reduce((s, i) => s + i.repasse_empresa, 0),
+    ),
+    itens,
+  };
 }

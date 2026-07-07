@@ -41,8 +41,13 @@ import {
   montarItem,
   calcularOrcamento,
   formatarBRL,
-  paraItensExtras,
   montarMensagemOrcamento,
+  clampPct,
+  resumirRepasseAcessorios,
+  calcularRepasseAcessorio,
+  AcessorioSelecionado,
+  Fornecedor,
+  ehAcessorio,
 } from "@/lib/orcamento";
 
 // Rótulos e ordem das seções do catálogo
@@ -50,6 +55,7 @@ const SECOES: { chave: CatalogoItem["categoria"]; titulo: string }[] = [
   { chave: "tv", titulo: "Instalação de TV" },
   { chave: "adicional", titulo: "Adicionais" },
   { chave: "outros", titulo: "Outros serviços" },
+  { chave: "acessorios", titulo: "Acessórios" },
 ];
 
 export default function OrcamentoNaHora() {
@@ -60,6 +66,10 @@ export default function OrcamentoNaHora() {
   // id -> quantidade. Presença = item selecionado.
   const [quantidades, setQuantidades] = useState<Record<string, number>>({});
   const [fecharAgora, setFecharAgora] = useState(false);
+  const [descontoPct, setDescontoPct] = useState<number | null>(null);
+  const [fornecedores, setFornecedores] = useState<
+    Record<string, "empresa" | "instalador">
+  >({});
 
   // Depois de gerar: guardamos a cotação criada + o resultado congelado
   const [gerado, setGerado] = useState<{
@@ -135,11 +145,40 @@ export default function OrcamentoNaHora() {
 
   const resultado = useMemo(
     () =>
-      config ? calcularOrcamento(itensSelecionados, config, fecharAgora) : null,
-    [itensSelecionados, config, fecharAgora]
+      config
+        ? calcularOrcamento(
+            itensSelecionados,
+            config,
+            fecharAgora,
+            descontoPct ?? undefined
+          )
+        : null,
+    [itensSelecionados, config, fecharAgora, descontoPct]
   );
 
+  const acessoriosSelecionados = useMemo<AcessorioSelecionado[]>(() => {
+    if (!catalogo) return [];
+    return catalogo
+      .filter((c) => quantidades[c.id] != null && ehAcessorio(c.categoria))
+      .map((c) => ({
+        ...montarItem(c, quantidades[c.id] ?? 1),
+        custo: c.custo ?? 0,
+        fornecedor: fornecedores[c.id] as Fornecedor,
+      }));
+  }, [catalogo, quantidades, fornecedores]);
+
+  const repasse = useMemo(
+    () =>
+      resumirRepasseAcessorios(
+        acessoriosSelecionados.filter((a) => a.fornecedor)
+      ),
+    [acessoriosSelecionados]
+  );
+
+  const faltaFornecedor = acessoriosSelecionados.some((a) => !a.fornecedor);
+
   const nomeCliente = servico?.clientes?.nome ?? null;
+  const temAcessorio = gerado?.itens?.some((i) => ehAcessorio(i.categoria));
 
   // -------------------------------------------------------------------
   // Ações
@@ -149,7 +188,35 @@ export default function OrcamentoNaHora() {
       if (!servicoId || !resultado || !config) throw new Error("Dados incompletos.");
       if (resultado.itens.length === 0) throw new Error("Selecione ao menos um item.");
 
-      const itensExtras = paraItensExtras(resultado);
+      const itensExtras = resultado.itens.map((item) => {
+        const descricao =
+          item.quantidade > 1 ? `${item.nome} (x${item.quantidade})` : item.nome;
+
+        if (!ehAcessorio(item.categoria)) {
+          return { descricao, valor: item.subtotal };
+        }
+
+        const catalogoItem = catalogo?.find((c) => c.id === item.catalogo_id);
+        const custoUnitario = catalogoItem?.custo ?? 0;
+        const fornecedor = fornecedores[item.catalogo_id] as Fornecedor;
+        const repasse = calcularRepasseAcessorio(
+          item.subtotal,
+          custoUnitario * item.quantidade,
+          fornecedor
+        );
+
+        return {
+          descricao,
+          valor: item.subtotal,
+          eh_acessorio: true,
+          catalogo_id: item.catalogo_id,
+          quantidade: item.quantidade,
+          custo_unitario: custoUnitario,
+          fornecedor,
+          repasse_instalador: repasse.repasse_instalador,
+          repasse_empresa: repasse.repasse_empresa,
+        };
+      });
       if (resultado.fechar_agora && resultado.desconto_valor > 0) {
         itensExtras.push({
           descricao: `Desconto fechando agora (-${resultado.desconto_pct}%)`,
@@ -322,6 +389,12 @@ export default function OrcamentoNaHora() {
               <p>✅ Garantia de {config!.garantia_dias} dias</p>
               <p>📅 Válido por {config!.validade_dias} dias</p>
               <p>⭐ +5.000 instalações em SP · 5 estrelas no Google</p>
+              {temAcessorio && (
+                <p className="text-[10px] text-muted-foreground/70">
+                  Válido enquanto durar os estoques, sujeito a
+                  indisponibilidade ou alteração de preço.
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -376,11 +449,21 @@ export default function OrcamentoNaHora() {
   // -------------------------------------------------------------------
   // TELA DE MONTAGEM (selecionar itens)
   // -------------------------------------------------------------------
+  const removerFornecedor = (itemId: string) =>
+    setFornecedores((f) => {
+      if (f[itemId] == null) return f;
+      const next = { ...f };
+      delete next[itemId];
+      return next;
+    });
+
   const toggleItem = (item: CatalogoItem) =>
     setQuantidades((q) => {
       const next = { ...q };
-      if (next[item.id] != null) delete next[item.id];
-      else next[item.id] = 1;
+      if (next[item.id] != null) {
+        delete next[item.id];
+        removerFornecedor(item.id);
+      } else next[item.id] = 1;
       return next;
     });
 
@@ -389,10 +472,15 @@ export default function OrcamentoNaHora() {
       const atual = q[item.id] ?? 0;
       const novo = atual + delta;
       const next = { ...q };
-      if (novo <= 0) delete next[item.id];
-      else next[item.id] = novo;
+      if (novo <= 0) {
+        delete next[item.id];
+        removerFornecedor(item.id);
+      } else next[item.id] = novo;
       return next;
     });
+
+  const escolherFornecedor = (itemId: string, fornecedor: "empresa" | "instalador") =>
+    setFornecedores((f) => ({ ...f, [itemId]: fornecedor }));
 
   return (
     <div className="mx-auto max-w-md px-4 pb-32 pt-4">
@@ -411,17 +499,45 @@ export default function OrcamentoNaHora() {
       {/* Fechar agora */}
       {config && (
         <Card className="mt-4 border-primary/30">
-          <CardContent className="flex items-center justify-between gap-3 py-4">
-            <div className="flex items-center gap-2">
-              <Zap className="h-5 w-5 text-primary" />
-              <div>
-                <p className="text-sm font-medium">Fechar agora</p>
-                <p className="text-xs text-muted-foreground">
-                  Aplica {config.desconto_fechar_agora_pct}% de desconto
-                </p>
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Zap className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="text-sm font-medium">Fechar agora</p>
+                  <p className="text-xs text-muted-foreground">
+                    Aplica {config.desconto_fechar_agora_pct}% de desconto
+                  </p>
+                </div>
               </div>
+              <Switch checked={fecharAgora} onCheckedChange={setFecharAgora} />
             </div>
-            <Switch checked={fecharAgora} onCheckedChange={setFecharAgora} />
+
+            {fecharAgora && (
+              <div className="mt-3 flex items-center justify-end gap-2">
+                <label
+                  htmlFor="desconto-pct"
+                  className="text-xs text-muted-foreground"
+                >
+                  Desconto (%)
+                </label>
+                <div className="relative">
+                  <input
+                    id="desconto-pct"
+                    type="number"
+                    inputMode="decimal"
+                    className="h-8 w-20 rounded-md border bg-background px-2 pr-5 text-right text-sm"
+                    value={descontoPct ?? config.desconto_fechar_agora_pct}
+                    onChange={(e) =>
+                      setDescontoPct(clampPct(Number(e.target.value)))
+                    }
+                  />
+                  <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-xs text-muted-foreground">
+                    %
+                  </span>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -440,9 +556,11 @@ export default function OrcamentoNaHora() {
                 {itens.map((item) => {
                   const qtd = quantidades[item.id];
                   const selecionado = qtd != null;
+                  const acessorio = ehAcessorio(item.categoria);
+                  const fornecedorEscolhido = fornecedores[item.id];
                   return (
+                    <div key={item.id}>
                     <div
-                      key={item.id}
                       className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-3 transition-colors ${
                         selecionado ? "border-primary bg-primary/5" : "bg-card"
                       }`}
@@ -510,6 +628,45 @@ export default function OrcamentoNaHora() {
                         </div>
                       )}
                     </div>
+
+                    {acessorio && selecionado && (
+                      <div className="mt-1.5 flex items-center gap-2 px-1">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={
+                            fornecedorEscolhido === "empresa"
+                              ? "default"
+                              : "outline"
+                          }
+                          className="h-7 px-3 text-xs"
+                          onClick={() => escolherFornecedor(item.id, "empresa")}
+                        >
+                          Empresa
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={
+                            fornecedorEscolhido === "instalador"
+                              ? "default"
+                              : "outline"
+                          }
+                          className="h-7 px-3 text-xs"
+                          onClick={() =>
+                            escolherFornecedor(item.id, "instalador")
+                          }
+                        >
+                          Eu
+                        </Button>
+                        {!fornecedorEscolhido && (
+                          <span className="text-xs text-amber-600">
+                            Escolha quem forneceu
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    </div>
                   );
                 })}
               </div>
@@ -521,30 +678,55 @@ export default function OrcamentoNaHora() {
       {/* Rodapé fixo com total + gerar */}
       {resultado && (
         <div className="fixed inset-x-0 bottom-0 border-t bg-background/95 px-4 py-3 backdrop-blur">
-          <div className="mx-auto flex max-w-md items-center justify-between gap-3">
-            <div>
-              <p className="text-xs text-muted-foreground">
-                {resultado.itens.length}{" "}
-                {resultado.itens.length === 1 ? "item" : "itens"}
-                {resultado.fechar_agora && resultado.desconto_valor > 0 && (
-                  <span className="text-emerald-600">
-                    {" "}
-                    · -{formatarBRL(resultado.desconto_valor)}
-                  </span>
-                )}
+          <div className="mx-auto max-w-md">
+            {acessoriosSelecionados.some((a) => a.fornecedor) && (
+              <p className="mb-2 text-center text-xs text-muted-foreground">
+                Repasse — Instalador:{" "}
+                <span className="font-medium">
+                  {formatarBRL(repasse.total_instalador)}
+                </span>{" "}
+                · Empresa:{" "}
+                <span className="font-medium">
+                  {formatarBRL(repasse.total_empresa)}
+                </span>
               </p>
-              <p className="text-lg font-bold">{formatarBRL(resultado.total)}</p>
+            )}
+            {faltaFornecedor && (
+              <p className="mb-2 text-center text-xs text-amber-600">
+                Escolha quem forneceu cada acessório
+              </p>
+            )}
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs text-muted-foreground">
+                  {resultado.itens.length}{" "}
+                  {resultado.itens.length === 1 ? "item" : "itens"}
+                  {resultado.fechar_agora && resultado.desconto_valor > 0 && (
+                    <span className="text-emerald-600">
+                      {" "}
+                      · -{formatarBRL(resultado.desconto_valor)}
+                    </span>
+                  )}
+                </p>
+                <p className="text-lg font-bold">
+                  {formatarBRL(resultado.total)}
+                </p>
+              </div>
+              <Button
+                size="lg"
+                disabled={
+                  resultado.itens.length === 0 ||
+                  gerar.isPending ||
+                  faltaFornecedor
+                }
+                onClick={() => gerar.mutate()}
+              >
+                {gerar.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                Gerar orçamento
+              </Button>
             </div>
-            <Button
-              size="lg"
-              disabled={resultado.itens.length === 0 || gerar.isPending}
-              onClick={() => gerar.mutate()}
-            >
-              {gerar.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
-              Gerar orçamento
-            </Button>
           </div>
         </div>
       )}

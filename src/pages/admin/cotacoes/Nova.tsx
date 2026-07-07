@@ -11,6 +11,7 @@ import { Search, X, Loader2, Plus, Trash2 } from 'lucide-react'
 import { normalizarTelefone } from '@/lib/utils'
 import { SelectorPrecoTV, type TVItem, type TotaisTV, novoItemTV } from '@/components/admin/SelectorPrecoTV'
 import { ehInstalacaoTV } from '@/lib/precosTV'
+import { CatalogoItem, Fornecedor, calcularRepasseAcessorio, formatarBRL } from '@/lib/orcamento'
 
 interface TipoServico {
   id: string
@@ -21,6 +22,13 @@ interface ItemExtra {
   id: string
   descricao: string
   valor: string
+  // Presentes só quando o item veio do catálogo de acessórios (fornecedor sempre "empresa" no admin)
+  catalogoId?: string
+  custoUnitario?: number
+  quantidade?: number
+  fornecedor?: Fornecedor
+  repasseInstalador?: number
+  repasseEmpresa?: number
 }
 
 export default function NovaCotacao() {
@@ -37,6 +45,8 @@ export default function NovaCotacao() {
   const [tvItens, setTvItens] = useState<TVItem[]>([novoItemTV()])
   const [tvIndisponivel, setTvIndisponivel] = useState(false)
   const [itensExtras, setItensExtras] = useState<ItemExtra[]>([])
+  const [catalogoAcessorios, setCatalogoAcessorios] = useState<CatalogoItem[]>([])
+  const [estoqueSaldos, setEstoqueSaldos] = useState<Record<string, number>>({})
 
   const [formData, setFormData] = useState({
     cliente_nome: '',
@@ -63,6 +73,13 @@ export default function NovaCotacao() {
   const totalItensExtras = itensExtras.reduce((s, i) => s + (parseFloat(i.valor) || 0), 0)
   const valorTotalComExtras = (parseFloat(formData.valor_mao_obra) || 0) + totalItensExtras
 
+  const repasseTotal = itensExtras
+    .filter(i => i.catalogoId)
+    .reduce((acc, i) => {
+      const r = calcularRepasseAcessorio(parseFloat(i.valor) || 0, (i.custoUnitario ?? 0) * (i.quantidade ?? 1), 'empresa')
+      return { instalador: acc.instalador + r.repasse_instalador, empresa: acc.empresa + r.repasse_empresa }
+    }, { instalador: 0, empresa: 0 })
+
   useEffect(() => {
     async function fetchTiposServico() {
       const { data } = await supabase
@@ -79,8 +96,31 @@ export default function NovaCotacao() {
       const { data } = await supabase.from('usuarios').select('empresa_id').eq('id', user.id).maybeSingle()
       if (data) setEmpresaId(data.empresa_id)
     }
+    async function fetchAcessorios() {
+      const { data } = await supabase
+        .from('catalogo_servicos')
+        .select('*')
+        .eq('ativo', true)
+        .eq('categoria', 'acessorios')
+        .order('ordem')
+
+      setCatalogoAcessorios((data || []) as CatalogoItem[])
+    }
+    async function fetchEstoqueSaldos() {
+      const { data } = await supabase
+        .from('estoque_saldo')
+        .select('catalogo_id, saldo')
+
+      const mapa: Record<string, number> = {}
+      for (const linha of (data || []) as { catalogo_id: string; saldo: number }[]) {
+        mapa[linha.catalogo_id] = linha.saldo ?? 0
+      }
+      setEstoqueSaldos(mapa)
+    }
     fetchTiposServico()
     fetchEmpresa()
+    fetchAcessorios()
+    fetchEstoqueSaldos()
   }, [])
 
   const isInstalacaoTV = ehInstalacaoTV(formData.tipo_servico)
@@ -265,7 +305,25 @@ export default function NovaCotacao() {
           tipo_servico: [tipoServicoFinal],
           descricao_servico: formData.descricao || tipoServicoFinal,
           valor_estimado: valorTotalComExtras > 0 ? valorTotalComExtras : null,
-          itens_extras: itensExtras.filter(i => i.descricao.trim() && parseFloat(i.valor) > 0).map(i => ({ descricao: i.descricao.trim(), valor: parseFloat(i.valor) })) as any,
+          itens_extras: itensExtras
+            .filter(i => i.descricao.trim() && parseFloat(i.valor) > 0)
+            .map(i => {
+              const descricao = i.descricao.trim()
+              const valor = parseFloat(i.valor)
+              if (!i.catalogoId) return { descricao, valor }
+              const repasse = calcularRepasseAcessorio(valor, (i.custoUnitario ?? 0) * (i.quantidade ?? 1), 'empresa')
+              return {
+                descricao,
+                valor,
+                eh_acessorio: true,
+                catalogo_id: i.catalogoId,
+                quantidade: i.quantidade ?? 1,
+                custo_unitario: i.custoUnitario ?? 0,
+                fornecedor: 'empresa' as Fornecedor,
+                repasse_instalador: repasse.repasse_instalador,
+                repasse_empresa: repasse.repasse_empresa,
+              }
+            }) as any,
           valor_material: formData.origem_suporte === 'empresa' ? 0 : (formData.valor_material ? parseFloat(formData.valor_material) : 0),
           origem_lead: formData.origem_lead,
           ocasiao: formData.ocasiao,
@@ -490,45 +548,91 @@ export default function NovaCotacao() {
 
               {/* Itens extras */}
               <div className="col-span-2 border rounded-md p-4 space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
                   <span className="text-sm font-medium">Itens Extras</span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setItensExtras(prev => [...prev, { id: `${Date.now()}`, descricao: '', valor: '' }])}
-                  >
-                    <Plus className="w-4 h-4 mr-1" /> Adicionar Item
-                  </Button>
+                  <div className="flex gap-2">
+                    {catalogoAcessorios.length > 0 && (
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          const item = catalogoAcessorios.find(c => c.id === e.target.value)
+                          if (!item) return
+                          const quantidade = 1
+                          const valor = item.preco * quantidade
+                          const repasse = calcularRepasseAcessorio(valor, item.custo * quantidade, 'empresa')
+                          setItensExtras(prev => [...prev, {
+                            id: `${Date.now()}`,
+                            descricao: item.nome,
+                            valor: valor.toString(),
+                            catalogoId: item.id,
+                            custoUnitario: item.custo,
+                            quantidade,
+                            fornecedor: 'empresa',
+                            repasseInstalador: repasse.repasse_instalador,
+                            repasseEmpresa: repasse.repasse_empresa,
+                          }])
+                        }}
+                        className="px-2 py-1 border rounded-md text-sm bg-white"
+                      >
+                        <option value="">+ Acessório do catálogo...</option>
+                        {catalogoAcessorios.map(item => {
+                          const saldo = estoqueSaldos[item.id] ?? 0
+                          return (
+                            <option key={item.id} value={item.id} disabled={saldo === 0}>
+                              {item.nome} — {saldo} em estoque
+                            </option>
+                          )
+                        })}
+                      </select>
+                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setItensExtras(prev => [...prev, { id: `${Date.now()}`, descricao: '', valor: '' }])}
+                    >
+                      <Plus className="w-4 h-4 mr-1" /> Adicionar Item
+                    </Button>
+                  </div>
                 </div>
                 {itensExtras.length === 0 && (
                   <p className="text-xs text-muted-foreground">Ex: suporte extra, material adicional, bronca...</p>
                 )}
                 {itensExtras.map((item) => (
-                  <div key={item.id} className="flex gap-2 items-center">
-                    <input
-                      type="text"
-                      placeholder="Descrição do item"
-                      value={item.descricao}
-                      onChange={(e) => setItensExtras(prev => prev.map(i => i.id === item.id ? { ...i, descricao: e.target.value } : i))}
-                      className="flex-1 px-3 py-2 border rounded-md text-sm"
-                    />
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="0,00"
-                      value={item.valor}
-                      onChange={(e) => setItensExtras(prev => prev.map(i => i.id === item.id ? { ...i, valor: e.target.value } : i))}
-                      className="w-28 px-3 py-2 border rounded-md text-sm"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setItensExtras(prev => prev.filter(i => i.id !== item.id))}
-                    >
-                      <Trash2 className="w-4 h-4 text-muted-foreground" />
-                    </Button>
+                  <div key={item.id} className="space-y-1">
+                    <div className="flex gap-2 items-center">
+                      <input
+                        type="text"
+                        placeholder="Descrição do item"
+                        value={item.descricao}
+                        onChange={(e) => setItensExtras(prev => prev.map(i => i.id === item.id ? { ...i, descricao: e.target.value } : i))}
+                        className="flex-1 px-3 py-2 border rounded-md text-sm"
+                      />
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="0,00"
+                        value={item.valor}
+                        onChange={(e) => setItensExtras(prev => prev.map(i => i.id === item.id ? { ...i, valor: e.target.value } : i))}
+                        className="w-28 px-3 py-2 border rounded-md text-sm"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setItensExtras(prev => prev.filter(i => i.id !== item.id))}
+                      >
+                        <Trash2 className="w-4 h-4 text-muted-foreground" />
+                      </Button>
+                    </div>
+                    {item.catalogoId && (
+                      <p className="text-xs text-muted-foreground pl-1">
+                        Acessório · Fornecedor: Empresa
+                        {typeof item.repasseInstalador === 'number' && (
+                          <> · Repasse instalador: {formatarBRL(item.repasseInstalador)}</>
+                        )}
+                      </p>
+                    )}
                   </div>
                 ))}
                 {itensExtras.length > 0 && (
@@ -536,6 +640,11 @@ export default function NovaCotacao() {
                     Mão de obra: R$ {(parseFloat(formData.valor_mao_obra) || 0).toFixed(2)}
                     {totalItensExtras > 0 && <> + Itens extras: R$ {totalItensExtras.toFixed(2)}</>}
                     <span className="font-semibold text-foreground ml-2">= R$ {valorTotalComExtras.toFixed(2)}</span>
+                    {(repasseTotal.instalador > 0 || repasseTotal.empresa > 0) && (
+                      <div className="text-xs mt-1">
+                        Repasse acessórios — Instalador: {formatarBRL(repasseTotal.instalador)} · Empresa: {formatarBRL(repasseTotal.empresa)}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
