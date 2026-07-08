@@ -18,7 +18,7 @@ import { CalendarioCotacoesSemanal } from '@/components/admin/CalendarioCotacoes
 import { CalendarioCotacoesMensal } from '@/components/admin/CalendarioCotacoesMensal'
 import { SelectorPrecoTV, type TVItem, type TotaisTV, novoItemTV } from '@/components/admin/SelectorPrecoTV'
 import { ehInstalacaoTV } from '@/lib/precosTV'
-import { Fornecedor, calcularRepasseAcessorio, formatarBRL } from '@/lib/orcamento'
+import { CatalogoItem, Fornecedor, calcularRepasseAcessorio, formatarBRL } from '@/lib/orcamento'
 import { TermoAceiteCard } from '@/components/admin/TermoAceiteCard'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
@@ -211,18 +211,47 @@ export default function ListaCotacoes() {
     custoUnitario?: number
     quantidade?: number
     fornecedor?: Fornecedor
+    repasseInstalador?: number
+    repasseEmpresa?: number
   }[]>([])
   const totalItensExtrasEdit = itensExtrasEdit.reduce((s, i) => s + (parseFloat(i.valor) || 0), 0)
+  const [catalogoAcessorios, setCatalogoAcessorios] = useState<CatalogoItem[]>([])
+  const [estoqueSaldos, setEstoqueSaldos] = useState<Record<string, number>>({})
 
   useEffect(() => {
     fetchCotacoes()
     fetchTiposServico()
+    fetchAcessorios()
+    fetchEstoqueSaldos()
     ;(async () => {
       if (!user) return
       const { data } = await supabase.from('usuarios').select('empresa_id').eq('id', user.id).maybeSingle()
       if (data) setEmpresaIdAtual(data.empresa_id)
     })()
   }, [user])
+
+  async function fetchAcessorios() {
+    const { data } = await supabase
+      .from('catalogo_servicos')
+      .select('*')
+      .eq('ativo', true)
+      .eq('categoria', 'acessorios')
+      .order('ordem')
+
+    setCatalogoAcessorios((data || []) as CatalogoItem[])
+  }
+
+  async function fetchEstoqueSaldos() {
+    const { data } = await supabase
+      .from('estoque_saldo')
+      .select('catalogo_id, saldo')
+
+    const mapa: Record<string, number> = {}
+    for (const linha of (data || []) as { catalogo_id: string; saldo: number }[]) {
+      mapa[linha.catalogo_id] = linha.saldo ?? 0
+    }
+    setEstoqueSaldos(mapa)
+  }
 
   async function fetchTiposServico() {
     const { data } = await supabase
@@ -1545,16 +1574,52 @@ export default function ListaCotacoes() {
 
                 {/* Itens extras */}
                 <div className="col-span-2 border rounded-md p-4 space-y-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
                     <span className="text-sm font-medium">Itens Extras</span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setItensExtrasEdit(prev => [...prev, { id: `${Date.now()}`, descricao: '', valor: '' }])}
-                    >
-                      <Plus className="w-4 h-4 mr-1" /> Adicionar Item
-                    </Button>
+                    <div className="flex gap-2">
+                      {catalogoAcessorios.length > 0 && (
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            const item = catalogoAcessorios.find(c => c.id === e.target.value)
+                            if (!item) return
+                            const quantidade = 1
+                            const valor = item.preco * quantidade
+                            const repasse = calcularRepasseAcessorio(valor, item.custo * quantidade, 'empresa')
+                            setItensExtrasEdit(prev => [...prev, {
+                              id: `${Date.now()}`,
+                              descricao: item.nome,
+                              valor: valor.toString(),
+                              catalogoId: item.id,
+                              custoUnitario: item.custo,
+                              quantidade,
+                              fornecedor: 'empresa',
+                              repasseInstalador: repasse.repasse_instalador,
+                              repasseEmpresa: repasse.repasse_empresa,
+                            }])
+                          }}
+                          className="px-2 py-1 border rounded-md text-sm bg-white"
+                        >
+                          <option value="">+ Acessório do catálogo...</option>
+                          {catalogoAcessorios.map(item => {
+                            const saldo = estoqueSaldos[item.id] ?? 0
+                            return (
+                              <option key={item.id} value={item.id} disabled={saldo === 0}>
+                                {item.nome} — {saldo} em estoque
+                              </option>
+                            )
+                          })}
+                        </select>
+                      )}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setItensExtrasEdit(prev => [...prev, { id: `${Date.now()}`, descricao: '', valor: '' }])}
+                      >
+                        <Plus className="w-4 h-4 mr-1" /> Adicionar Item
+                      </Button>
+                    </div>
                   </div>
                   {itensExtrasEdit.length === 0 && (
                     <p className="text-xs text-muted-foreground">Ex: suporte extra, material adicional, bronca...</p>
