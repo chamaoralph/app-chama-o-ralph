@@ -47,6 +47,8 @@ export default function NovaCotacao() {
   const [itensExtras, setItensExtras] = useState<ItemExtra[]>([])
   const [catalogoAcessorios, setCatalogoAcessorios] = useState<CatalogoItem[]>([])
   const [estoqueSaldos, setEstoqueSaldos] = useState<Record<string, number>>({})
+  const [buscandoCep, setBuscandoCep] = useState(false)
+  const [cepErro, setCepErro] = useState(false)
 
   const [formData, setFormData] = useState({
     cliente_nome: '',
@@ -227,6 +229,43 @@ export default function NovaCotacao() {
     } finally {
       setBuscandoCliente(false)
     }
+  }
+
+  async function handleCepChange(valor: string) {
+    const digitos = valor.replace(/\D/g, '').slice(0, 8)
+    const formatado = digitos.length > 5 ? `${digitos.slice(0, 5)}-${digitos.slice(5)}` : digitos
+    setFormData(prev => ({ ...prev, cep: formatado }))
+    setCepErro(false)
+
+    if (digitos.length !== 8) return
+
+    setBuscandoCep(true)
+    try {
+      const resp = await fetch(`https://viacep.com.br/ws/${digitos}/json/`)
+      const data = await resp.json()
+
+      if (data.erro) {
+        setCepErro(true)
+      } else {
+        const cidadeUf = data.localidade && data.uf ? `${data.localidade} - ${data.uf}` : ''
+        const enderecoBase = [data.logradouro, cidadeUf].filter(Boolean).join(', ')
+        setFormData(prev => ({
+          ...prev,
+          bairro: data.bairro || prev.bairro,
+          endereco_completo: enderecoBase || prev.endereco_completo,
+        }))
+      }
+    } catch {
+      setCepErro(true)
+    } finally {
+      setBuscandoCep(false)
+    }
+  }
+
+  function seguirSemCep() {
+    setFormData(prev => ({ ...prev, cep: '' }))
+    setCepErro(false)
+    setBuscandoCep(false)
   }
 
   function limparBusca() {
@@ -434,6 +473,27 @@ export default function NovaCotacao() {
             {/* Campos expandidos - só aparecem após busca */}
             {clienteBuscado && (
               <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2 flex gap-2 items-end">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium mb-2">CEP</label>
+                    <Input
+                      type="text"
+                      value={formData.cep}
+                      onChange={(e) => handleCepChange(e.target.value)}
+                      placeholder="00000-000"
+                      maxLength={9}
+                    />
+                    {buscandoCep && (
+                      <p className="text-xs text-muted-foreground mt-1">Buscando endereço...</p>
+                    )}
+                    {cepErro && (
+                      <p className="text-xs text-red-600 mt-1">CEP não encontrado. Preencha o endereço manualmente.</p>
+                    )}
+                  </div>
+                  <Button type="button" variant="outline" onClick={seguirSemCep}>
+                    Seguir sem CEP
+                  </Button>
+                </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">Nome *</label>
                   <Input type="text" required value={formData.cliente_nome} onChange={(e) => setFormData({...formData, cliente_nome: e.target.value})} />
