@@ -94,6 +94,30 @@ export default function Aprovacoes() {
     fetchServicos()
   }, [filtroStatus])
 
+  // Regra fixa: Valor Total de Mão de Obra = Valor recebido - (Reembolso instalador + Reembolso empresa)
+  // Mão de obra instalador = Valor Total de Mão de Obra / 2
+  useEffect(() => {
+    if (!aprovacaoModal.open) return
+
+    const recebido = parseFloat(aprovacaoModal.valor_recebido_cliente) || 0
+    const reembolsoInstalador = parseFloat(aprovacaoModal.valor_reembolso_despesas) || 0
+    const reembolsoEmpresa = parseFloat(aprovacaoModal.custo_suporte) || 0
+
+    const valorTotalMaoObra = recebido - (reembolsoInstalador + reembolsoEmpresa)
+    const maoObraInstalador = valorTotalMaoObra / 2
+
+    setAprovacaoModal(prev => ({
+      ...prev,
+      valor_total: valorTotalMaoObra.toFixed(2),
+      valor_mao_obra_instalador: maoObraInstalador.toFixed(2),
+    }))
+  }, [
+    aprovacaoModal.open,
+    aprovacaoModal.valor_recebido_cliente,
+    aprovacaoModal.valor_reembolso_despesas,
+    aprovacaoModal.custo_suporte,
+  ])
+
   async function fetchServicos() {
     try {
       setLoading(true)
@@ -506,7 +530,7 @@ export default function Aprovacoes() {
                     <h3 className="font-semibold text-gray-900 mb-3">Valores</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="bg-gray-50 p-3 rounded-lg">
-                        <p className="text-sm text-gray-600">Valor Total</p>
+                        <p className="text-sm text-gray-600">Valor Total de Mão de Obra</p>
                         <p className="text-lg font-semibold text-gray-900">
                           R$ {servico.valor_total.toFixed(2)}
                         </p>
@@ -654,14 +678,14 @@ export default function Aprovacoes() {
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="ap-valor-total">Valor total cobrado (R$)</Label>
+                <Label htmlFor="ap-valor-total">Valor Total de Mão de Obra (R$)</Label>
                 <Input
                   id="ap-valor-total"
                   type="number"
-                  min="0"
-                  step="0.01"
+                  readOnly
+                  disabled
+                  className="bg-gray-100"
                   value={aprovacaoModal.valor_total}
-                  onChange={(e) => setAprovacaoModal(prev => ({ ...prev, valor_total: e.target.value }))}
                 />
               </div>
               <div className="grid gap-2">
@@ -669,10 +693,10 @@ export default function Aprovacoes() {
                 <Input
                   id="ap-mao-obra"
                   type="number"
-                  min="0"
-                  step="0.01"
+                  readOnly
+                  disabled
+                  className="bg-gray-100"
                   value={aprovacaoModal.valor_mao_obra_instalador}
-                  onChange={(e) => setAprovacaoModal(prev => ({ ...prev, valor_mao_obra_instalador: e.target.value }))}
                 />
               </div>
             </div>

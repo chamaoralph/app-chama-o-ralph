@@ -17,7 +17,7 @@
 
 ```javascript
 function main() {
-  var WEBHOOK_URL = 'https://xenevneonaqbrqiuvuch.supabase.co/functions/v1/google-ads-webhook';
+  var WEBHOOK_URL = 'https://dgkpxgwpjgnrobxduamz.supabase.co/functions/v1/google-ads-webhook';
   var WEBHOOK_TOKEN = 'SEU_TOKEN_AQUI'; // Cole seu GOOGLE_ADS_WEBHOOK_TOKEN aqui
   var EMPRESA_ID = 'SEU_EMPRESA_ID';    // Cole o UUID da sua empresa aqui
   var DAYS_BACK = 7; // Quantos dias para trás sincronizar

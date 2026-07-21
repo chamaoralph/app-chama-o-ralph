@@ -46,7 +46,7 @@ Public routes: `/`, `/login`, `/signup`, `/instalar`, `/aceite/:token`
 - Client and auto-generated types: `src/integrations/supabase/`
 - 8 Edge Functions in `supabase/functions/` (webhooks for Google Ads, WhatsApp, ratings, backups) — JWT verification is disabled on all of them
 - Migrations in `supabase/migrations/`
-- Project ID: `xenevneonaqbrqiuvuch`
+- Project ID: `dgkpxgwpjgnrobxduamz`
 
 ### Path Alias
 
