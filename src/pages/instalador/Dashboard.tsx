@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { InstaladorLayout } from '@/components/layout/InstaladorLayout'
 import { supabase } from '@/integrations/supabase/client'
 import { Link } from 'react-router-dom'
-import { Calendar, DollarSign, Package, TrendingUp, Clock, ChevronRight, ChevronLeft, MapPin } from 'lucide-react'
+import { Calendar, DollarSign, Package, TrendingUp, Clock, ChevronRight, ChevronLeft, MapPin, Gift } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -36,7 +36,7 @@ export default function InstaladorDashboard() {
 
   const hoje = new Date()
   const [mesDesempenho, setMesDesempenho] = useState({ ano: hoje.getFullYear(), mes: hoje.getMonth() + 1 })
-  const [desempenho, setDesempenho] = useState({ servicos: 0, maoObra: 0, reembolso: 0 })
+  const [desempenho, setDesempenho] = useState({ servicos: 0, maoObra: 0, reembolso: 0, ganhoAcessorios: 0 })
   const [loadingDesempenho, setLoadingDesempenho] = useState(false)
 
   const isCurrentMonth = mesDesempenho.ano === hoje.getFullYear() && mesDesempenho.mes === hoje.getMonth() + 1
@@ -77,7 +77,7 @@ export default function InstaladorDashboard() {
 
       const { data } = await supabase
         .from('servicos')
-        .select('valor_mao_obra_instalador, valor_reembolso_despesas')
+        .select('valor_mao_obra_instalador, valor_reembolso_despesas, ganho_acessorios_instalador')
         .eq('instalador_id', user.id)
         .eq('status', 'concluido')
         .gte('data_servico_agendada', `${primeiroDia}T00:00:00`)
@@ -87,6 +87,7 @@ export default function InstaladorDashboard() {
         servicos: data?.length || 0,
         maoObra: data?.reduce((sum, s) => sum + Number(s.valor_mao_obra_instalador || 0), 0) || 0,
         reembolso: data?.reduce((sum, s) => sum + Number(s.valor_reembolso_despesas || 0), 0) || 0,
+        ganhoAcessorios: data?.reduce((sum, s) => sum + Number(s.ganho_acessorios_instalador || 0), 0) || 0,
       })
     } catch (err) {
       console.error('Erro ao carregar desempenho:', err)
@@ -410,7 +411,7 @@ export default function InstaladorDashboard() {
           {loadingDesempenho ? (
             <div className="flex justify-center py-6"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" /></div>
           ) : (
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-purple-50 border border-purple-100 rounded-lg p-4 text-center">
                 <div className="text-3xl font-bold text-purple-700">{desempenho.servicos}</div>
                 <div className="text-sm text-purple-600 mt-1">Serviços Concluídos</div>
@@ -422,6 +423,13 @@ export default function InstaladorDashboard() {
               <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 text-center">
                 <div className="text-2xl font-bold text-blue-700">R$ {desempenho.reembolso.toFixed(2)}</div>
                 <div className="text-sm text-blue-600 mt-1">Total Reembolsos</div>
+              </div>
+              <div className="bg-amber-50 border border-amber-100 rounded-lg p-4 text-center">
+                <div className="flex items-center justify-center gap-1 text-amber-700">
+                  <Gift className="h-4 w-4" />
+                  <span className="text-2xl font-bold">R$ {desempenho.ganhoAcessorios.toFixed(2)}</span>
+                </div>
+                <div className="text-sm text-amber-600 mt-1">Ganho com venda de acessórios</div>
               </div>
             </div>
           )}
