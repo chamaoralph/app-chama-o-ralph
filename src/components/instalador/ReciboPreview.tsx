@@ -9,6 +9,8 @@ interface ServicoRecibo {
   valor_mao_obra_instalador: number
   valor_reembolso_despesas: number
   custo_suporte: number
+  ganho_acessorios_instalador?: number | null
+  ganho_acessorios_empresa?: number | null
   valor_recebido_cliente: number
   recebimento_cliente: string | null
 }
@@ -22,15 +24,18 @@ interface ReciboPreviewProps {
 function calcServico(s: ServicoRecibo) {
   const reembInst = s.valor_reembolso_despesas || 0
   const reembEmp = s.custo_suporte || 0
+  const ganhoInst = s.ganho_acessorios_instalador || 0
+  const ganhoEmp = s.ganho_acessorios_empresa || 0
   const maoObra = s.valor_mao_obra_instalador || 0
-  // totalEmp/totalInst são calculados a partir do 50% fixo — independente de quem recebeu
-  const totalEmp = maoObra + reembEmp
-  const totalInst = maoObra + reembInst
+  // totalEmp/totalInst são calculados a partir do 50% fixo — independente de quem recebeu.
+  // Ganho de acessórios entra igual reembolso (pass-through), só que em linha própria.
+  const totalEmp = maoObra + reembEmp + ganhoEmp
+  const totalInst = maoObra + reembInst + ganhoInst
   // recebimento_cliente afeta apenas o saldo final (quem já tem o dinheiro em mãos)
   const recebido = s.valor_recebido_cliente || 0
   const recebInst = s.recebimento_cliente === 'instalador' ? recebido : 0
   const recebEmp = s.recebimento_cliente === 'empresa' ? recebido : 0
-  return { reembInst, reembEmp, recebido, recebInst, recebEmp, totalEmp, totalInst }
+  return { reembInst, reembEmp, ganhoInst, ganhoEmp, recebido, recebInst, recebEmp, totalEmp, totalInst }
 }
 
 const fmt = (v: number) => `R$ ${v.toFixed(2)}`
@@ -43,12 +48,14 @@ export function ReciboPreview({ instaladorNome, dataReferencia, servicos }: Reci
       maoObra: acc.maoObra + (c.s.valor_mao_obra_instalador || 0),
       reembInst: acc.reembInst + c.reembInst,
       reembEmp: acc.reembEmp + c.reembEmp,
+      ganhoInst: acc.ganhoInst + c.ganhoInst,
+      ganhoEmp: acc.ganhoEmp + c.ganhoEmp,
       recebInst: acc.recebInst + c.recebInst,
       recebEmp: acc.recebEmp + c.recebEmp,
       totalEmp: acc.totalEmp + c.totalEmp,
       totalInst: acc.totalInst + c.totalInst,
     }),
-    { maoObra: 0, reembInst: 0, reembEmp: 0, recebInst: 0, recebEmp: 0, totalEmp: 0, totalInst: 0 }
+    { maoObra: 0, reembInst: 0, reembEmp: 0, ganhoInst: 0, ganhoEmp: 0, recebInst: 0, recebEmp: 0, totalEmp: 0, totalInst: 0 }
   )
 
   const totalRecebidoPeloInstalador = totals.recebInst
@@ -205,6 +212,20 @@ export function ReciboPreview({ instaladorNome, dataReferencia, servicos }: Reci
             <p style={{ fontSize: '16px', fontWeight: 'bold', color: '#15803d' }}>{fmt(totals.totalInst)}</p>
           </div>
         </div>
+
+        {totals.ganhoEmp > 0 && (
+          <div style={{ ...s.summaryRow, color: '#1d4ed8' }}>
+            <span>Ganho com acessórios (empresa):</span>
+            <span style={{ fontWeight: '600' }}>{fmt(totals.ganhoEmp)}</span>
+          </div>
+        )}
+
+        {totals.ganhoInst > 0 && (
+          <div style={{ ...s.summaryRow, color: '#15803d' }}>
+            <span>Ganho com acessórios (instalador):</span>
+            <span style={{ fontWeight: '600' }}>{fmt(totals.ganhoInst)}</span>
+          </div>
+        )}
 
         {totals.recebEmp > 0 && (
           <div style={{ ...s.summaryRow, color: '#2563eb' }}>

@@ -1,9 +1,21 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Minus, Plus } from "lucide-react";
 import { InstaladorLayout } from "@/components/layout/InstaladorLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import {
+  CatalogoItem,
+  Fornecedor,
+  AcessorioSelecionado,
+  montarItem,
+  calcularRepasseAcessorio,
+  paraExtraServico,
+  somarExtras,
+  somarDecomposicaoExtras,
+  formatarBRL,
+} from "@/lib/orcamento";
 
 interface ItemEstoqueDevolver {
   servico_id: string;
@@ -84,6 +96,114 @@ export default function FinalizarServico() {
   const [recebimentoCliente, setRecebimentoCliente] = useState<'empresa' | 'instalador'>('empresa');
   const [valorRecebidoCliente, setValorRecebidoCliente] = useState("");
   const [quantidadesDevolver, setQuantidadesDevolver] = useState<Record<string, number>>({});
+
+  // --- Extras (acessórios vendidos na finalização) ---
+  const [quantidadesExtras, setQuantidadesExtras] = useState<Record<string, number>>({});
+  const [fornecedoresExtras, setFornecedoresExtras] = useState<Record<string, Fornecedor>>({});
+  const [custosInstaladorExtras, setCustosInstaladorExtras] = useState<Record<string, string>>({});
+
+  const { data: catalogoAcessorios } = useQuery({
+    queryKey: ["catalogo-acessorios-extra"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("catalogo_servicos")
+        .select("*")
+        .eq("ativo", true)
+        .eq("categoria", "acessorios")
+        .order("ordem", { ascending: true });
+      if (error) throw error;
+      return data as CatalogoItem[];
+    },
+  });
+
+  const { data: saldosEstoqueExtras } = useQuery({
+    queryKey: ["estoque-saldo-extra"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("estoque_saldo")
+        .select("catalogo_id, saldo");
+      if (error) throw error;
+      return (data || []) as { catalogo_id: string; saldo: number }[];
+    },
+  });
+
+  const saldoExtraPorId = useMemo(() => {
+    const mapa: Record<string, number> = {};
+    (saldosEstoqueExtras ?? []).forEach((s) => { mapa[s.catalogo_id] = s.saldo; });
+    return mapa;
+  }, [saldosEstoqueExtras]);
+
+  const acessoriosExtrasEmpresaIds = useMemo(() => {
+    if (!catalogoAcessorios) return [];
+    return catalogoAcessorios
+      .filter((c) => quantidadesExtras[c.id] != null && fornecedoresExtras[c.id] === "empresa")
+      .map((c) => c.id);
+  }, [catalogoAcessorios, quantidadesExtras, fornecedoresExtras]);
+
+  const custoEstoqueExtraQueries = useQueries({
+    queries: acessoriosExtrasEmpresaIds.map((catalogoId) => ({
+      queryKey: ["custo-atual-acessorio", catalogoId],
+      queryFn: async () => {
+        const { data, error } = await supabase.rpc("custo_atual_acessorio", {
+          p_catalogo_id: catalogoId,
+        });
+        if (error) throw error;
+        return data as number | null;
+      },
+    })),
+  });
+
+  const custoEstoqueExtraPorId = useMemo(() => {
+    const mapa: Record<string, { valor: number | null; carregando: boolean }> = {};
+    acessoriosExtrasEmpresaIds.forEach((catalogoId, idx) => {
+      const q = custoEstoqueExtraQueries[idx];
+      mapa[catalogoId] = { valor: q?.data ?? null, carregando: q?.isLoading ?? false };
+    });
+    return mapa;
+  }, [acessoriosExtrasEmpresaIds, custoEstoqueExtraQueries]);
+
+  const acessoriosExtrasSelecionados = useMemo<AcessorioSelecionado[]>(() => {
+    if (!catalogoAcessorios) return [];
+    return catalogoAcessorios
+      .filter((c) => quantidadesExtras[c.id] != null)
+      .map((c) => {
+        const fornecedor = fornecedoresExtras[c.id] as Fornecedor;
+        const custo =
+          fornecedor === "instalador"
+            ? parseFloat(custosInstaladorExtras[c.id] || "0") || 0
+            : custoEstoqueExtraPorId[c.id]?.valor ?? 0;
+        return { ...montarItem(c, quantidadesExtras[c.id] ?? 1), custo, fornecedor };
+      });
+  }, [catalogoAcessorios, quantidadesExtras, fornecedoresExtras, custosInstaladorExtras, custoEstoqueExtraPorId]);
+
+  // Acessório sem fornecedor escolhido, sem estoque (empresa) ou sem custo digitado (instalador) — bloqueia envio
+  const extraComProblema = acessoriosExtrasSelecionados.some((a) => {
+    if (!a.fornecedor) return true;
+    if (a.fornecedor === "empresa") {
+      return (saldoExtraPorId[a.catalogo_id] ?? 0) <= 0 || custoEstoqueExtraPorId[a.catalogo_id]?.valor == null;
+    }
+    return !custosInstaladorExtras[a.catalogo_id]?.trim();
+  });
+
+  const extrasNovos = useMemo(
+    () => acessoriosExtrasSelecionados.filter((a) => a.fornecedor).map(paraExtraServico),
+    [acessoriosExtrasSelecionados],
+  );
+
+  const resumoExtrasNovos = useMemo(() => somarExtras(extrasNovos), [extrasNovos]);
+
+  const ajustarQtdExtra = (catalogoId: string, delta: number) =>
+    setQuantidadesExtras((q) => {
+      const atual = q[catalogoId] ?? 0;
+      const novo = atual + delta;
+      const next = { ...q };
+      if (novo <= 0) {
+        delete next[catalogoId];
+        setFornecedoresExtras((f) => { const n = { ...f }; delete n[catalogoId]; return n; });
+        setCustosInstaladorExtras((c) => { const n = { ...c }; delete n[catalogoId]; return n; });
+      } else next[catalogoId] = novo;
+      return next;
+    });
 
   const { data: itensParaDevolver } = useQuery({
     queryKey: ["estoque-a-devolver", servicoId],
@@ -193,6 +313,15 @@ export default function FinalizarServico() {
       return;
     }
 
+    if (extraComProblema) {
+      toast({
+        title: "❌ Extras incompletos",
+        description: "Escolha o fornecedor/custo de cada acessório extra antes de enviar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setEnviando(true);
 
     try {
@@ -235,8 +364,29 @@ export default function FinalizarServico() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
-      const reembInstFinal = temReembolso ? parseFloat(valorReembolso || '0') : (servico.valor_reembolso_despesas || 0)
-      const valorEmpresaRecebeu = (servico.valor_mao_obra_instalador || 0) * 2 + (servico.custo_suporte || 0) + reembInstFinal
+      // Extras (acessórios vendidos na finalização): a lista atual é a fonte da
+      // verdade. Como um reenvio por correção recarrega o serviço já com os
+      // campos flat somados da tentativa anterior, "descontaminamos" cada
+      // agregado subtraindo o efeito dos servicos_extras salvos antes de somar
+      // os extras da tentativa atual — assim nunca dobra. Reembolso (custo) e
+      // ganho (lucro) de cada extra vão para campos separados: reembolso é
+      // custo puro, ganho é a fatia 70/30 do lucro (ver decomporExtra).
+      const decompAntigos = somarDecomposicaoExtras((servico.servicos_extras || []) as typeof extrasNovos);
+      const decompNovos = somarDecomposicaoExtras(extrasNovos);
+
+      const reembDespesaBase = temReembolso
+        ? parseFloat(valorReembolso || '0')
+        : Math.max(0, (servico.valor_reembolso_despesas || 0) - decompAntigos.reembolso_instalador);
+      const custoSuporteBase = Math.max(0, (servico.custo_suporte || 0) - decompAntigos.reembolso_empresa);
+      const ganhoInstBase = Math.max(0, (servico.ganho_acessorios_instalador || 0) - decompAntigos.ganho_instalador);
+      const ganhoEmpBase = Math.max(0, (servico.ganho_acessorios_empresa || 0) - decompAntigos.ganho_empresa);
+
+      const reembInstFinal = reembDespesaBase + decompNovos.reembolso_instalador
+      const custoSuporteFinal = custoSuporteBase + decompNovos.reembolso_empresa
+      const ganhoInstFinal = ganhoInstBase + decompNovos.ganho_instalador
+      const ganhoEmpFinal = ganhoEmpBase + decompNovos.ganho_empresa
+      const valorEmpresaRecebeu = (servico.valor_mao_obra_instalador || 0) * 2
+        + custoSuporteFinal + reembInstFinal + ganhoInstFinal + ganhoEmpFinal
 
       const { error: updateError } = await supabase
         .from("servicos")
@@ -245,10 +395,22 @@ export default function FinalizarServico() {
           fotos_conclusao: fotosPaths,
           nota_fiscal_url: notaFiscalPath,
           valor_reembolso_despesas: reembInstFinal,
+          custo_suporte: custoSuporteFinal,
+          ganho_acessorios_instalador: ganhoInstFinal,
+          ganho_acessorios_empresa: ganhoEmpFinal,
           observacoes_instalador: observacoes,
           data_conclusao: new Date().toISOString(),
           recebimento_cliente: recebimentoCliente,
-          valor_recebido_cliente: recebimentoCliente === 'instalador' ? parseFloat(valorRecebidoCliente || '0') : valorEmpresaRecebeu,
+          // Ramo 'instalador': o campo já pede o TOTAL recebido do cliente
+          // (rótulo abaixo deixa isso explícito), incluindo extras — não soma
+          // nada por cima. Não precisa descontaminar: é digitado do zero a
+          // cada envio (nunca pré-preenchido do banco), então nada se acumula.
+          // Ramo 'empresa': valorEmpresaRecebeu já é reconstruído a partir dos
+          // 4 agregados acima, que ESSES sim são descontaminados.
+          valor_recebido_cliente: recebimentoCliente === 'instalador'
+            ? parseFloat(valorRecebidoCliente || '0')
+            : valorEmpresaRecebeu,
+          servicos_extras: extrasNovos,
         })
         .eq("id", servicoId)
         .eq("instalador_id", user.id)
@@ -356,6 +518,132 @@ export default function FinalizarServico() {
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {catalogoAcessorios && catalogoAcessorios.length > 0 && (
+          <div className="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 className="text-lg font-semibold mb-1">Vendeu algum acessório extra?</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Itens vendidos na hora, fora do que já estava no orçamento. Opcional.
+            </p>
+            <div className="space-y-3">
+              {catalogoAcessorios.map((item) => {
+                const qtd = quantidadesExtras[item.id];
+                const selecionado = qtd != null;
+                const fornecedorEscolhido = fornecedoresExtras[item.id];
+                const semEstoque = (saldoExtraPorId[item.id] ?? 0) <= 0;
+                const custoEmpresaInfo = custoEstoqueExtraPorId[item.id];
+                return (
+                  <div key={item.id} className="border rounded-md p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium">{item.nome}</p>
+                        <p className="text-xs text-muted-foreground">{formatarBRL(item.preco)} / un</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => ajustarQtdExtra(item.id, -1)}
+                          disabled={!selecionado}
+                          className="h-7 w-7 flex items-center justify-center border rounded-md disabled:opacity-40"
+                        >
+                          <Minus className="h-3.5 w-3.5" />
+                        </button>
+                        <span className="w-5 text-center text-sm">{qtd ?? 0}</span>
+                        <button
+                          type="button"
+                          onClick={() => ajustarQtdExtra(item.id, 1)}
+                          className="h-7 w-7 flex items-center justify-center border rounded-md"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {selecionado && (
+                      <div className="mt-2 space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={semEstoque}
+                            onClick={() => setFornecedoresExtras((f) => ({ ...f, [item.id]: "empresa" }))}
+                            className={`h-7 px-3 rounded-md text-xs border disabled:opacity-40 ${fornecedorEscolhido === "empresa" ? "bg-blue-600 text-white border-blue-600" : ""}`}
+                          >
+                            Empresa
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFornecedoresExtras((f) => ({ ...f, [item.id]: "instalador" }))}
+                            className={`h-7 px-3 rounded-md text-xs border ${fornecedorEscolhido === "instalador" ? "bg-blue-600 text-white border-blue-600" : ""}`}
+                          >
+                            Eu forneci
+                          </button>
+                          {!fornecedorEscolhido && (
+                            <span className="text-xs text-amber-600">Escolha quem forneceu</span>
+                          )}
+                        </div>
+
+                        {semEstoque && (
+                          <p className="text-xs text-amber-600">Sem estoque — venda apenas se você forneceu</p>
+                        )}
+
+                        {fornecedorEscolhido === "empresa" && !semEstoque && (
+                          <p className="text-xs text-muted-foreground">
+                            {custoEmpresaInfo?.carregando
+                              ? "Buscando custo…"
+                              : custoEmpresaInfo?.valor != null
+                              ? `custo ${formatarBRL(custoEmpresaInfo.valor)} — do estoque`
+                              : "Custo indisponível — tente novamente"}
+                          </p>
+                        )}
+
+                        {fornecedorEscolhido === "instalador" && (
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs text-muted-foreground">Custo que você pagou (R$)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={custosInstaladorExtras[item.id] ?? ""}
+                              onChange={(e) =>
+                                setCustosInstaladorExtras((c) => ({ ...c, [item.id]: e.target.value }))
+                              }
+                              className="h-7 w-24 border rounded-md px-2 text-right text-sm"
+                              placeholder="0,00"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {extrasNovos.length > 0 && (
+              <div className="mt-4 border-t pt-3 space-y-1">
+                {extrasNovos.map((e) => (
+                  <div key={e.catalogo_id} className="flex justify-between text-xs text-muted-foreground">
+                    <span>{e.nome} — lucro {formatarBRL(e.lucro)}</span>
+                    <span>você {formatarBRL(e.repasse_instalador)} · empresa {formatarBRL(e.repasse_empresa)}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between text-sm font-semibold pt-1">
+                  <span>Total extras (R$ {resumoExtrasNovos.totalVenda.toFixed(2)})</span>
+                  <span>
+                    você {formatarBRL(resumoExtrasNovos.totalInstalador)} · empresa{" "}
+                    {formatarBRL(resumoExtrasNovos.totalEmpresa)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {extraComProblema && (
+              <p className="mt-2 text-xs text-amber-600">
+                Resolva o fornecedor/custo dos extras selecionados antes de enviar.
+              </p>
+            )}
           </div>
         )}
 
@@ -471,7 +759,10 @@ export default function FinalizarServico() {
 
           {recebimentoCliente === 'instalador' && (
             <div>
-              <label className="block text-sm font-medium mb-2">💰 Valor recebido do cliente (R$) *</label>
+              <label className="block text-sm font-medium mb-2">💰 Valor TOTAL recebido do cliente (R$) *</label>
+              <p className="text-xs text-muted-foreground mb-1">
+                Inclua tudo que você recebeu em mãos, mesmo os acessórios extras vendidos acima.
+              </p>
               <input
                 type="number"
                 step="0.01"
@@ -482,6 +773,13 @@ export default function FinalizarServico() {
                 className="w-full px-3 py-2 border rounded-md"
                 placeholder="0.00"
               />
+              {resumoExtrasNovos.totalVenda > 0 &&
+                (parseFloat(valorRecebidoCliente || '0') < resumoExtrasNovos.totalVenda) && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    ⚠️ Você marcou {formatarBRL(resumoExtrasNovos.totalVenda)} em acessórios extras —
+                    confirme se o valor recebido já inclui esse total.
+                  </p>
+                )}
             </div>
           )}
 

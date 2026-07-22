@@ -318,3 +318,105 @@ export function resumirRepasseAcessorios(
     itens,
   };
 }
+
+// =====================================================================
+// Extras vendidos na finalização do serviço (servicos.servicos_extras)
+// Reaproveita o mesmo repasse 70/30 acima, mas persistido por item —
+// necessário porque um reenvio (correcao_solicitada) precisa reconstruir
+// os campos flat (valor_reembolso_despesas, custo_suporte,
+// valor_recebido_cliente) sem somar os extras da tentativa anterior de novo.
+// =====================================================================
+
+/** Um item de acessório vendido na finalização, já com o repasse calculado. */
+export interface ExtraServicoItem {
+  catalogo_id: string;
+  nome: string;
+  valor_venda: number;
+  valor_compra: number;
+  fornecedor: Fornecedor;
+  lucro: number;
+  repasse_instalador: number;
+  repasse_empresa: number;
+}
+
+/** Converte um acessório selecionado (com fornecedor definido) no item a persistir. */
+export function paraExtraServico(a: AcessorioSelecionado): ExtraServicoItem {
+  const r = calcularRepasseAcessorio(
+    a.subtotal,
+    arredondar2(a.custo * a.quantidade),
+    a.fornecedor,
+  );
+  return {
+    catalogo_id: a.catalogo_id,
+    nome: a.nome,
+    valor_venda: r.venda,
+    valor_compra: r.custo,
+    fornecedor: a.fornecedor,
+    lucro: r.lucro,
+    repasse_instalador: r.repasse_instalador,
+    repasse_empresa: r.repasse_empresa,
+  };
+}
+
+/** Soma os totais de uma lista de extras (já persistidos ou a persistir). */
+export function somarExtras(extras: ExtraServicoItem[]): {
+  totalVenda: number;
+  totalInstalador: number;
+  totalEmpresa: number;
+} {
+  return {
+    totalVenda: arredondar2(extras.reduce((s, e) => s + e.valor_venda, 0)),
+    totalInstalador: arredondar2(
+      extras.reduce((s, e) => s + e.repasse_instalador, 0),
+    ),
+    totalEmpresa: arredondar2(
+      extras.reduce((s, e) => s + e.repasse_empresa, 0),
+    ),
+  };
+}
+
+/**
+ * Separa o repasse de cada extra em reembolso (o custo, devolvido a quem
+ * comprou) vs ganho (a parte do lucro 70/30). custo + ganho = repasse do lado
+ * que forneceu; o outro lado só tem ganho (os 30/70% restantes do lucro).
+ */
+export interface DecomposicaoExtra {
+  reembolso_instalador: number;
+  ganho_instalador: number;
+  reembolso_empresa: number;
+  ganho_empresa: number;
+}
+
+export function decomporExtra(e: ExtraServicoItem): DecomposicaoExtra {
+  const custo = e.valor_compra;
+  if (e.fornecedor === 'instalador') {
+    return {
+      reembolso_instalador: custo,
+      ganho_instalador: arredondar2(e.repasse_instalador - custo),
+      reembolso_empresa: 0,
+      ganho_empresa: e.repasse_empresa,
+    };
+  }
+  return {
+    reembolso_instalador: 0,
+    ganho_instalador: e.repasse_instalador,
+    reembolso_empresa: custo,
+    ganho_empresa: arredondar2(e.repasse_empresa - custo),
+  };
+}
+
+/** Soma a decomposição reembolso/ganho de vários extras (já persistidos ou a persistir). */
+export function somarDecomposicaoExtras(extras: ExtraServicoItem[]): DecomposicaoExtra {
+  return extras.reduce(
+    (acc, e) => {
+      const d = decomporExtra(e);
+      return {
+        reembolso_instalador: arredondar2(acc.reembolso_instalador + d.reembolso_instalador),
+        ganho_instalador: arredondar2(acc.ganho_instalador + d.ganho_instalador),
+        reembolso_empresa: arredondar2(acc.reembolso_empresa + d.reembolso_empresa),
+        ganho_empresa: arredondar2(acc.ganho_empresa + d.ganho_empresa),
+      };
+    },
+    { reembolso_instalador: 0, ganho_instalador: 0, reembolso_empresa: 0, ganho_empresa: 0 },
+  );
+}

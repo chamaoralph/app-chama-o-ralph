@@ -16,6 +16,8 @@ interface ServicoRecibo {
   valor_mao_obra_instalador: number
   valor_reembolso_despesas: number
   custo_suporte: number
+  ganho_acessorios_instalador?: number | null
+  ganho_acessorios_empresa?: number | null
   valor_recebido_cliente: number
   recebimento_cliente: string | null
 }
@@ -62,16 +64,21 @@ export function GerarReciboModal({
 
   const totalMaoObra = servicos.reduce((sum, s) => sum + (s.valor_mao_obra_instalador || 0), 0)
   const totalReembolso = servicos.reduce((sum, s) => sum + (s.valor_reembolso_despesas || 0) + (s.custo_suporte || 0), 0)
+  const totalGanhoAcessorios = servicos.reduce(
+    (sum, s) => sum + (s.ganho_acessorios_instalador || 0) + (s.ganho_acessorios_empresa || 0),
+    0
+  )
   const totalInst = servicos.reduce((sum, s) => {
     const reembInst = s.valor_reembolso_despesas || 0
+    const ganhoInst = s.ganho_acessorios_instalador || 0
     const maoObra = s.valor_mao_obra_instalador || 0
-    return sum + (maoObra + reembInst)
+    return sum + (maoObra + reembInst + ganhoInst)
   }, 0)
   const totalRecebidoPeloInstalador = servicos.reduce(
     (sum, s) => sum + (s.recebimento_cliente === 'instalador' ? (s.valor_recebido_cliente || 0) : 0),
     0
   )
-  const totalGeral = totalMaoObra + totalReembolso
+  const totalGeral = totalMaoObra + totalReembolso + totalGanhoAcessorios
   const saldoLiquido = totalInst - totalRecebidoPeloInstalador
 
   async function gerarImagem(): Promise<Blob | null> {

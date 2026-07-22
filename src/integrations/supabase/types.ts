@@ -1272,12 +1272,15 @@ export type Database = {
           empresa_id: string
           endereco_completo: string
           fotos_conclusao: string[] | null
+          ganho_acessorios_empresa: number
+          ganho_acessorios_instalador: number
           id: string
           instalador_id: string | null
           nota_fiscal_url: string | null
           observacoes_instalador: string | null
           origem_suporte: string | null
           recebimento_cliente: string | null
+          servicos_extras: Json | null
           status: string | null
           tipo_servico: string[]
           updated_at: string | null
@@ -1298,12 +1301,15 @@ export type Database = {
           empresa_id: string
           endereco_completo: string
           fotos_conclusao?: string[] | null
+          ganho_acessorios_empresa?: number
+          ganho_acessorios_instalador?: number
           id?: string
           instalador_id?: string | null
           nota_fiscal_url?: string | null
           observacoes_instalador?: string | null
           origem_suporte?: string | null
           recebimento_cliente?: string | null
+          servicos_extras?: Json | null
           status?: string | null
           tipo_servico: string[]
           updated_at?: string | null
@@ -1324,12 +1330,15 @@ export type Database = {
           empresa_id?: string
           endereco_completo?: string
           fotos_conclusao?: string[] | null
+          ganho_acessorios_empresa?: number
+          ganho_acessorios_instalador?: number
           id?: string
           instalador_id?: string | null
           nota_fiscal_url?: string | null
           observacoes_instalador?: string | null
           origem_suporte?: string | null
           recebimento_cliente?: string | null
+          servicos_extras?: Json | null
           status?: string | null
           tipo_servico?: string[]
           updated_at?: string | null

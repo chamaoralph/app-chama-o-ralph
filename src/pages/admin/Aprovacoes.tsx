@@ -18,6 +18,7 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { ExtraServicoItem, formatarBRL, decomporExtra } from '@/lib/orcamento'
 import {
   Select,
   SelectContent,
@@ -41,6 +42,9 @@ interface Servico {
   valor_recebido_cliente: number
   recebimento_cliente: string | null
   custo_suporte: number
+  ganho_acessorios_instalador: number
+  ganho_acessorios_empresa: number
+  servicos_extras: ExtraServicoItem[] | null
   fotos_conclusao: string[]
   nota_fiscal_url: string | null
   observacoes_instalador: string | null
@@ -65,6 +69,8 @@ interface AprovacaoModal {
   valor_recebido_cliente: string
   valor_reembolso_despesas: string
   custo_suporte: string
+  ganho_acessorios_instalador: string
+  ganho_acessorios_empresa: string
 }
 
 export default function Aprovacoes() {
@@ -88,22 +94,28 @@ export default function Aprovacoes() {
     valor_recebido_cliente: '',
     valor_reembolso_despesas: '',
     custo_suporte: '',
+    ganho_acessorios_instalador: '',
+    ganho_acessorios_empresa: '',
   })
 
   useEffect(() => {
     fetchServicos()
   }, [filtroStatus])
 
-  // Regra fixa: Valor Total de Mão de Obra = Valor recebido - (Reembolso instalador + Reembolso empresa)
-  // Mão de obra instalador = Valor Total de Mão de Obra / 2
+  // Regra fixa: Valor Total de Mão de Obra = Valor recebido - (Reembolso instalador +
+  // Reembolso empresa + Ganho acessórios instalador + Ganho acessórios empresa).
+  // Ganho de acessórios é pass-through (não é mão de obra), igual reembolso.
+  // Mão de obra instalador = Valor Total de Mão de Obra / 2.
   useEffect(() => {
     if (!aprovacaoModal.open) return
 
     const recebido = parseFloat(aprovacaoModal.valor_recebido_cliente) || 0
     const reembolsoInstalador = parseFloat(aprovacaoModal.valor_reembolso_despesas) || 0
     const reembolsoEmpresa = parseFloat(aprovacaoModal.custo_suporte) || 0
+    const ganhoInstalador = parseFloat(aprovacaoModal.ganho_acessorios_instalador) || 0
+    const ganhoEmpresa = parseFloat(aprovacaoModal.ganho_acessorios_empresa) || 0
 
-    const valorTotalMaoObra = recebido - (reembolsoInstalador + reembolsoEmpresa)
+    const valorTotalMaoObra = recebido - (reembolsoInstalador + reembolsoEmpresa + ganhoInstalador + ganhoEmpresa)
     const maoObraInstalador = valorTotalMaoObra / 2
 
     setAprovacaoModal(prev => ({
@@ -116,6 +128,8 @@ export default function Aprovacoes() {
     aprovacaoModal.valor_recebido_cliente,
     aprovacaoModal.valor_reembolso_despesas,
     aprovacaoModal.custo_suporte,
+    aprovacaoModal.ganho_acessorios_instalador,
+    aprovacaoModal.ganho_acessorios_empresa,
   ])
 
   async function fetchServicos() {
@@ -196,6 +210,8 @@ export default function Aprovacoes() {
       valor_recebido_cliente: String(servico.valor_recebido_cliente ?? ''),
       valor_reembolso_despesas: String(servico.valor_reembolso_despesas ?? ''),
       custo_suporte: String(servico.custo_suporte ?? ''),
+      ganho_acessorios_instalador: String(servico.ganho_acessorios_instalador ?? '0'),
+      ganho_acessorios_empresa: String(servico.ganho_acessorios_empresa ?? '0'),
     })
   }
 
@@ -549,6 +565,35 @@ export default function Aprovacoes() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Extras vendidos na finalização */}
+                  {servico.servicos_extras && servico.servicos_extras.length > 0 && (
+                    <div className="border-t pt-4">
+                      <h3 className="font-semibold text-gray-900 mb-2">Acessórios extras vendidos</h3>
+                      <p className="text-xs text-gray-500 mb-2">
+                        Reembolso (custo) já somado em Reembolso Despesas/Custo Suporte; Ganho (lucro) já somado em
+                        Ganho Acessórios Instalador/Empresa — tudo já refletido na mão de obra acima.
+                      </p>
+                      <div className="space-y-2">
+                        {servico.servicos_extras.map((item, idx) => {
+                          const d = decomporExtra(item)
+                          return (
+                            <div key={idx} className="bg-gray-50 p-3 rounded-lg flex flex-wrap items-center justify-between gap-2 text-sm">
+                              <div>
+                                <span className="font-medium text-gray-900">{item.nome}</span>{' '}
+                                <span className="text-gray-500">— venda {formatarBRL(item.valor_venda)} · forneceu: {item.fornecedor === 'empresa' ? 'empresa' : 'instalador'}</span>
+                              </div>
+                              <div className="text-gray-700">
+                                inst: reemb {formatarBRL(d.reembolso_instalador)} + ganho <span className="font-semibold">{formatarBRL(d.ganho_instalador)}</span>
+                                {' · '}
+                                empresa: reemb {formatarBRL(d.reembolso_empresa)} + ganho <span className="font-semibold">{formatarBRL(d.ganho_empresa)}</span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Observações do Instalador */}
                   {servico.observacoes_instalador && (
