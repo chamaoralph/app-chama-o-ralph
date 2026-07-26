@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { CheckCircle, XCircle, Loader2, Trash2 } from 'lucide-react'
+import { CheckCircle, XCircle, Loader2, Trash2, AlertTriangle } from 'lucide-react'
 import { formatarDataBR } from '@/lib/utils'
 import {
   Dialog,
@@ -27,6 +27,18 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
+interface ItemExtraCotacao {
+  descricao?: string
+  valor?: number
+  eh_acessorio?: boolean
+  catalogo_id?: string
+  quantidade?: number
+  custo_unitario?: number
+  fornecedor?: string
+  repasse_instalador?: number
+  repasse_empresa?: number
+}
+
 interface Servico {
   id: string
   codigo: string
@@ -45,6 +57,7 @@ interface Servico {
   ganho_acessorios_instalador: number
   ganho_acessorios_empresa: number
   acessorios_vendidos: ExtraServicoItem[] | null
+  cotacao_itens_extras: ItemExtraCotacao[]
   percentual_mao_obra: number
   fotos_conclusao: string[]
   nota_fiscal_url: string | null
@@ -73,6 +86,46 @@ interface AprovacaoModal {
   ganho_acessorios_instalador: string
   ganho_acessorios_empresa: string
   percentual_mao_obra: number
+}
+
+// Acessório incluído na COTAÇÃO (cotacoes.itens_extras), não na finalização.
+// Só exibição — nenhum valor daqui é gravado em servicos. Adapta o formato de
+// itens_extras (descricao/valor/custo_unitario) pro formato que decomporExtra
+// já espera (nome/valor_venda/valor_compra), reaproveitando a mesma fórmula 70/30.
+function itemCotacaoParaExtra(item: ItemExtraCotacao): ExtraServicoItem {
+  const quantidade = item.quantidade ?? 1
+  const valor_compra = (item.custo_unitario ?? 0) * quantidade
+  const valor_venda = item.valor ?? 0
+  return {
+    catalogo_id: item.catalogo_id ?? '',
+    nome: item.descricao ?? 'Acessório',
+    quantidade,
+    valor_venda,
+    valor_compra,
+    fornecedor: item.fornecedor === 'instalador' ? 'instalador' : 'empresa',
+    lucro: Math.round((valor_venda - valor_compra) * 100) / 100,
+    repasse_instalador: item.repasse_instalador ?? 0,
+    repasse_empresa: item.repasse_empresa ?? 0,
+  }
+}
+
+function acessoriosDaCotacao(itensExtras: ItemExtraCotacao[]): ExtraServicoItem[] {
+  return (itensExtras || [])
+    .filter(item => item?.eh_acessorio === true)
+    .map(itemCotacaoParaExtra)
+}
+
+// Diverge quando o que já está registrado em ganho_acessorios_* do serviço não
+// cobre o que a cotação sozinha deveria gerar — sinal de que o pagamento ainda
+// não reflete o repasse 70/30 do acessório vendido na cotação (bug da Frente 1/2).
+function divergePagamentoAcessorioCotacao(servico: Servico): boolean {
+  const itens = acessoriosDaCotacao(servico.cotacao_itens_extras)
+  if (itens.length === 0) return false
+  const deveriaInstalador = itens.reduce((s, i) => s + i.repasse_instalador, 0)
+  const deveriaEmpresa = itens.reduce((s, i) => s + i.repasse_empresa, 0)
+  const registrado = (servico.ganho_acessorios_instalador || 0) + (servico.ganho_acessorios_empresa || 0)
+  const deveria = deveriaInstalador + deveriaEmpresa
+  return registrado < deveria - 0.01
 }
 
 export default function Aprovacoes() {
@@ -146,7 +199,8 @@ export default function Aprovacoes() {
         .from('servicos')
         .select(`
           *,
-          clientes!servicos_cliente_id_fkey(nome, telefone)
+          clientes!servicos_cliente_id_fkey(nome, telefone),
+          cotacoes!servicos_cotacao_id_fkey(itens_extras)
         `)
 
       // Aplicar filtro
@@ -186,6 +240,7 @@ export default function Aprovacoes() {
         cliente_telefone: (servico.clientes as any)?.telefone || '',
         instalador_nome: (servico.instalador_id && nomesInstaladores[servico.instalador_id]) || null,
         percentual_mao_obra: (servico.instalador_id && percentuaisInstaladores[servico.instalador_id]) ?? 50,
+        cotacao_itens_extras: (servico as unknown as { cotacoes: { itens_extras: ItemExtraCotacao[] | null } | null }).cotacoes?.itens_extras || [],
       })) || []
 
       setServicos(servicosFormatados)
@@ -604,6 +659,52 @@ export default function Aprovacoes() {
                       </div>
                     </div>
                   )}
+
+                  {/* Acessórios incluídos na cotação de origem — só leitura, não reflete em nenhum campo de pagamento abaixo */}
+                  {(() => {
+                    const itensCotacao = acessoriosDaCotacao(servico.cotacao_itens_extras)
+                    if (itensCotacao.length === 0) return null
+                    const diverge = divergePagamentoAcessorioCotacao(servico)
+                    return (
+                      <div className="border-t pt-4">
+                        <h3 className="font-semibold text-gray-900 mb-2">
+                          Acessórios na cotação (informativo — confira o pagamento)
+                        </h3>
+                        <p className="text-xs text-gray-500 mb-2">
+                          Vendido no orçamento original, não na finalização. Os valores abaixo são o repasse
+                          70/30 correto — eles NÃO estão necessariamente somados nos campos de Mão de Obra /
+                          Reembolso / Ganho Acessórios deste serviço.
+                        </p>
+                        {diverge && (
+                          <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 text-amber-800 text-sm p-3 rounded-lg mb-2">
+                            <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                            <span>
+                              Os valores de mão de obra / reembolso deste serviço podem não refletir o repasse
+                              correto do acessório. Revisar antes de aprovar.
+                            </span>
+                          </div>
+                        )}
+                        <div className="space-y-2">
+                          {itensCotacao.map((item, idx) => {
+                            const d = decomporExtra(item)
+                            return (
+                              <div key={idx} className="bg-gray-50 p-3 rounded-lg flex flex-wrap items-center justify-between gap-2 text-sm">
+                                <div>
+                                  <span className="font-medium text-gray-900">{item.nome}</span>{' '}
+                                  <span className="text-gray-500">— venda {formatarBRL(item.valor_venda)} · forneceu: {item.fornecedor === 'empresa' ? 'empresa' : 'instalador'}</span>
+                                </div>
+                                <div className="text-gray-700">
+                                  inst: reemb {formatarBRL(d.reembolso_instalador)} + ganho <span className="font-semibold">{formatarBRL(d.ganho_instalador)}</span>
+                                  {' · '}
+                                  empresa: reemb {formatarBRL(d.reembolso_empresa)} + ganho <span className="font-semibold">{formatarBRL(d.ganho_empresa)}</span>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })()}
 
                   {/* Observações do Instalador */}
                   {servico.observacoes_instalador && (
