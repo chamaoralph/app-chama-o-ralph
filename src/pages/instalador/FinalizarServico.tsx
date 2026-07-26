@@ -367,11 +367,11 @@ export default function FinalizarServico() {
       // Extras (acessórios vendidos na finalização): a lista atual é a fonte da
       // verdade. Como um reenvio por correção recarrega o serviço já com os
       // campos flat somados da tentativa anterior, "descontaminamos" cada
-      // agregado subtraindo o efeito dos servicos_extras salvos antes de somar
-      // os extras da tentativa atual — assim nunca dobra. Reembolso (custo) e
-      // ganho (lucro) de cada extra vão para campos separados: reembolso é
-      // custo puro, ganho é a fatia 70/30 do lucro (ver decomporExtra).
-      const decompAntigos = somarDecomposicaoExtras((servico.servicos_extras || []) as typeof extrasNovos);
+      // agregado subtraindo o efeito dos acessorios_vendidos salvos antes de
+      // somar os extras da tentativa atual — assim nunca dobra. Reembolso
+      // (custo) e ganho (lucro) de cada extra vão para campos separados:
+      // reembolso é custo puro, ganho é a fatia 70/30 do lucro (ver decomporExtra).
+      const decompAntigos = somarDecomposicaoExtras((servico.acessorios_vendidos || []) as typeof extrasNovos);
       const decompNovos = somarDecomposicaoExtras(extrasNovos);
 
       const reembDespesaBase = temReembolso
@@ -410,7 +410,7 @@ export default function FinalizarServico() {
           valor_recebido_cliente: recebimentoCliente === 'instalador'
             ? parseFloat(valorRecebidoCliente || '0')
             : valorEmpresaRecebeu,
-          servicos_extras: extrasNovos,
+          acessorios_vendidos: extrasNovos,
         })
         .eq("id", servicoId)
         .eq("instalador_id", user.id)

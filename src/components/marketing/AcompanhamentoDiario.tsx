@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -12,7 +13,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { DollarSign, TrendingUp, Briefcase, Percent, Settings, AlertTriangle, CheckCircle } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { formatarBRL } from "@/lib/orcamento"
+import { DollarSign, TrendingUp, Briefcase, Percent, Settings, AlertTriangle, CheckCircle, Package } from "lucide-react"
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const TZ = "America/Sao_Paulo"
@@ -108,11 +111,67 @@ function fmt(v: number) {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export function AcompanhamentoDiario() {
+  const { toast } = useToast()
   const [mesAno, setMesAno] = useState(defaultMes)
   const [metas, setMetas] = useState<Metas>(carregarMetas)
   const [editMetas, setEditMetas] = useState<Metas>(metas)
   const [modalAberto, setModalAberto] = useState(false)
   const [loading, setLoading] = useState(true)
+
+  // ─── Acessórios (mesmo mês/período da aba, via React Query) ─────────────────
+  const [anoAcessorios, mesNumAcessorios] = mesAno.split("-").map(Number)
+  const diasNoMesAcessorios = new Date(anoAcessorios, mesNumAcessorios, 0).getDate()
+  const dataInicioAcessorios = `${mesAno}-01`
+  const dataFimAcessorios = `${mesAno}-${String(diasNoMesAcessorios).padStart(2, "0")}`
+
+  const { data: empresaIdAcessorios } = useQuery({
+    queryKey: ["empresa-id-acessorios"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error("Não autenticado")
+      const { data, error } = await supabase
+        .from("usuarios")
+        .select("empresa_id")
+        .eq("id", user.id)
+        .single()
+      if (error) throw error
+      return data.empresa_id as string
+    },
+  })
+
+  const { data: metricasAcessorios, isLoading: loadingMetricasAcessorios } = useQuery({
+    queryKey: ["metricas-acessorios", empresaIdAcessorios, dataInicioAcessorios, dataFimAcessorios],
+    enabled: !!empresaIdAcessorios,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("metricas_acessorios", {
+        p_empresa_id: empresaIdAcessorios!,
+        p_data_inicio: dataInicioAcessorios,
+        p_data_fim: dataFimAcessorios,
+      })
+      if (error) {
+        toast({ title: "Erro ao carregar métricas de acessórios", description: error.message, variant: "destructive" })
+        throw error
+      }
+      return data?.[0] ?? null
+    },
+  })
+
+  const { data: rankingAcessoriosInstalador, isLoading: loadingRankingAcessorios } = useQuery({
+    queryKey: ["metricas-acessorios-instalador", empresaIdAcessorios, dataInicioAcessorios, dataFimAcessorios],
+    enabled: !!empresaIdAcessorios,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("metricas_acessorios_por_instalador", {
+        p_empresa_id: empresaIdAcessorios!,
+        p_data_inicio: dataInicioAcessorios,
+        p_data_fim: dataFimAcessorios,
+      })
+      if (error) {
+        toast({ title: "Erro ao carregar ranking de acessórios por instalador", description: error.message, variant: "destructive" })
+        throw error
+      }
+      return data ?? []
+    },
+  })
 
   const [servicos, setServicos] = useState<any[]>([])
   const [lancamentos, setLancamentos] = useState<any[]>([])
@@ -575,6 +634,148 @@ export function AcompanhamentoDiario() {
                 })}
           </tbody>
         </table>
+      </div>
+
+      {/* Acessórios extras vendidos no período */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          <Package className="w-5 h-5" />
+          Acessórios
+        </h3>
+
+        {!loadingMetricasAcessorios && metricasAcessorios && metricasAcessorios.total_servicos > 0 && metricasAcessorios.total_linhas === 0 ? (
+          <p className="text-sm text-muted-foreground">Nenhum acessório vendido no período</p>
+        ) : (
+          <>
+            {/* 4 Cards de acessórios */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Percent className="w-4 h-4" />
+                    Taxa de Anexo
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {loadingMetricasAcessorios ? (
+                    <Skeleton className="h-8 w-20" />
+                  ) : (
+                    <p className="text-2xl font-bold">
+                      {(metricasAcessorios?.taxa_anexo_pct ?? 0).toFixed(1)}%
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <DollarSign className="w-4 h-4" />
+                    Lucro de Acessórios
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {loadingMetricasAcessorios ? (
+                    <Skeleton className="h-8 w-32" />
+                  ) : (
+                    <>
+                      <p className="text-2xl font-bold">
+                        {formatarBRL(
+                          (metricasAcessorios?.lucro_acessorios_empresa ?? 0) +
+                            (metricasAcessorios?.lucro_acessorios_instalador ?? 0)
+                        )}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {formatarBRL(metricasAcessorios?.lucro_acessorios_empresa ?? 0)} empresa ·{" "}
+                        {formatarBRL(metricasAcessorios?.lucro_acessorios_instalador ?? 0)} instalador
+                      </p>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Briefcase className="w-4 h-4" />
+                    Itens por Serviço
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {loadingMetricasAcessorios ? (
+                    <Skeleton className="h-8 w-16" />
+                  ) : (
+                    <p className="text-2xl font-bold">
+                      {(metricasAcessorios?.itens_por_servico_anexado ?? 0).toFixed(2)}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Percent className="w-4 h-4" />
+                    % Fornecido pela Empresa
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {loadingMetricasAcessorios ? (
+                    <Skeleton className="h-8 w-20" />
+                  ) : (
+                    <p className="text-2xl font-bold">
+                      {(metricasAcessorios?.pct_fornecido_empresa ?? 0).toFixed(1)}%
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Ranking por instalador */}
+            <div className="bg-card rounded-lg shadow-sm border overflow-x-auto">
+              <table className="min-w-[600px] w-full text-sm">
+                <thead className="bg-muted/50 border-b">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-medium text-muted-foreground">Instalador</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">Serviços Concluídos</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">Itens Vendidos</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">Lucro Gerado</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {loadingRankingAcessorios
+                    ? Array.from({ length: 4 }).map((_, i) => (
+                        <tr key={i}>
+                          {Array.from({ length: 4 }).map((_, j) => (
+                            <td key={j} className="px-3 py-2">
+                              <Skeleton className="h-4 w-full" />
+                            </td>
+                          ))}
+                        </tr>
+                      ))
+                    : !rankingAcessoriosInstalador || rankingAcessoriosInstalador.length === 0
+                    ? (
+                      <tr>
+                        <td colSpan={4} className="px-3 py-4 text-center text-muted-foreground">
+                          Nenhum instalador com serviços concluídos no período
+                        </td>
+                      </tr>
+                    )
+                    : rankingAcessoriosInstalador.map((row) => (
+                        <tr key={row.instalador_id} className="hover:bg-muted/30 transition-colors">
+                          <td className="px-3 py-2 font-medium">{row.instalador_nome}</td>
+                          <td className="px-3 py-2 text-right">{row.servicos_concluidos}</td>
+                          <td className="px-3 py-2 text-right">{row.itens_vendidos}</td>
+                          <td className="px-3 py-2 text-right text-green-700">
+                            {formatarBRL(row.lucro_gerado_empresa ?? 0)}
+                          </td>
+                        </tr>
+                      ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Dialog: Ajustar Metas */}

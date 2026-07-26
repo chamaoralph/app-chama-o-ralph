@@ -320,7 +320,7 @@ export function resumirRepasseAcessorios(
 }
 
 // =====================================================================
-// Extras vendidos na finalização do serviço (servicos.servicos_extras)
+// Extras vendidos na finalização do serviço (servicos.acessorios_vendidos)
 // Reaproveita o mesmo repasse 70/30 acima, mas persistido por item —
 // necessário porque um reenvio (correcao_solicitada) precisa reconstruir
 // os campos flat (valor_reembolso_despesas, custo_suporte,
@@ -331,6 +331,7 @@ export function resumirRepasseAcessorios(
 export interface ExtraServicoItem {
   catalogo_id: string;
   nome: string;
+  quantidade: number;
   valor_venda: number;
   valor_compra: number;
   fornecedor: Fornecedor;
@@ -349,6 +350,7 @@ export function paraExtraServico(a: AcessorioSelecionado): ExtraServicoItem {
   return {
     catalogo_id: a.catalogo_id,
     nome: a.nome,
+    quantidade: a.quantidade ?? 1,
     valor_venda: r.venda,
     valor_compra: r.custo,
     fornecedor: a.fornecedor,

@@ -44,7 +44,8 @@ interface Servico {
   custo_suporte: number
   ganho_acessorios_instalador: number
   ganho_acessorios_empresa: number
-  servicos_extras: ExtraServicoItem[] | null
+  acessorios_vendidos: ExtraServicoItem[] | null
+  percentual_mao_obra: number
   fotos_conclusao: string[]
   nota_fiscal_url: string | null
   observacoes_instalador: string | null
@@ -71,6 +72,7 @@ interface AprovacaoModal {
   custo_suporte: string
   ganho_acessorios_instalador: string
   ganho_acessorios_empresa: string
+  percentual_mao_obra: number
 }
 
 export default function Aprovacoes() {
@@ -96,6 +98,7 @@ export default function Aprovacoes() {
     custo_suporte: '',
     ganho_acessorios_instalador: '',
     ganho_acessorios_empresa: '',
+    percentual_mao_obra: 50,
   })
 
   useEffect(() => {
@@ -105,7 +108,9 @@ export default function Aprovacoes() {
   // Regra fixa: Valor Total de Mão de Obra = Valor recebido - (Reembolso instalador +
   // Reembolso empresa + Ganho acessórios instalador + Ganho acessórios empresa).
   // Ganho de acessórios é pass-through (não é mão de obra), igual reembolso.
-  // Mão de obra instalador = Valor Total de Mão de Obra / 2.
+  // Mão de obra instalador = Valor Total de Mão de Obra × percentual_mao_obra do
+  // instalador (não é sempre 50/50 — ex: dono da empresa tem percentual 0, então o
+  // valor inteiro fica só como receita da empresa, sem repasse de mão de obra).
   useEffect(() => {
     if (!aprovacaoModal.open) return
 
@@ -116,7 +121,7 @@ export default function Aprovacoes() {
     const ganhoEmpresa = parseFloat(aprovacaoModal.ganho_acessorios_empresa) || 0
 
     const valorTotalMaoObra = recebido - (reembolsoInstalador + reembolsoEmpresa + ganhoInstalador + ganhoEmpresa)
-    const maoObraInstalador = valorTotalMaoObra / 2
+    const maoObraInstalador = valorTotalMaoObra * (aprovacaoModal.percentual_mao_obra / 100)
 
     setAprovacaoModal(prev => ({
       ...prev,
@@ -130,6 +135,7 @@ export default function Aprovacoes() {
     aprovacaoModal.custo_suporte,
     aprovacaoModal.ganho_acessorios_instalador,
     aprovacaoModal.ganho_acessorios_empresa,
+    aprovacaoModal.percentual_mao_obra,
   ])
 
   async function fetchServicos() {
@@ -159,15 +165,17 @@ export default function Aprovacoes() {
       // que nem sempre tem registro correspondente para instaladores mais antigos)
       const instaladorIds = Array.from(new Set((data || []).map(s => s.instalador_id).filter(Boolean)))
       const nomesInstaladores: Record<string, string> = {}
+      const percentuaisInstaladores: Record<string, number> = {}
       if (instaladorIds.length > 0) {
         const { data: usuariosData, error: erroUsuarios } = await supabase
           .from('usuarios')
-          .select('id, nome')
+          .select('id, nome, percentual_mao_obra')
           .in('id', instaladorIds)
 
         if (erroUsuarios) throw erroUsuarios
         for (const u of usuariosData || []) {
           nomesInstaladores[u.id] = u.nome
+          percentuaisInstaladores[u.id] = u.percentual_mao_obra ?? 50
         }
       }
 
@@ -176,7 +184,8 @@ export default function Aprovacoes() {
         ...servico,
         cliente_nome: (servico.clientes as any)?.nome || '',
         cliente_telefone: (servico.clientes as any)?.telefone || '',
-        instalador_nome: (servico.instalador_id && nomesInstaladores[servico.instalador_id]) || null
+        instalador_nome: (servico.instalador_id && nomesInstaladores[servico.instalador_id]) || null,
+        percentual_mao_obra: (servico.instalador_id && percentuaisInstaladores[servico.instalador_id]) ?? 50,
       })) || []
 
       setServicos(servicosFormatados)
@@ -212,6 +221,7 @@ export default function Aprovacoes() {
       custo_suporte: String(servico.custo_suporte ?? ''),
       ganho_acessorios_instalador: String(servico.ganho_acessorios_instalador ?? '0'),
       ganho_acessorios_empresa: String(servico.ganho_acessorios_empresa ?? '0'),
+      percentual_mao_obra: servico.percentual_mao_obra ?? 50,
     })
   }
 
@@ -567,7 +577,7 @@ export default function Aprovacoes() {
                   </div>
 
                   {/* Extras vendidos na finalização */}
-                  {servico.servicos_extras && servico.servicos_extras.length > 0 && (
+                  {servico.acessorios_vendidos && servico.acessorios_vendidos.length > 0 && (
                     <div className="border-t pt-4">
                       <h3 className="font-semibold text-gray-900 mb-2">Acessórios extras vendidos</h3>
                       <p className="text-xs text-gray-500 mb-2">
@@ -575,7 +585,7 @@ export default function Aprovacoes() {
                         Ganho Acessórios Instalador/Empresa — tudo já refletido na mão de obra acima.
                       </p>
                       <div className="space-y-2">
-                        {servico.servicos_extras.map((item, idx) => {
+                        {servico.acessorios_vendidos.map((item, idx) => {
                           const d = decomporExtra(item)
                           return (
                             <div key={idx} className="bg-gray-50 p-3 rounded-lg flex flex-wrap items-center justify-between gap-2 text-sm">
@@ -797,6 +807,33 @@ export default function Aprovacoes() {
                 />
               </div>
             </div>
+            {(parseFloat(aprovacaoModal.ganho_acessorios_instalador) > 0 ||
+              parseFloat(aprovacaoModal.ganho_acessorios_empresa) > 0) && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="ap-ganho-acessorios-instalador">Ganho Acessórios Instalador (R$)</Label>
+                  <Input
+                    id="ap-ganho-acessorios-instalador"
+                    type="number"
+                    readOnly
+                    disabled
+                    className="bg-gray-100"
+                    value={aprovacaoModal.ganho_acessorios_instalador}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="ap-ganho-acessorios-empresa">Ganho Acessórios Empresa (R$)</Label>
+                  <Input
+                    id="ap-ganho-acessorios-empresa"
+                    type="number"
+                    readOnly
+                    disabled
+                    className="bg-gray-100"
+                    value={aprovacaoModal.ganho_acessorios_empresa}
+                  />
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button
