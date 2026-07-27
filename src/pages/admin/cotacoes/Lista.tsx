@@ -1773,48 +1773,6 @@ export default function ListaCotacoes() {
                     rows={3}
                   />
                 </div>
-                
-                {/* Seção Suporte */}
-                <div className="col-span-2 border-t pt-4 mt-2">
-                  <h4 className="font-medium mb-3">Suporte de TV</h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Origem do Suporte</Label>
-                      <Select
-                        value={editForm.origem_suporte}
-                        onValueChange={(v) => {
-                          setEditForm({...editForm, origem_suporte: v, valor_material: v === 'empresa' ? '' : editForm.valor_material})
-                          setTvItensEdit(prev => prev.map(it => ({ ...it, origem_suporte: v as TVItem['origem_suporte'] })))
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Não aplicável" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="nao_aplicavel">Não aplicável</SelectItem>
-                          <SelectItem value="empresa">Empresa fornece</SelectItem>
-                          <SelectItem value="instalador">Instalador compra (reembolso)</SelectItem>
-                          <SelectItem value="cliente">Cliente já tem</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {editForm.origem_suporte && editForm.origem_suporte !== 'cliente' && editForm.origem_suporte !== 'nao_aplicavel' && (
-                      <div className="space-y-2">
-                        <Label>Custo do Suporte (R$)</Label>
-                        <Input 
-                          type="number"
-                          step="0.01"
-                          value={editForm.custo_suporte}
-                          onChange={(e) => {
-                            setEditForm({...editForm, custo_suporte: e.target.value})
-                            setTvItensEdit(prev => prev.map(it => ({ ...it, custo_suporte: parseFloat(e.target.value) || 0 })))
-                          }}
-                          placeholder="0,00"
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
             </div>
           </div>
 
