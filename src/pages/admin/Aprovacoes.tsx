@@ -115,17 +115,15 @@ function acessoriosDaCotacao(itensExtras: ItemExtraCotacao[]): ExtraServicoItem[
     .map(itemCotacaoParaExtra)
 }
 
-// Diverge quando o que já está registrado em ganho_acessorios_* do serviço não
-// cobre o que a cotação sozinha deveria gerar — sinal de que o pagamento ainda
-// não reflete o repasse 70/30 do acessório vendido na cotação (bug da Frente 1/2).
-function divergePagamentoAcessorioCotacao(servico: Servico): boolean {
-  const itens = acessoriosDaCotacao(servico.cotacao_itens_extras)
-  if (itens.length === 0) return false
-  const deveriaInstalador = itens.reduce((s, i) => s + i.repasse_instalador, 0)
-  const deveriaEmpresa = itens.reduce((s, i) => s + i.repasse_empresa, 0)
-  const registrado = (servico.ganho_acessorios_instalador || 0) + (servico.ganho_acessorios_empresa || 0)
-  const deveria = deveriaInstalador + deveriaEmpresa
-  return registrado < deveria - 0.01
+// Só os itens da cotação que AINDA não foram processados (não aparecem em
+// acessorios_vendidos pelo catalogo_id) — uma vez que o trigger/correção já
+// gravou o repasse real ali, o bloco informativo desta cotação ficaria
+// desatualizado (o custo real do estoque pode diferir do custo_unitario
+// digitado na cotação) e não deve mais ser mostrado como pendente de revisão.
+function acessoriosDaCotacaoPendentes(servico: Servico): ExtraServicoItem[] {
+  const jaProcessados = new Set((servico.acessorios_vendidos || []).map(i => i.catalogo_id))
+  return acessoriosDaCotacao(servico.cotacao_itens_extras)
+    .filter(item => !jaProcessados.has(item.catalogo_id))
 }
 
 export default function Aprovacoes() {
@@ -662,9 +660,8 @@ export default function Aprovacoes() {
 
                   {/* Acessórios incluídos na cotação de origem — só leitura, não reflete em nenhum campo de pagamento abaixo */}
                   {(() => {
-                    const itensCotacao = acessoriosDaCotacao(servico.cotacao_itens_extras)
+                    const itensCotacao = acessoriosDaCotacaoPendentes(servico)
                     if (itensCotacao.length === 0) return null
-                    const diverge = divergePagamentoAcessorioCotacao(servico)
                     return (
                       <div className="border-t pt-4">
                         <h3 className="font-semibold text-gray-900 mb-2">
@@ -672,18 +669,17 @@ export default function Aprovacoes() {
                         </h3>
                         <p className="text-xs text-gray-500 mb-2">
                           Vendido no orçamento original, não na finalização. Os valores abaixo são o repasse
-                          70/30 correto — eles NÃO estão necessariamente somados nos campos de Mão de Obra /
-                          Reembolso / Ganho Acessórios deste serviço.
+                          70/30 estimado (com o custo digitado na cotação, que pode não ser o custo real do
+                          estoque) — eles ainda NÃO estão somados nos campos de Mão de Obra / Reembolso /
+                          Ganho Acessórios deste serviço.
                         </p>
-                        {diverge && (
-                          <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 text-amber-800 text-sm p-3 rounded-lg mb-2">
-                            <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                            <span>
-                              Os valores de mão de obra / reembolso deste serviço podem não refletir o repasse
-                              correto do acessório. Revisar antes de aprovar.
-                            </span>
-                          </div>
-                        )}
+                        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 text-amber-800 text-sm p-3 rounded-lg mb-2">
+                          <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                          <span>
+                            Os valores de mão de obra / reembolso deste serviço podem não refletir o repasse
+                            correto do acessório. Revisar antes de aprovar.
+                          </span>
+                        </div>
                         <div className="space-y-2">
                           {itensCotacao.map((item, idx) => {
                             const d = decomporExtra(item)
