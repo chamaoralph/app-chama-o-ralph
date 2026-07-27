@@ -45,6 +45,7 @@ interface Cotacao {
     telefone: string
     endereco_completo: string | null
     bairro: string | null
+    cep: string | null
     idade: number | null
     tipo_alerta: string | null
     observacao_alerta: string | null
@@ -56,6 +57,7 @@ interface EditForm {
   cliente_nome: string
   cliente_telefone: string
   cliente_idade: string
+  cep: string
   endereco_completo: string
   bairro: string
   origem_lead: string
@@ -169,6 +171,7 @@ export default function ListaCotacoes() {
     cliente_nome: '',
     cliente_telefone: '',
     cliente_idade: '',
+    cep: '',
     endereco_completo: '',
     bairro: '',
     origem_lead: '',
@@ -187,6 +190,8 @@ export default function ListaCotacoes() {
     custo_suporte: ''
   })
   const [editLoading, setEditLoading] = useState(false)
+  const [cepErroEdit, setCepErroEdit] = useState(false)
+  const [buscandoCepEdit, setBuscandoCepEdit] = useState(false)
   const [motivoNaoGerou, setMotivoNaoGerou] = useState<string>('')
   const [observacaoNaoGerou, setObservacaoNaoGerou] = useState<string>('')
   const [paginaAtual, setPaginaAtual] = useState(1)
@@ -375,6 +380,7 @@ export default function ListaCotacoes() {
       cliente_nome: cotacao.clientes.nome || '',
       cliente_telefone: cotacao.clientes.telefone || '',
       cliente_idade: cotacao.clientes.idade?.toString() || '',
+      cep: cotacao.clientes.cep || '',
       endereco_completo: cotacao.clientes.endereco_completo || '',
       bairro: cotacao.clientes.bairro || '',
       origem_lead: cotacao.origem_lead || '',
@@ -423,6 +429,39 @@ export default function ListaCotacoes() {
         : []
     )
     setCotacaoParaEditar(cotacao)
+    setCepErroEdit(false)
+    setBuscandoCepEdit(false)
+  }
+
+  async function handleCepChangeEdit(valor: string) {
+    const digitos = valor.replace(/\D/g, '').slice(0, 8)
+    const formatado = digitos.length > 5 ? `${digitos.slice(0, 5)}-${digitos.slice(5)}` : digitos
+    setEditForm(prev => ({ ...prev, cep: formatado }))
+    setCepErroEdit(false)
+
+    if (digitos.length !== 8) return
+
+    setBuscandoCepEdit(true)
+    try {
+      const resp = await fetch(`https://viacep.com.br/ws/${digitos}/json/`)
+      const data = await resp.json()
+
+      if (data.erro) {
+        setCepErroEdit(true)
+      } else {
+        const cidadeUf = data.localidade && data.uf ? `${data.localidade} - ${data.uf}` : ''
+        const enderecoBase = [data.logradouro, cidadeUf].filter(Boolean).join(', ')
+        setEditForm(prev => ({
+          ...prev,
+          bairro: data.bairro || prev.bairro,
+          endereco_completo: enderecoBase || prev.endereco_completo,
+        }))
+      }
+    } catch {
+      setCepErroEdit(true)
+    } finally {
+      setBuscandoCepEdit(false)
+    }
   }
 
   function handleTotaisCalculadosEdit(totais: TotaisTV, indisponivel: boolean) {
@@ -454,6 +493,7 @@ export default function ListaCotacoes() {
           nome: editForm.cliente_nome,
           telefone: editForm.cliente_telefone,
           idade: editForm.cliente_idade ? parseInt(editForm.cliente_idade) : null,
+          cep: editForm.cep || null,
           endereco_completo: editForm.endereco_completo,
           bairro: editForm.bairro,
         })
@@ -1383,9 +1423,24 @@ export default function ListaCotacoes() {
             <div>
               <h3 className="text-lg font-semibold mb-4">Dados do Cliente</h3>
               <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2 space-y-2">
+                  <Label>CEP</Label>
+                  <Input
+                    value={editForm.cep}
+                    onChange={(e) => handleCepChangeEdit(e.target.value)}
+                    placeholder="00000-000"
+                    maxLength={9}
+                  />
+                  {buscandoCepEdit && (
+                    <p className="text-xs text-muted-foreground">Buscando endereço...</p>
+                  )}
+                  {cepErroEdit && (
+                    <p className="text-xs text-red-600">CEP não encontrado. Preencha o endereço manualmente.</p>
+                  )}
+                </div>
                 <div className="space-y-2">
                   <Label>Nome</Label>
-                  <Input 
+                  <Input
                     value={editForm.cliente_nome}
                     onChange={(e) => setEditForm({...editForm, cliente_nome: e.target.value})}
                   />
