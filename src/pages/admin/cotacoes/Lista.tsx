@@ -292,14 +292,17 @@ export default function ListaCotacoes() {
       const cotacoesRaw = data || []
 
       // Buscar instalador_id dos serviços vinculados às cotações
+      // (não filtramos por .in(cotacaoIds) aqui: com centenas de cotações essa lista de IDs
+      // estoura o limite de tamanho de URL do PostgREST e a query falha silenciosamente)
       let instaladorNomePorCotacao: Record<string, string> = {}
       if (cotacoesRaw.length > 0) {
-        const cotacaoIds = cotacoesRaw.map(c => c.id)
-        const { data: servData } = await supabase
+        const { data: servData, error: servError } = await supabase
           .from('servicos')
           .select('cotacao_id, instalador_id')
-          .in('cotacao_id', cotacaoIds)
+          .not('cotacao_id', 'is', null)
           .not('instalador_id', 'is', null)
+
+        if (servError) console.error('Erro ao buscar instalador dos serviços:', servError)
 
         if (servData && servData.length > 0) {
           const instaladorIds = [...new Set(servData.map(s => s.instalador_id as string))]
