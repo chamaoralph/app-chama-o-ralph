@@ -13,7 +13,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { PackagePlus, Loader2, Boxes, History } from "lucide-react";
+import { PackagePlus, Loader2, Boxes, History, SlidersHorizontal } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -39,6 +39,13 @@ type FormCompra = {
   data_compra: string; // yyyy-mm-dd
 };
 
+type FormAjuste = {
+  catalogo_id: string;
+  direcao: "entrada" | "saida";
+  quantidade: string;
+  motivo: string;
+};
+
 const hoje = () => new Date().toISOString().slice(0, 10);
 
 const FORM_VAZIO: FormCompra = {
@@ -47,6 +54,13 @@ const FORM_VAZIO: FormCompra = {
   custo_unitario: "",
   fornecedor: "",
   data_compra: hoje(),
+};
+
+const AJUSTE_VAZIO: FormAjuste = {
+  catalogo_id: "",
+  direcao: "saida",
+  quantidade: "",
+  motivo: "",
 };
 
 export default function EstoqueAcessorios() {
@@ -87,16 +101,17 @@ export default function EstoqueAcessorios() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("estoque_movimentos")
-        .select("id, catalogo_id, tipo, quantidade, custo_total, created_at")
+        .select("id, catalogo_id, tipo, quantidade, custo_total, observacoes, created_at")
         .order("created_at", { ascending: false })
         .limit(50);
       if (error) throw error;
       return data as {
         id: string;
         catalogo_id: string;
-        tipo: "baixa" | "devolucao";
+        tipo: "baixa" | "devolucao" | "ajuste_entrada" | "ajuste_saida";
         quantidade: number;
         custo_total: number;
+        observacoes: string | null;
         created_at: string;
       }[];
     },
@@ -141,6 +156,46 @@ export default function EstoqueAcessorios() {
       qc.invalidateQueries({ queryKey: ["estoque-movimentos"] });
       setForm({ ...FORM_VAZIO, data_compra: hoje() });
       toast({ title: "Compra lançada", description: "Estoque atualizado." });
+    },
+    onError: (e: Error) =>
+      toast({ variant: "destructive", title: "Erro", description: e.message }),
+  });
+
+  // ajuste manual de saldo (correção de inventário, perda, quebra — sem vínculo com serviço)
+  const [ajuste, setAjuste] = useState<FormAjuste>(AJUSTE_VAZIO);
+
+  const ajustar = useMutation({
+    mutationFn: async () => {
+      const quantidade = parseInt(ajuste.quantidade, 10);
+      if (!ajuste.catalogo_id) throw new Error("Escolha o acessório.");
+      if (!Number.isInteger(quantidade) || quantidade <= 0)
+        throw new Error("Quantidade inválida.");
+      if (!ajuste.motivo.trim()) throw new Error("Informe o motivo do ajuste.");
+
+      const p_quantidade = ajuste.direcao === "saida" ? -quantidade : quantidade;
+
+      const { data, error } = await supabase.rpc("ajustar_estoque_manual", {
+        p_catalogo_id: ajuste.catalogo_id,
+        p_quantidade,
+        p_motivo: ajuste.motivo.trim(),
+      });
+      if (error) throw error;
+      return data?.[0] as
+        | { custo_total: number; qtd_atendida: number; qtd_faltante: number }
+        | undefined;
+    },
+    onSuccess: (resultado) => {
+      qc.invalidateQueries({ queryKey: ["estoque-saldos"] });
+      qc.invalidateQueries({ queryKey: ["estoque-movimentos"] });
+      setAjuste({ ...AJUSTE_VAZIO, direcao: ajuste.direcao });
+      if (ajuste.direcao === "saida" && resultado && resultado.qtd_faltante > 0) {
+        toast({
+          title: "Ajuste parcial",
+          description: `Só havia ${resultado.qtd_atendida} unidade(s) em estoque — saldo zerado. Faltaram ${resultado.qtd_faltante} un.`,
+        });
+      } else {
+        toast({ title: "Saldo ajustado", description: "Estoque atualizado." });
+      }
     },
     onError: (e: Error) =>
       toast({ variant: "destructive", title: "Erro", description: e.message }),
@@ -227,6 +282,86 @@ export default function EstoqueAcessorios() {
         </CardContent>
       </Card>
 
+      {/* Ajuste manual de saldo */}
+      <Card>
+        <CardContent className="space-y-3 py-4">
+          <div className="flex items-center gap-2">
+            <SlidersHorizontal className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-semibold">Ajuste manual de saldo</h3>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Use para corrigir divergências de inventário, perda ou quebra — sem vincular a um serviço.
+          </p>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1 sm:col-span-2">
+              <Label className="text-xs">Acessório</Label>
+              <Select
+                value={ajuste.catalogo_id}
+                onValueChange={(v) => setAjuste({ ...ajuste, catalogo_id: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Escolha o acessório" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(acessorios ?? []).map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.nome} (saldo: {saldoDe(a.id)} un)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs">Direção</Label>
+              <Select
+                value={ajuste.direcao}
+                onValueChange={(v: "entrada" | "saida") =>
+                  setAjuste({ ...ajuste, direcao: v })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="saida">Reduzir (perda / quebra)</SelectItem>
+                  <SelectItem value="entrada">Adicionar (corrigir contagem)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Quantidade</Label>
+              <Input
+                inputMode="numeric"
+                value={ajuste.quantidade}
+                onChange={(e) => setAjuste({ ...ajuste, quantidade: e.target.value })}
+                placeholder="2"
+              />
+            </div>
+            <div className="space-y-1 sm:col-span-2">
+              <Label className="text-xs">Motivo</Label>
+              <Input
+                value={ajuste.motivo}
+                onChange={(e) => setAjuste({ ...ajuste, motivo: e.target.value })}
+                placeholder="Ex: quebra em transporte, contagem física de estoque"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <Button
+              variant={ajuste.direcao === "saida" ? "destructive" : "default"}
+              onClick={() => ajustar.mutate()}
+              disabled={ajustar.isPending}
+            >
+              {ajustar.isPending && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+              {ajuste.direcao === "saida" ? "Dar baixa" : "Adicionar ao saldo"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Saldo atual */}
       <Card>
         <CardContent className="py-4">
@@ -280,34 +415,48 @@ export default function EstoqueAcessorios() {
             </p>
           ) : (
             <div className="space-y-1">
-              {(movimentos ?? []).map((m) => (
-                <div
-                  key={m.id}
-                  className="flex items-center justify-between border-b py-1.5 text-sm last:border-0"
-                >
-                  <div className="min-w-0">
-                    <span className="truncate">{nomeDe(m.catalogo_id)}</span>
-                    <span
-                      className={`ml-2 text-xs ${
-                        m.tipo === "baixa"
-                          ? "text-destructive"
-                          : "text-emerald-600"
-                      }`}
-                    >
-                      {m.tipo === "baixa" ? "saída" : "devolução"}
-                    </span>
+              {(movimentos ?? []).map((m) => {
+                const eSaida = m.tipo === "baixa" || m.tipo === "ajuste_saida";
+                const rotulo =
+                  m.tipo === "baixa"
+                    ? "saída"
+                    : m.tipo === "devolucao"
+                    ? "devolução"
+                    : m.tipo === "ajuste_saida"
+                    ? "ajuste manual"
+                    : "ajuste manual";
+                return (
+                  <div
+                    key={m.id}
+                    className="flex items-center justify-between border-b py-1.5 text-sm last:border-0"
+                  >
+                    <div className="min-w-0">
+                      <span className="truncate">{nomeDe(m.catalogo_id)}</span>
+                      <span
+                        className={`ml-2 text-xs ${
+                          eSaida ? "text-destructive" : "text-emerald-600"
+                        }`}
+                      >
+                        {rotulo}
+                      </span>
+                      {m.observacoes && (
+                        <div className="truncate text-xs text-muted-foreground">
+                          {m.observacoes}
+                        </div>
+                      )}
+                    </div>
+                    <div className="whitespace-nowrap text-right">
+                      <span className="font-medium">
+                        {eSaida ? "-" : "+"}
+                        {m.quantidade} un
+                      </span>
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        {formatarBRL(m.custo_total)}
+                      </span>
+                    </div>
                   </div>
-                  <div className="whitespace-nowrap text-right">
-                    <span className="font-medium">
-                      {m.tipo === "baixa" ? "-" : "+"}
-                      {m.quantidade} un
-                    </span>
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      {formatarBRL(m.custo_total)}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>

@@ -825,6 +825,7 @@ export type Database = {
           empresa_id: string
           id: string
           lote_id: string
+          observacoes: string | null
           quantidade: number
           servico_id: string | null
           tipo: string
@@ -837,6 +838,7 @@ export type Database = {
           empresa_id: string
           id?: string
           lote_id: string
+          observacoes?: string | null
           quantidade: number
           servico_id?: string | null
           tipo: string
@@ -849,6 +851,7 @@ export type Database = {
           empresa_id?: string
           id?: string
           lote_id?: string
+          observacoes?: string | null
           quantidade?: number
           servico_id?: string | null
           tipo?: string
@@ -2091,6 +2094,18 @@ export type Database = {
       }
     }
     Functions: {
+      ajustar_estoque_manual: {
+        Args: {
+          p_catalogo_id: string
+          p_motivo: string
+          p_quantidade: number
+        }
+        Returns: {
+          custo_total: number
+          qtd_atendida: number
+          qtd_faltante: number
+        }[]
+      }
       aprovar_orcamento_na_hora: {
         Args: { p_cotacao_id: string }
         Returns: string
