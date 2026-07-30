@@ -96,6 +96,7 @@ export default function FinalizarServico() {
   const [recebimentoCliente, setRecebimentoCliente] = useState<'empresa' | 'instalador'>('empresa');
   const [valorRecebidoCliente, setValorRecebidoCliente] = useState("");
   const [quantidadesDevolver, setQuantidadesDevolver] = useState<Record<string, number>>({});
+  const [usouSuporteGarantia, setUsouSuporteGarantia] = useState<boolean | null>(null);
 
   // --- Extras (acessórios vendidos na finalização) ---
   const [quantidadesExtras, setQuantidadesExtras] = useState<Record<string, number>>({});
@@ -132,6 +133,42 @@ export default function FinalizarServico() {
     (saldosEstoqueExtras ?? []).forEach((s) => { mapa[s.catalogo_id] = s.saldo; });
     return mapa;
   }, [saldosEstoqueExtras]);
+
+  // --- Garantia Total: suporte fixo universal usado na instalação ---
+  const isGarantiaTotal = servico?.cotacoes?.tv_cobertura === "total";
+
+  const { data: catalogoSuporteGarantia } = useQuery({
+    queryKey: ["catalogo-suporte-garantia-total"],
+    enabled: isGarantiaTotal,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("catalogo_servicos")
+        .select("*")
+        .eq("ativo", true)
+        .eq("categoria", "acessorios")
+        .ilike("nome", "%suporte fixo universal%")
+        .maybeSingle();
+      if (error) throw error;
+      return data as CatalogoItem | null;
+    },
+  });
+
+  const saldoSuporteGarantia = catalogoSuporteGarantia ? (saldoExtraPorId[catalogoSuporteGarantia.id] ?? 0) : 0;
+
+  const { data: custoSuporteGarantia, isLoading: carregandoCustoSuporteGarantia } = useQuery({
+    queryKey: ["custo-atual-suporte-garantia-total", catalogoSuporteGarantia?.id],
+    enabled: !!catalogoSuporteGarantia?.id && usouSuporteGarantia === true,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("custo_atual_acessorio", {
+        p_catalogo_id: catalogoSuporteGarantia!.id,
+      });
+      if (error) throw error;
+      return data as number | null;
+    },
+  });
+
+  const suporteGarantiaComProblema =
+    isGarantiaTotal && (usouSuporteGarantia === null || (usouSuporteGarantia === true && (!catalogoSuporteGarantia || saldoSuporteGarantia <= 0)));
 
   const acessoriosExtrasEmpresaIds = useMemo(() => {
     if (!catalogoAcessorios) return [];
@@ -253,7 +290,7 @@ export default function FinalizarServico() {
       
       const { data, error } = await supabase
         .from("servicos")
-        .select("*, clientes!servicos_cliente_id_fkey(*)")
+        .select("*, clientes!servicos_cliente_id_fkey(*), cotacoes!servicos_cotacao_id_fkey(tv_cobertura)")
         .eq("id", servicoId)
         .maybeSingle();
 
@@ -322,6 +359,17 @@ export default function FinalizarServico() {
       return;
     }
 
+    if (suporteGarantiaComProblema) {
+      toast({
+        title: "❌ Garantia Total incompleta",
+        description: usouSuporteGarantia === null
+          ? "Informe se você usou o suporte fixo universal da empresa."
+          : "Sem estoque registrado do suporte fixo universal — avise o admin antes de enviar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setEnviando(true);
 
     try {
@@ -371,7 +419,17 @@ export default function FinalizarServico() {
       // somar os extras da tentativa atual — assim nunca dobra. Reembolso
       // (custo) e ganho (lucro) de cada extra vão para campos separados:
       // reembolso é custo puro, ganho é a fatia 70/30 do lucro (ver decomporExtra).
-      const decompAntigos = somarDecomposicaoExtras((servico.acessorios_vendidos || []) as typeof extrasNovos);
+      //
+      // acessorios_vendidos mistura itens da COTAÇÃO (custo real FIFO, gravados
+      // na aprovação) com os vendidos NA finalização — sem discriminar, um
+      // reenvio "descontaminava" e descartava os da cotação também. Só
+      // descontaminamos/substituímos os marcados origem:'finalizacao'; os da
+      // cotação (ou sem a marca, de registros antigos) ficam sempre preservados.
+      const acessoriosAntigos = (servico.acessorios_vendidos || []) as typeof extrasNovos;
+      const acessoriosCotacao = acessoriosAntigos.filter((a) => a.origem !== 'finalizacao');
+      const acessoriosFinalizacaoAntigos = acessoriosAntigos.filter((a) => a.origem === 'finalizacao');
+
+      const decompAntigos = somarDecomposicaoExtras(acessoriosFinalizacaoAntigos);
       const decompNovos = somarDecomposicaoExtras(extrasNovos);
 
       const reembDespesaBase = temReembolso
@@ -410,7 +468,8 @@ export default function FinalizarServico() {
           valor_recebido_cliente: recebimentoCliente === 'instalador'
             ? parseFloat(valorRecebidoCliente || '0')
             : valorEmpresaRecebeu,
-          acessorios_vendidos: extrasNovos,
+          acessorios_vendidos: [...acessoriosCotacao, ...extrasNovos],
+          usou_suporte_garantia_total: isGarantiaTotal ? (usouSuporteGarantia ?? false) : false,
         })
         .eq("id", servicoId)
         .eq("instalador_id", user.id)
@@ -642,6 +701,55 @@ export default function FinalizarServico() {
             {extraComProblema && (
               <p className="mt-2 text-xs text-amber-600">
                 Resolva o fornecedor/custo dos extras selecionados antes de enviar.
+              </p>
+            )}
+          </div>
+        )}
+
+        {isGarantiaTotal && (
+          <div className="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 className="text-lg font-semibold mb-1">🛡️ Garantia Total — Suporte Fixo</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Este cliente está no plano Garantia Total. Você usou um suporte fixo universal da empresa nesta instalação?
+            </p>
+            <div className="flex gap-4">
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="suporte-garantia"
+                  checked={usouSuporteGarantia === false}
+                  onChange={() => setUsouSuporteGarantia(false)}
+                  className="mr-2"
+                />
+                Não usei / cliente já tinha
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="suporte-garantia"
+                  checked={usouSuporteGarantia === true}
+                  onChange={() => setUsouSuporteGarantia(true)}
+                  className="mr-2"
+                />
+                Sim, usei o suporte da empresa
+              </label>
+            </div>
+
+            {usouSuporteGarantia === null && (
+              <p className="text-xs text-amber-600 mt-2">Selecione uma opção antes de enviar.</p>
+            )}
+
+            {usouSuporteGarantia === true && (
+              <p className="text-xs text-muted-foreground mt-2">
+                {!catalogoSuporteGarantia
+                  ? "⚠️ Item \"Suporte Fixo Universal\" não encontrado no catálogo — avise o admin."
+                  : saldoSuporteGarantia <= 0
+                  ? "⚠️ Sem estoque registrado deste suporte — avise o admin antes de enviar."
+                  : carregandoCustoSuporteGarantia
+                  ? "Buscando custo…"
+                  : custoSuporteGarantia != null
+                  ? `Custo ${formatarBRL(custoSuporteGarantia)} — será descontado como reembolso da empresa (sem afetar seu ganho), dividido igualmente entre você e a empresa na aprovação.`
+                  : "Custo indisponível — tente novamente"}
               </p>
             )}
           </div>

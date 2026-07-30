@@ -59,6 +59,8 @@ interface Servico {
   acessorios_vendidos: ExtraServicoItem[] | null
   cotacao_itens_extras: ItemExtraCotacao[]
   percentual_mao_obra: number
+  usou_suporte_garantia_total: boolean
+  estoque_suporte_garantia_baixado: boolean
   fotos_conclusao: string[]
   nota_fiscal_url: string | null
   observacoes_instalador: string | null
@@ -138,6 +140,7 @@ export default function Aprovacoes() {
     servicoId: null,
     observacao: ''
   })
+  const [catalogoSuporteGarantiaId, setCatalogoSuporteGarantiaId] = useState<string | null>(null)
   const [aprovacaoModal, setAprovacaoModal] = useState<AprovacaoModal>({
     open: false,
     servicoId: null,
@@ -155,6 +158,18 @@ export default function Aprovacoes() {
   useEffect(() => {
     fetchServicos()
   }, [filtroStatus])
+
+  // Item de catálogo do suporte fixo universal (plano Garantia Total) — buscado uma vez.
+  useEffect(() => {
+    supabase
+      .from('catalogo_servicos')
+      .select('id')
+      .eq('ativo', true)
+      .eq('categoria', 'acessorios')
+      .ilike('nome', '%suporte fixo universal%')
+      .maybeSingle()
+      .then(({ data }) => setCatalogoSuporteGarantiaId(data?.id ?? null))
+  }, [])
 
   // Regra fixa: Valor Total de Mão de Obra = Valor recebido - (Reembolso instalador +
   // Reembolso empresa + Ganho acessórios instalador + Ganho acessórios empresa).
@@ -262,7 +277,17 @@ export default function Aprovacoes() {
     }
   }
 
-  function abrirModalAprovacao(servico: Servico) {
+  async function abrirModalAprovacao(servico: Servico) {
+    let custoSuporteInicial = servico.custo_suporte ?? 0
+
+    // Suporte fixo universal (Garantia Total) usado na finalização, ainda não processado:
+    // soma o custo real do estoque (FIFO) ao reembolso empresa. A baixa física do estoque
+    // só acontece de fato ao confirmar a aprovação (confirmarAprovacao).
+    if (servico.usou_suporte_garantia_total && !servico.estoque_suporte_garantia_baixado && catalogoSuporteGarantiaId) {
+      const { data } = await supabase.rpc('custo_atual_acessorio', { p_catalogo_id: catalogoSuporteGarantiaId })
+      custoSuporteInicial += (data as number | null) ?? 0
+    }
+
     setAprovacaoModal({
       open: true,
       servicoId: servico.id,
@@ -271,7 +296,7 @@ export default function Aprovacoes() {
       recebimento_cliente: servico.recebimento_cliente || 'empresa',
       valor_recebido_cliente: String(servico.valor_recebido_cliente ?? ''),
       valor_reembolso_despesas: String(servico.valor_reembolso_despesas ?? ''),
-      custo_suporte: String(servico.custo_suporte ?? ''),
+      custo_suporte: String(custoSuporteInicial),
       ganho_acessorios_instalador: String(servico.ganho_acessorios_instalador ?? '0'),
       ganho_acessorios_empresa: String(servico.ganho_acessorios_empresa ?? '0'),
       percentual_mao_obra: servico.percentual_mao_obra ?? 50,
@@ -286,17 +311,36 @@ export default function Aprovacoes() {
     try {
       setProcessingId(servicoId)
 
+      const servicoAtual = servicos.find(s => s.id === servicoId)
+      const precisaBaixarSuporteGarantia =
+        !!servicoAtual?.usou_suporte_garantia_total && !servicoAtual?.estoque_suporte_garantia_baixado
+
+      const updatePayload: Record<string, unknown> = {
+        status: 'concluido',
+        valor_total: parseFloat(valor_total) || 0,
+        valor_mao_obra_instalador: parseFloat(valor_mao_obra_instalador) || 0,
+        recebimento_cliente,
+        valor_recebido_cliente: parseFloat(valor_recebido_cliente) || 0,
+        valor_reembolso_despesas: parseFloat(valor_reembolso_despesas) || 0,
+        custo_suporte: parseFloat(custo_suporte) || 0,
+      }
+
+      if (precisaBaixarSuporteGarantia) {
+        if (!catalogoSuporteGarantiaId) {
+          throw new Error('Item "Suporte Fixo Universal" não encontrado no catálogo — não é possível dar baixa no estoque.')
+        }
+        const { error: erroBaixa } = await supabase.rpc('baixar_estoque_fifo', {
+          p_catalogo_id: catalogoSuporteGarantiaId,
+          p_quantidade: 1,
+          p_servico_id: servicoId,
+        })
+        if (erroBaixa) throw erroBaixa
+        updatePayload.estoque_suporte_garantia_baixado = true
+      }
+
       const { data, error } = await supabase
         .from('servicos')
-        .update({
-          status: 'concluido',
-          valor_total: parseFloat(valor_total) || 0,
-          valor_mao_obra_instalador: parseFloat(valor_mao_obra_instalador) || 0,
-          recebimento_cliente,
-          valor_recebido_cliente: parseFloat(valor_recebido_cliente) || 0,
-          valor_reembolso_despesas: parseFloat(valor_reembolso_despesas) || 0,
-          custo_suporte: parseFloat(custo_suporte) || 0,
-        })
+        .update(updatePayload)
         .eq('id', servicoId)
         .select()
 
@@ -629,6 +673,18 @@ export default function Aprovacoes() {
                     </div>
                   </div>
 
+                  {/* Garantia Total: suporte fixo universal usado na finalização */}
+                  {servico.usou_suporte_garantia_total && (
+                    <div className="border-t pt-4">
+                      <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg text-sm text-blue-900">
+                        🛡️ <span className="font-medium">Garantia Total:</span> instalador marcou que usou o suporte fixo universal da empresa.{' '}
+                        {servico.estoque_suporte_garantia_baixado
+                          ? 'Custo já processado e baixado do estoque.'
+                          : 'O custo real (FIFO) será somado ao Reembolso empresa e a baixa de estoque ocorrerá ao confirmar a aprovação.'}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Extras vendidos na finalização */}
                   {servico.acessorios_vendidos && servico.acessorios_vendidos.length > 0 && (
                     <div className="border-t pt-4">
@@ -902,6 +958,15 @@ export default function Aprovacoes() {
                   value={aprovacaoModal.custo_suporte}
                   onChange={(e) => setAprovacaoModal(prev => ({ ...prev, custo_suporte: e.target.value }))}
                 />
+                {(() => {
+                  const modalServico = servicos.find(s => s.id === aprovacaoModal.servicoId)
+                  if (!modalServico?.usou_suporte_garantia_total || modalServico.estoque_suporte_garantia_baixado) return null
+                  return (
+                    <p className="text-xs text-blue-700">
+                      Já inclui o custo estimado do suporte fixo universal (Garantia Total). A baixa real do estoque acontece ao confirmar.
+                    </p>
+                  )
+                })()}
               </div>
             </div>
             {(parseFloat(aprovacaoModal.ganho_acessorios_instalador) > 0 ||

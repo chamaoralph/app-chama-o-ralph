@@ -327,7 +327,16 @@ export function resumirRepasseAcessorios(
 // valor_recebido_cliente) sem somar os extras da tentativa anterior de novo.
 // =====================================================================
 
-/** Um item de acessório vendido na finalização, já com o repasse calculado. */
+/**
+ * Um item de acessório vendido, já com o repasse calculado. `origem` diferencia
+ * itens incluídos na COTAÇÃO (gravados pelas triggers de aprovação, com custo
+ * real FIFO) dos vendidos NA FINALIZAÇÃO pelo instalador — os dois tipos
+ * convivem no mesmo campo `servicos.acessorios_vendidos`, então sem essa marca
+ * não dá pra saber quais preservar num reenvio de finalização (ver
+ * FinalizarServico.tsx). Itens antigos sem o campo (gravados antes dessa
+ * mudança) são tratados como 'cotacao' por segurança — ver uso em
+ * FinalizarServico.tsx.
+ */
 export interface ExtraServicoItem {
   catalogo_id: string;
   nome: string;
@@ -338,6 +347,7 @@ export interface ExtraServicoItem {
   lucro: number;
   repasse_instalador: number;
   repasse_empresa: number;
+  origem?: 'cotacao' | 'finalizacao';
 }
 
 /** Converte um acessório selecionado (com fornecedor definido) no item a persistir. */
@@ -357,6 +367,7 @@ export function paraExtraServico(a: AcessorioSelecionado): ExtraServicoItem {
     lucro: r.lucro,
     repasse_instalador: r.repasse_instalador,
     repasse_empresa: r.repasse_empresa,
+    origem: 'finalizacao',
   };
 }
 
