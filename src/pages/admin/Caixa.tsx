@@ -266,9 +266,14 @@ export default function Caixa() {
               saldo >= 0 ? "bg-blue-50 border-blue-200" : "bg-orange-50 border-orange-200"
             }`}
           >
-            <p className={`text-sm font-medium mb-1 ${saldo >= 0 ? "text-blue-600" : "text-orange-600"}`}>SALDO</p>
+            <p className={`text-sm font-medium mb-1 ${saldo >= 0 ? "text-blue-600" : "text-orange-600"}`}>
+              RESULTADO DO MÊS
+            </p>
             <p className={`text-3xl font-bold ${saldo >= 0 ? "text-blue-700" : "text-orange-700"}`}>
               R$ {saldo.toFixed(2)}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Receita − despesas − mão de obra só do mês filtrado, não é o caixa acumulado.
             </p>
           </div>
         </div>

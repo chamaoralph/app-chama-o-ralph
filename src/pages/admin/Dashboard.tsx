@@ -431,7 +431,7 @@ export default function AdminDashboard() {
             <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl p-4 min-w-[140px] flex-shrink-0">
               <DollarSign className="h-6 w-6 mb-2 opacity-80" />
               <div className="text-xl font-bold">R$ {metricas.saldoCaixa.toFixed(0)}</div>
-              <div className="text-xs opacity-90">Saldo</div>
+              <div className="text-xs opacity-90">Resultado do Mês</div>
             </div>
 
             <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-xl p-4 min-w-[140px] flex-shrink-0">
@@ -647,7 +647,7 @@ export default function AdminDashboard() {
               <span className="text-3xl opacity-30">💰</span>
             </div>
             <div className="text-2xl font-bold">R$ {metricas.saldoCaixa.toFixed(2)}</div>
-            <div className="text-sm opacity-90">Saldo do Mês</div>
+            <div className="text-sm opacity-90">Resultado do Mês (receita − despesas − mão de obra)</div>
           </div>
 
           <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
