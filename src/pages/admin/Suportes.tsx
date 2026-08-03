@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useMemo, Fragment } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AdminLayout } from '@/components/layout/AdminLayout'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/lib/auth'
@@ -19,12 +20,17 @@ import { ptBR } from 'date-fns/locale'
 interface Instalador {
   id: string
   nome: string
-  saldo_suportes?: number
+}
+
+interface CatalogoSuporte {
+  id: string
+  nome: string
 }
 
 interface Movimentacao {
   id: string
   instalador_id: string
+  catalogo_id: string | null
   quantidade: number
   tipo_movimento: string
   data_movimento: string
@@ -34,25 +40,37 @@ interface Movimentacao {
   valor_unitario: number | null
   usuarios?: { nome: string }
   servicos?: { codigo: string } | null
+  catalogo_servicos?: { nome: string } | null
 }
+
+interface MovimentacaoSaldo {
+  instalador_id: string
+  catalogo_id: string | null
+  tipo_movimento: string
+  quantidade: number
+}
+
+interface BucketSaldo {
+  catalogoId: string | null
+  label: string
+  saldo: number
+}
+
+const BAIXA_FIFO_RESULT_VAZIO = { custo_total: 0, qtd_atendida: 0, qtd_faltante: 0 }
 
 export default function Suportes() {
   const { user } = useAuth()
   const { toast } = useToast()
-  const [loading, setLoading] = useState(true)
-  const [instaladores, setInstaladores] = useState<Instalador[]>([])
-  const [movimentacoes, setMovimentacoes] = useState<Movimentacao[]>([])
-  const [saldos, setSaldos] = useState<Record<string, number>>({})
-  
+  const qc = useQueryClient()
+
   // Form de entrega
   const [formEntrega, setFormEntrega] = useState({
     instalador_id: '',
+    catalogo_id: '',
     quantidade: '1',
-    valor_unitario: '',
     observacoes: ''
   })
-  const [enviando, setEnviando] = useState(false)
-  
+
   // Estado do modal de edição
   const [editando, setEditando] = useState<Movimentacao | null>(null)
   const [formEdit, setFormEdit] = useState({
@@ -62,135 +80,216 @@ export default function Suportes() {
   })
   const [salvandoEdicao, setSalvandoEdicao] = useState(false)
 
-  useEffect(() => {
-    fetchData()
-  }, [user])
+  const empresaQuery = useQuery({
+    queryKey: ['minha-empresa', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select('empresa_id')
+        .eq('id', user!.id)
+        .single()
+      if (error) throw error
+      return data.empresa_id as string
+    },
+    enabled: !!user?.id,
+  })
 
-  async function fetchData() {
-    try {
-      setLoading(true)
-      
-      // Buscar instaladores ativos
-      const { data: instData } = await supabase
+  const instaladoresQuery = useQuery({
+    queryKey: ['instaladores-ativos'],
+    queryFn: async () => {
+      const { data, error } = await supabase
         .from('usuarios')
         .select('id, nome')
         .eq('tipo', 'instalador')
         .eq('ativo', true)
         .order('nome')
-      
-      setInstaladores(instData || [])
-      
-      // Buscar movimentações
-      const { data: movData } = await supabase
+      if (error) throw error
+      return (data || []) as Instalador[]
+    },
+  })
+
+  const catalogoSuportesQuery = useQuery({
+    queryKey: ['catalogo-suportes'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('catalogo_servicos')
+        .select('id, nome')
+        .eq('categoria', 'acessorios')
+        .eq('ativo', true)
+        .ilike('nome', '%suporte%')
+        .order('nome')
+      if (error) throw error
+      return (data || []) as CatalogoSuporte[]
+    },
+  })
+
+  const saldoCentralQuery = useQuery({
+    queryKey: ['estoque-saldo-suportes'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('estoque_saldo').select('catalogo_id, saldo')
+      if (error) throw error
+      return (data || []) as { catalogo_id: string; saldo: number }[]
+    },
+  })
+
+  // Todas as movimentações (sem limite) — usadas só pro cálculo de saldo por
+  // instalador/modelo. Separado do histórico (que é limitado a 100) pra não
+  // dar saldo errado quando a empresa já passou de 100 movimentações.
+  const movimentacoesSaldoQuery = useQuery({
+    queryKey: ['movimentacoes-suportes-saldo'],
+    queryFn: async () => {
+      const { data, error } = await supabase
         .from('movimentacoes_suportes')
-        .select('*, usuarios!movimentacoes_suportes_instalador_id_fkey(nome), servicos(codigo)')
+        .select('instalador_id, catalogo_id, tipo_movimento, quantidade')
+      if (error) throw error
+      return (data || []) as MovimentacaoSaldo[]
+    },
+  })
+
+  const historicoQuery = useQuery({
+    queryKey: ['movimentacoes-suportes-historico'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('movimentacoes_suportes')
+        .select('*, usuarios!movimentacoes_suportes_instalador_id_fkey(nome), servicos(codigo), catalogo_servicos(nome)')
         .order('created_at', { ascending: false })
         .limit(100)
-      
-      setMovimentacoes((movData || []) as Movimentacao[])
-      
-      // Calcular saldos por instalador
-      if (movData) {
-        const saldoCalc: Record<string, number> = {}
-        movData.forEach((mov) => {
-          if (!saldoCalc[mov.instalador_id]) saldoCalc[mov.instalador_id] = 0
-          if (mov.tipo_movimento === 'entrega') {
-            saldoCalc[mov.instalador_id] += mov.quantidade
-          } else if (mov.tipo_movimento === 'devolucao' || mov.tipo_movimento === 'uso') {
-            saldoCalc[mov.instalador_id] -= mov.quantidade
-          }
-        })
-        setSaldos(saldoCalc)
+      if (error) throw error
+      return (data || []) as Movimentacao[]
+    },
+  })
+
+  const instaladores = instaladoresQuery.data ?? []
+  const catalogoSuportes = catalogoSuportesQuery.data ?? []
+  const movimentacoes = historicoQuery.data ?? []
+
+  const saldoCentralPorCatalogo = useMemo(() => {
+    const mapa: Record<string, number> = {}
+    for (const s of saldoCentralQuery.data ?? []) mapa[s.catalogo_id] = s.saldo
+    return mapa
+  }, [saldoCentralQuery.data])
+
+  const nomeCatalogo = (id: string) => catalogoSuportes.find((c) => c.id === id)?.nome ?? 'Modelo removido'
+
+  const saldosPorInstalador = useMemo(() => {
+    const mapa: Record<string, Record<string, BucketSaldo>> = {}
+    for (const mov of movimentacoesSaldoQuery.data ?? []) {
+      const chave = mov.catalogo_id ?? '__sem_modelo__'
+      if (!mapa[mov.instalador_id]) mapa[mov.instalador_id] = {}
+      if (!mapa[mov.instalador_id][chave]) {
+        mapa[mov.instalador_id][chave] = {
+          catalogoId: mov.catalogo_id,
+          label: mov.catalogo_id ? nomeCatalogo(mov.catalogo_id) : 'Não especificado',
+          saldo: 0,
+        }
       }
-      
-    } catch (error) {
-      console.error('Erro ao buscar dados:', error)
-    } finally {
-      setLoading(false)
+      const bucket = mapa[mov.instalador_id][chave]
+      if (mov.tipo_movimento === 'entrega') bucket.saldo += mov.quantidade
+      else if (mov.tipo_movimento === 'devolucao' || mov.tipo_movimento === 'uso') bucket.saldo -= mov.quantidade
     }
+    const resultado: Record<string, BucketSaldo[]> = {}
+    for (const [instaladorId, buckets] of Object.entries(mapa)) {
+      resultado[instaladorId] = Object.values(buckets)
+        .filter((b) => b.saldo !== 0)
+        .sort((a, b) => a.label.localeCompare(b.label))
+    }
+    return resultado
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [movimentacoesSaldoQuery.data, catalogoSuportes])
+
+  const totalPorInstalador = (instaladorId: string) =>
+    (saldosPorInstalador[instaladorId] ?? []).reduce((s, b) => s + b.saldo, 0)
+
+  function invalidarTudo() {
+    qc.invalidateQueries({ queryKey: ['movimentacoes-suportes-saldo'] })
+    qc.invalidateQueries({ queryKey: ['movimentacoes-suportes-historico'] })
+    qc.invalidateQueries({ queryKey: ['estoque-saldo-suportes'] })
   }
 
-  async function registrarEntrega(e: React.FormEvent) {
-    e.preventDefault()
-    if (!formEntrega.instalador_id || !formEntrega.quantidade) return
-    
-    setEnviando(true)
-    try {
-      const { data: userData } = await supabase
-        .from('usuarios')
-        .select('empresa_id')
-        .eq('id', user?.id)
-        .single()
-      
-      if (!userData) throw new Error('Usuário não encontrado')
-      
-      const { error } = await supabase
-        .from('movimentacoes_suportes')
-        .insert({
-          empresa_id: userData.empresa_id,
-          instalador_id: formEntrega.instalador_id,
-          quantidade: parseInt(formEntrega.quantidade),
-          tipo_movimento: 'entrega',
-          valor_unitario: formEntrega.valor_unitario ? parseFloat(formEntrega.valor_unitario) : 0,
-          observacoes: formEntrega.observacoes || null,
-          data_movimento: new Date().toISOString().split('T')[0]
-        })
-      
-      if (error) throw error
-      
-      toast({
-        title: '✅ Suportes entregues!',
-        description: `${formEntrega.quantidade} suporte(s) registrado(s) com sucesso.`
-      })
-      
-      setFormEntrega({ instalador_id: '', quantidade: '1', valor_unitario: '', observacoes: '' })
-      fetchData()
-      
-    } catch (error: any) {
-      console.error('Erro:', error)
-      toast({
-        title: '❌ Erro ao registrar',
-        description: error.message,
-        variant: 'destructive'
-      })
-    } finally {
-      setEnviando(false)
-    }
-  }
+  const registrarEntrega = useMutation({
+    mutationFn: async () => {
+      if (!formEntrega.instalador_id) throw new Error('Selecione o instalador.')
+      if (!formEntrega.catalogo_id) throw new Error('Selecione o modelo de suporte.')
+      const quantidade = parseInt(formEntrega.quantidade, 10)
+      if (!Number.isInteger(quantidade) || quantidade <= 0) throw new Error('Quantidade inválida.')
 
-  async function registrarDevolucao(instaladorId: string, quantidade: number) {
-    try {
-      const { data: userData } = await supabase
-        .from('usuarios')
-        .select('empresa_id')
-        .eq('id', user?.id)
-        .single()
-      
-      if (!userData) throw new Error('Usuário não encontrado')
-      
-      const { error } = await supabase
-        .from('movimentacoes_suportes')
-        .insert({
-          empresa_id: userData.empresa_id,
-          instalador_id: instaladorId,
-          quantidade: quantidade,
-          tipo_movimento: 'devolucao',
-          data_movimento: new Date().toISOString().split('T')[0]
+      const saldoDisponivel = saldoCentralPorCatalogo[formEntrega.catalogo_id] ?? 0
+      if (quantidade > saldoDisponivel) {
+        throw new Error(`Só há ${saldoDisponivel} unidade(s) desse modelo em estoque.`)
+      }
+      if (!empresaQuery.data) throw new Error('Empresa não encontrada.')
+
+      const { data: resultado, error: erroBaixa } = await supabase.rpc('baixar_estoque_fifo', {
+        p_catalogo_id: formEntrega.catalogo_id,
+        p_quantidade: quantidade,
+        p_servico_id: null,
+      })
+      if (erroBaixa) throw erroBaixa
+      const { custo_total, qtd_atendida, qtd_faltante } = resultado?.[0] ?? BAIXA_FIFO_RESULT_VAZIO
+      if (qtd_atendida === 0) throw new Error('Sem estoque disponível para este modelo.')
+
+      const { error: erroInsert } = await supabase.from('movimentacoes_suportes').insert({
+        empresa_id: empresaQuery.data,
+        instalador_id: formEntrega.instalador_id,
+        catalogo_id: formEntrega.catalogo_id,
+        quantidade: qtd_atendida,
+        tipo_movimento: 'entrega',
+        valor_unitario: qtd_atendida > 0 ? Number((custo_total / qtd_atendida).toFixed(2)) : 0,
+        observacoes: formEntrega.observacoes || null,
+        data_movimento: new Date().toISOString().split('T')[0],
+      })
+      if (erroInsert) throw erroInsert
+
+      return { qtdAtendida: qtd_atendida as number, qtdFaltante: qtd_faltante as number }
+    },
+    onSuccess: ({ qtdAtendida, qtdFaltante }) => {
+      invalidarTudo()
+      setFormEntrega({ instalador_id: '', catalogo_id: '', quantidade: '1', observacoes: '' })
+      if (qtdFaltante > 0) {
+        toast({
+          title: '⚠️ Entrega parcial',
+          description: `Só havia ${qtdAtendida} em estoque — entrega registrada parcialmente. Faltaram ${qtdFaltante}.`
         })
-      
+      } else {
+        toast({ title: '✅ Suportes entregues!', description: `${qtdAtendida} suporte(s) registrado(s) com sucesso.` })
+      }
+    },
+    onError: (error: Error) => {
+      toast({ title: '❌ Erro ao registrar', description: error.message, variant: 'destructive' })
+    },
+  })
+
+  const registrarDevolucao = useMutation({
+    mutationFn: async ({ instaladorId, catalogoId, quantidade }: { instaladorId: string; catalogoId: string | null; quantidade: number }) => {
+      if (!empresaQuery.data) throw new Error('Empresa não encontrada.')
+
+      if (catalogoId) {
+        const { error: erroAjuste } = await supabase.rpc('ajustar_estoque_manual', {
+          p_catalogo_id: catalogoId,
+          p_quantidade: quantidade,
+          p_motivo: 'Devolução de suporte pelo instalador',
+        })
+        if (erroAjuste) throw erroAjuste
+      }
+
+      const { error } = await supabase.from('movimentacoes_suportes').insert({
+        empresa_id: empresaQuery.data,
+        instalador_id: instaladorId,
+        catalogo_id: catalogoId,
+        quantidade,
+        tipo_movimento: 'devolucao',
+        data_movimento: new Date().toISOString().split('T')[0],
+      })
       if (error) throw error
-      
+    },
+    onSuccess: () => {
+      invalidarTudo()
       toast({ title: '✅ Devolução registrada!' })
-      fetchData()
-      
-    } catch (error: any) {
-      toast({
-        title: '❌ Erro',
-        description: error.message,
-        variant: 'destructive'
-      })
-    }
-  }
+    },
+    onError: (error: Error) => {
+      toast({ title: '❌ Erro', description: error.message, variant: 'destructive' })
+    },
+  })
 
   const getTipoMovimentoBadge = (tipo: string) => {
     switch (tipo) {
@@ -216,7 +315,7 @@ export default function Suportes() {
 
   async function salvarEdicao() {
     if (!editando) return
-    
+
     setSalvandoEdicao(true)
     try {
       const { error } = await supabase
@@ -227,22 +326,22 @@ export default function Suportes() {
           observacoes: formEdit.observacoes?.trim() || null
         })
         .eq('id', editando.id)
-      
+
       if (error) throw error
-      
+
       toast({
         title: '✅ Movimentação atualizada!',
         description: 'Os dados foram salvos com sucesso.'
       })
-      
+
       setEditando(null)
-      fetchData()
-      
-    } catch (error: any) {
+      invalidarTudo()
+
+    } catch (error) {
       console.error('Erro ao atualizar:', error)
       toast({
         title: '❌ Erro ao atualizar',
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
         variant: 'destructive'
       })
     } finally {
@@ -250,7 +349,7 @@ export default function Suportes() {
     }
   }
 
-  if (loading) {
+  if (instaladoresQuery.isLoading || historicoQuery.isLoading) {
     return (
       <AdminLayout>
         <div className="flex justify-center items-center h-64">
@@ -292,17 +391,23 @@ export default function Suportes() {
                   Entregar Suportes
                 </CardTitle>
                 <CardDescription>
-                  Registre a entrega de suportes para um instalador
+                  Registre a entrega de suportes para um instalador — a baixa é feita direto no estoque
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={registrarEntrega} className="space-y-4">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    registrarEntrega.mutate()
+                  }}
+                  className="space-y-4"
+                >
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label>Instalador *</Label>
-                      <Select 
-                        value={formEntrega.instalador_id} 
-                        onValueChange={(v) => setFormEntrega({...formEntrega, instalador_id: v})}
+                      <Select
+                        value={formEntrega.instalador_id}
+                        onValueChange={(v) => setFormEntrega({ ...formEntrega, instalador_id: v })}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione..." />
@@ -310,47 +415,62 @@ export default function Suportes() {
                         <SelectContent>
                           {instaladores.map((inst) => (
                             <SelectItem key={inst.id} value={inst.id}>
-                              {inst.nome} {saldos[inst.id] ? `(${saldos[inst.id]} em mãos)` : ''}
+                              {inst.nome} {totalPorInstalador(inst.id) ? `(${totalPorInstalador(inst.id)} em mãos)` : ''}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
-                    
+
+                    <div className="space-y-2">
+                      <Label>Modelo do suporte *</Label>
+                      <Select
+                        value={formEntrega.catalogo_id}
+                        onValueChange={(v) => setFormEntrega({ ...formEntrega, catalogo_id: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {catalogoSuportes.map((c) => {
+                            const saldo = saldoCentralPorCatalogo[c.id] ?? 0
+                            return (
+                              <SelectItem key={c.id} value={c.id} disabled={saldo <= 0}>
+                                {c.nome} — {saldo} {saldo === 1 ? 'disponível' : 'disponíveis'}
+                              </SelectItem>
+                            )
+                          })}
+                          {catalogoSuportes.length === 0 && (
+                            <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                              Nenhum modelo cadastrado no catálogo
+                            </div>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
                     <div className="space-y-2">
                       <Label>Quantidade *</Label>
-                      <Input 
+                      <Input
                         type="number"
                         min="1"
                         value={formEntrega.quantidade}
-                        onChange={(e) => setFormEntrega({...formEntrega, quantidade: e.target.value})}
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label>Valor Unitário (R$) *</Label>
-                      <Input 
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={formEntrega.valor_unitario}
-                        onChange={(e) => setFormEntrega({...formEntrega, valor_unitario: e.target.value})}
-                        placeholder="0,00"
+                        onChange={(e) => setFormEntrega({ ...formEntrega, quantidade: e.target.value })}
                       />
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label>Observações</Label>
-                    <Input 
+                    <Input
                       value={formEntrega.observacoes}
-                      onChange={(e) => setFormEntrega({...formEntrega, observacoes: e.target.value})}
+                      onChange={(e) => setFormEntrega({ ...formEntrega, observacoes: e.target.value })}
                       placeholder="Ex: Suportes articulados 32-55"
                     />
                   </div>
-                  
-                  <Button type="submit" disabled={enviando || !formEntrega.instalador_id}>
-                    {enviando ? 'Registrando...' : 'Registrar Entrega'}
+
+                  <Button type="submit" disabled={registrarEntrega.isPending || !formEntrega.instalador_id || !formEntrega.catalogo_id}>
+                    {registrarEntrega.isPending ? 'Registrando...' : 'Registrar Entrega'}
                   </Button>
                 </form>
               </CardContent>
@@ -362,45 +482,65 @@ export default function Suportes() {
               <CardHeader>
                 <CardTitle>Saldo por Instalador</CardTitle>
                 <CardDescription>
-                  Quantidade de suportes em mãos de cada instalador
+                  Quantidade de suportes em mãos de cada instalador, por modelo
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Instalador</TableHead>
-                      <TableHead className="text-center">Suportes em Mãos</TableHead>
+                      <TableHead>Instalador / Modelo</TableHead>
+                      <TableHead className="text-center">Saldo</TableHead>
                       <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {instaladores.map((inst) => (
-                      <TableRow key={inst.id}>
-                        <TableCell className="font-medium">{inst.nome}</TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant={saldos[inst.id] > 0 ? 'default' : 'secondary'}>
-                            {saldos[inst.id] || 0}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {saldos[inst.id] > 0 && (
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => {
-                                const qtd = prompt('Quantos suportes devolver?', '1')
-                                if (qtd && parseInt(qtd) > 0) {
-                                  registrarDevolucao(inst.id, parseInt(qtd))
-                                }
-                              }}
-                            >
-                              Devolver
-                            </Button>
+                    {instaladores.map((inst) => {
+                      const buckets = saldosPorInstalador[inst.id] ?? []
+                      const total = totalPorInstalador(inst.id)
+                      return (
+                        <Fragment key={inst.id}>
+                          <TableRow className="bg-muted/40">
+                            <TableCell className="font-semibold">{inst.nome}</TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant={total > 0 ? 'default' : 'secondary'}>{total}</Badge>
+                            </TableCell>
+                            <TableCell />
+                          </TableRow>
+                          {buckets.length === 0 && (
+                            <TableRow>
+                              <TableCell colSpan={3} className="pl-6 text-sm text-muted-foreground">
+                                Nenhum suporte em mãos
+                              </TableCell>
+                            </TableRow>
                           )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                          {buckets.map((b) => (
+                            <TableRow key={`${inst.id}-${b.catalogoId ?? 'sem-modelo'}`}>
+                              <TableCell className="pl-6 text-sm text-muted-foreground">{b.label}</TableCell>
+                              <TableCell className="text-center">{b.saldo}</TableCell>
+                              <TableCell className="text-right">
+                                {b.saldo > 0 && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={registrarDevolucao.isPending}
+                                    onClick={() => {
+                                      const qtd = prompt(`Quantos "${b.label}" devolver?`, '1')
+                                      const quantidade = qtd ? parseInt(qtd, 10) : 0
+                                      if (quantidade > 0) {
+                                        registrarDevolucao.mutate({ instaladorId: inst.id, catalogoId: b.catalogoId, quantidade })
+                                      }
+                                    }}
+                                  >
+                                    Devolver
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </Fragment>
+                      )
+                    })}
                     {instaladores.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={3} className="text-center text-gray-500 py-8">
@@ -428,6 +568,7 @@ export default function Suportes() {
                     <TableRow>
                       <TableHead>Data</TableHead>
                       <TableHead>Instalador</TableHead>
+                      <TableHead>Modelo</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead className="text-center">Qtd</TableHead>
                       <TableHead className="text-right">Valor Unit.</TableHead>
@@ -445,6 +586,9 @@ export default function Suportes() {
                         <TableCell className="font-medium">
                           {mov.usuarios?.nome || '-'}
                         </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {mov.catalogo_servicos?.nome || '—'}
+                        </TableCell>
                         <TableCell>
                           {getTipoMovimentoBadge(mov.tipo_movimento)}
                         </TableCell>
@@ -452,8 +596,8 @@ export default function Suportes() {
                           {mov.tipo_movimento === 'entrega' ? '+' : '-'}{mov.quantidade}
                         </TableCell>
                         <TableCell className="text-right">
-                          {mov.valor_unitario && mov.valor_unitario > 0 
-                            ? `R$ ${mov.valor_unitario.toFixed(2)}` 
+                          {mov.valor_unitario && mov.valor_unitario > 0
+                            ? `R$ ${mov.valor_unitario.toFixed(2)}`
                             : '-'}
                         </TableCell>
                         <TableCell>
@@ -475,7 +619,7 @@ export default function Suportes() {
                     ))}
                     {movimentacoes.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                           Nenhuma movimentação registrada
                         </TableCell>
                       </TableRow>
@@ -496,7 +640,7 @@ export default function Suportes() {
                 Altere os dados da movimentação de suportes
               </DialogDescription>
             </DialogHeader>
-            
+
             {editando && (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4 text-sm">
@@ -509,13 +653,17 @@ export default function Suportes() {
                     <p className="font-medium capitalize">{editando.tipo_movimento}</p>
                   </div>
                   <div>
+                    <span className="text-muted-foreground">Modelo:</span>
+                    <p className="font-medium">{editando.catalogo_servicos?.nome || '—'}</p>
+                  </div>
+                  <div>
                     <span className="text-muted-foreground">Data:</span>
                     <p className="font-medium">
                       {format(new Date(editando.data_movimento), 'dd/MM/yyyy', { locale: ptBR })}
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="edit-quantidade">Quantidade *</Label>
                   <Input
@@ -526,7 +674,7 @@ export default function Suportes() {
                     onChange={(e) => setFormEdit({ ...formEdit, quantidade: e.target.value })}
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="edit-valor">Valor Unitário (R$)</Label>
                   <Input
@@ -539,7 +687,7 @@ export default function Suportes() {
                     placeholder="0,00"
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="edit-obs">Observações</Label>
                   <Input
@@ -552,7 +700,7 @@ export default function Suportes() {
                 </div>
               </div>
             )}
-            
+
             <DialogFooter>
               <Button variant="outline" onClick={() => setEditando(null)}>
                 Cancelar

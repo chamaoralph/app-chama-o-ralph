@@ -19,6 +19,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { ExtraServicoItem, formatarBRL, decomporExtra } from '@/lib/orcamento'
+import type { TVItem } from '@/components/admin/SelectorPrecoTV'
 import {
   Select,
   SelectContent,
@@ -42,6 +43,8 @@ interface ItemExtraCotacao {
 interface Servico {
   id: string
   codigo: string
+  empresa_id: string
+  cotacao_id: string | null
   instalador_id: string
   cliente_id: string
   tipo_servico: string[]
@@ -53,14 +56,17 @@ interface Servico {
   valor_reembolso_despesas: number
   valor_recebido_cliente: number
   recebimento_cliente: string | null
+  origem_suporte: string | null
   custo_suporte: number
   ganho_acessorios_instalador: number
   ganho_acessorios_empresa: number
   acessorios_vendidos: ExtraServicoItem[] | null
   cotacao_itens_extras: ItemExtraCotacao[]
+  tvs_itens: TVItem[] | null
   percentual_mao_obra: number
   usou_suporte_garantia_total: boolean
   estoque_suporte_garantia_baixado: boolean
+  estoque_suporte_instalador_baixado: boolean
   fotos_conclusao: string[]
   nota_fiscal_url: string | null
   observacoes_instalador: string | null
@@ -126,6 +132,23 @@ function acessoriosDaCotacaoPendentes(servico: Servico): ExtraServicoItem[] {
   const jaProcessados = new Set((servico.acessorios_vendidos || []).map(i => i.catalogo_id))
   return acessoriosDaCotacao(servico.cotacao_itens_extras)
     .filter(item => !jaProcessados.has(item.catalogo_id))
+}
+
+// Quantidade de suportes do INSTALADOR usados neste serviço, para dar baixa
+// em movimentacoes_suportes (tipo_movimento='uso') na aprovação.
+//
+// Fonte primária: cotacoes.tvs_itens (1 item por TV, cada um com sua própria
+// origem_suporte) — cobre cotações com múltiplas TVs de origem mista, já que
+// o campo agregado servico.origem_suporte só reflete a primeira TV.
+//
+// Fallback: cotações anteriores à introdução de tvs_itens não têm o array
+// preenchido — nesse caso usa o campo agregado.
+function contarSuportesInstalador(servico: Servico): number {
+  const itens = servico.tvs_itens
+  if (Array.isArray(itens) && itens.length > 0) {
+    return itens.filter(item => item?.origem_suporte === 'instalador').length
+  }
+  return servico.origem_suporte === 'instalador' ? 1 : 0
 }
 
 export default function Aprovacoes() {
@@ -213,7 +236,7 @@ export default function Aprovacoes() {
         .select(`
           *,
           clientes!servicos_cliente_id_fkey(nome, telefone),
-          cotacoes!servicos_cotacao_id_fkey(itens_extras)
+          cotacoes!servicos_cotacao_id_fkey(itens_extras, tvs_itens)
         `)
 
       // Aplicar filtro
@@ -254,6 +277,7 @@ export default function Aprovacoes() {
         instalador_nome: (servico.instalador_id && nomesInstaladores[servico.instalador_id]) || null,
         percentual_mao_obra: (servico.instalador_id && percentuaisInstaladores[servico.instalador_id]) ?? 50,
         cotacao_itens_extras: (servico as unknown as { cotacoes: { itens_extras: ItemExtraCotacao[] | null } | null }).cotacoes?.itens_extras || [],
+        tvs_itens: (servico as unknown as { cotacoes: { tvs_itens: TVItem[] | null } | null }).cotacoes?.tvs_itens ?? null,
       })) || []
 
       setServicos(servicosFormatados)
@@ -315,6 +339,15 @@ export default function Aprovacoes() {
       const precisaBaixarSuporteGarantia =
         !!servicoAtual?.usou_suporte_garantia_total && !servicoAtual?.estoque_suporte_garantia_baixado
 
+      // Suporte(s) de propriedade do instalador usado(s) na(s) TV(s) deste serviço.
+      // Guard: precisa ter instalador atribuído e ainda não ter sido baixado antes
+      // (evita duplicar em caso de desaprovar + reaprovar).
+      const precisaAvaliarSuporteInstalador =
+        !!servicoAtual?.instalador_id && !servicoAtual?.estoque_suporte_instalador_baixado
+      const quantidadeSuporteInstalador = precisaAvaliarSuporteInstalador && servicoAtual
+        ? contarSuportesInstalador(servicoAtual)
+        : 0
+
       const updatePayload: Record<string, unknown> = {
         status: 'concluido',
         valor_total: parseFloat(valor_total) || 0,
@@ -336,6 +369,24 @@ export default function Aprovacoes() {
         })
         if (erroBaixa) throw erroBaixa
         updatePayload.estoque_suporte_garantia_baixado = true
+      }
+
+      // Baixa de suporte(s) do instalador: só insere movimentação se houver
+      // efetivamente ao menos 1 suporte de origem 'instalador' — não lança
+      // linha à toa com quantidade 0.
+      if (quantidadeSuporteInstalador > 0 && servicoAtual) {
+        const { error: erroBaixaSuporteInstalador } = await supabase
+          .from('movimentacoes_suportes')
+          .insert({
+            empresa_id: servicoAtual.empresa_id,
+            instalador_id: servicoAtual.instalador_id,
+            quantidade: quantidadeSuporteInstalador,
+            tipo_movimento: 'uso',
+            servico_id: servicoId,
+            observacoes: `Baixa automática na aprovação do serviço ${servicoAtual.codigo}`,
+          })
+        if (erroBaixaSuporteInstalador) throw erroBaixaSuporteInstalador
+        updatePayload.estoque_suporte_instalador_baixado = true
       }
 
       const { data, error } = await supabase
