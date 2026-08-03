@@ -116,7 +116,6 @@ export default function Suportes() {
         .select('id, nome')
         .eq('categoria', 'acessorios')
         .eq('ativo', true)
-        .ilike('nome', '%suporte%')
         .order('nome')
       if (error) throw error
       return (data || []) as CatalogoSuporte[]
@@ -209,7 +208,7 @@ export default function Suportes() {
   const registrarEntrega = useMutation({
     mutationFn: async () => {
       if (!formEntrega.instalador_id) throw new Error('Selecione o instalador.')
-      if (!formEntrega.catalogo_id) throw new Error('Selecione o modelo de suporte.')
+      if (!formEntrega.catalogo_id) throw new Error('Selecione o acessório.')
       const quantidade = parseInt(formEntrega.quantidade, 10)
       if (!Number.isInteger(quantidade) || quantidade <= 0) throw new Error('Quantidade inválida.')
 
@@ -226,7 +225,7 @@ export default function Suportes() {
       })
       if (erroBaixa) throw erroBaixa
       const { custo_total, qtd_atendida, qtd_faltante } = resultado?.[0] ?? BAIXA_FIFO_RESULT_VAZIO
-      if (qtd_atendida === 0) throw new Error('Sem estoque disponível para este modelo.')
+      if (qtd_atendida === 0) throw new Error('Sem estoque disponível para este acessório.')
 
       const { error: erroInsert } = await supabase.from('movimentacoes_suportes').insert({
         empresa_id: empresaQuery.data,
@@ -251,7 +250,7 @@ export default function Suportes() {
           description: `Só havia ${qtdAtendida} em estoque — entrega registrada parcialmente. Faltaram ${qtdFaltante}.`
         })
       } else {
-        toast({ title: '✅ Suportes entregues!', description: `${qtdAtendida} suporte(s) registrado(s) com sucesso.` })
+        toast({ title: '✅ Acessórios entregues!', description: `${qtdAtendida} unidade(s) registrada(s) com sucesso.` })
       }
     },
     onError: (error: Error) => {
@@ -267,7 +266,7 @@ export default function Suportes() {
         const { error: erroAjuste } = await supabase.rpc('ajustar_estoque_manual', {
           p_catalogo_id: catalogoId,
           p_quantidade: quantidade,
-          p_motivo: 'Devolução de suporte pelo instalador',
+          p_motivo: 'Devolução de acessório pelo instalador',
         })
         if (erroAjuste) throw erroAjuste
       }
@@ -363,8 +362,8 @@ export default function Suportes() {
     <AdminLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Controle de Suportes</h1>
-          <p className="text-gray-600 mt-2">Gerencie a entrega e uso de suportes de TV pelos instaladores</p>
+          <h1 className="text-3xl font-bold text-gray-900">Controle de Acessórios</h1>
+          <p className="text-gray-600 mt-2">Gerencie a entrega e uso de acessórios do inventário (suportes, cabos, controles etc.) pelos instaladores</p>
         </div>
 
         <Tabs defaultValue="entregar" className="w-full">
@@ -388,10 +387,10 @@ export default function Suportes() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Package className="w-5 h-5" />
-                  Entregar Suportes
+                  Entregar Acessórios
                 </CardTitle>
                 <CardDescription>
-                  Registre a entrega de suportes para um instalador — a baixa é feita direto no estoque
+                  Registre a entrega de um acessório do inventário para um instalador — a baixa é feita direto no estoque
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -423,7 +422,7 @@ export default function Suportes() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Modelo do suporte *</Label>
+                      <Label>Acessório *</Label>
                       <Select
                         value={formEntrega.catalogo_id}
                         onValueChange={(v) => setFormEntrega({ ...formEntrega, catalogo_id: v })}
@@ -442,7 +441,7 @@ export default function Suportes() {
                           })}
                           {catalogoSuportes.length === 0 && (
                             <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                              Nenhum modelo cadastrado no catálogo
+                              Nenhum acessório cadastrado no catálogo
                             </div>
                           )}
                         </SelectContent>
@@ -465,7 +464,7 @@ export default function Suportes() {
                     <Input
                       value={formEntrega.observacoes}
                       onChange={(e) => setFormEntrega({ ...formEntrega, observacoes: e.target.value })}
-                      placeholder="Ex: Suportes articulados 32-55"
+                      placeholder="Ex: Suportes articulados 32-55, cabo HDMI 2m"
                     />
                   </div>
 
@@ -482,7 +481,7 @@ export default function Suportes() {
               <CardHeader>
                 <CardTitle>Saldo por Instalador</CardTitle>
                 <CardDescription>
-                  Quantidade de suportes em mãos de cada instalador, por modelo
+                  Quantidade de acessórios em mãos de cada instalador, por item
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -510,7 +509,7 @@ export default function Suportes() {
                           {buckets.length === 0 && (
                             <TableRow>
                               <TableCell colSpan={3} className="pl-6 text-sm text-muted-foreground">
-                                Nenhum suporte em mãos
+                                Nenhum acessório em mãos
                               </TableCell>
                             </TableRow>
                           )}
@@ -559,7 +558,7 @@ export default function Suportes() {
               <CardHeader>
                 <CardTitle>Histórico de Movimentações</CardTitle>
                 <CardDescription>
-                  Últimas 100 movimentações de suportes
+                  Últimas 100 movimentações de acessórios
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -637,7 +636,7 @@ export default function Suportes() {
             <DialogHeader>
               <DialogTitle>Editar Movimentação</DialogTitle>
               <DialogDescription>
-                Altere os dados da movimentação de suportes
+                Altere os dados da movimentação de acessórios
               </DialogDescription>
             </DialogHeader>
 

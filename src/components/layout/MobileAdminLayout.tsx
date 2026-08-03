@@ -49,7 +49,7 @@ const moreItems = [
   { to: "/admin/follow-up", icon: PhoneCall, label: "Follow-Up" },
   { to: "/admin/clientes", icon: Users, label: "Clientes" },
   { to: "/admin/instaladores", icon: Users, label: "Instaladores" },
-  { to: "/admin/suportes", icon: Package, label: "Suportes" },
+  { to: "/admin/suportes", icon: Package, label: "Acessórios" },
   { to: "/admin/despesas", icon: Receipt, label: "Despesas" },
   { to: "/admin/relatorios", icon: BarChart3, label: "Relatórios" },
   { to: "/admin/marketing", icon: TrendingUp, label: "Marketing" },
