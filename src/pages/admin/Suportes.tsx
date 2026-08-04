@@ -45,6 +45,35 @@ interface Movimentacao {
   catalogo_servicos?: { nome: string } | null
 }
 
+interface EstoqueMovimento {
+  id: string
+  catalogo_id: string
+  tipo: 'baixa' | 'devolucao' | 'ajuste_entrada' | 'ajuste_saida'
+  quantidade: number
+  custo_total: number
+  observacoes: string | null
+  created_at: string
+  servico_id: string | null
+  servicos?: { codigo: string } | null
+}
+
+interface HistoricoItem {
+  id: string
+  origem: 'suporte' | 'estoque'
+  createdAt: string
+  dataExibicao: string
+  catalogoNome: string
+  tipoKey: string
+  tipoLabel: string
+  sinal: '+' | '-'
+  quantidade: number
+  instaladorNome: string | null
+  servicoCodigo: string | null
+  valorTotal: number | null
+  observacoes: string | null
+  original: Movimentacao | null
+}
+
 interface MovimentacaoSaldo {
   instalador_id: string
   catalogo_id: string | null
@@ -162,9 +191,27 @@ export default function Suportes() {
     },
   })
 
+  // Movimentos do estoque central (compras à parte, ficam em estoque_lotes) —
+  // baixas por venda em cotação/serviço e ajustes manuais de saldo. Não tem
+  // instalador vinculado (fica em movimentacoes_suportes quando tem), por
+  // isso entram no histórico unificado como uma origem separada.
+  const estoqueMovimentosQuery = useQuery({
+    queryKey: ['estoque-movimentos-historico'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('estoque_movimentos')
+        .select('id, catalogo_id, tipo, quantidade, custo_total, observacoes, created_at, servico_id, servicos(codigo)')
+        .order('created_at', { ascending: false })
+        .limit(100)
+      if (error) throw error
+      return (data || []) as EstoqueMovimento[]
+    },
+  })
+
   const instaladores = instaladoresQuery.data ?? []
   const catalogoSuportes = catalogoSuportesQuery.data ?? []
   const movimentacoes = historicoQuery.data ?? []
+  const estoqueMovimentos = estoqueMovimentosQuery.data ?? []
 
   const saldoCentralPorCatalogo = useMemo(() => {
     const mapa: Record<string, number> = {}
@@ -173,6 +220,56 @@ export default function Suportes() {
   }, [saldoCentralQuery.data])
 
   const nomeCatalogo = (id: string) => catalogoSuportes.find((c) => c.id === id)?.nome ?? 'Modelo removido'
+
+  const TIPO_LABELS: Record<string, string> = {
+    entrega: 'Entrega',
+    devolucao: 'Devolução',
+    uso: 'Uso',
+    baixa: 'Baixa (venda/uso)',
+    ajuste_entrada: 'Ajuste entrada',
+    ajuste_saida: 'Ajuste saída',
+  }
+
+  const historicoUnificado = useMemo<HistoricoItem[]>(() => {
+    const doSuporte: HistoricoItem[] = movimentacoes.map((mov) => ({
+      id: `suporte-${mov.id}`,
+      origem: 'suporte',
+      createdAt: mov.created_at,
+      dataExibicao: mov.data_movimento,
+      catalogoNome: mov.catalogo_servicos?.nome ?? (mov.catalogo_id ? nomeCatalogo(mov.catalogo_id) : '—'),
+      tipoKey: mov.tipo_movimento,
+      tipoLabel: TIPO_LABELS[mov.tipo_movimento] ?? mov.tipo_movimento,
+      sinal: mov.tipo_movimento === 'entrega' ? '+' : '-',
+      quantidade: mov.quantidade,
+      instaladorNome: mov.usuarios?.nome ?? null,
+      servicoCodigo: mov.servicos?.codigo ?? null,
+      valorTotal: mov.valor_unitario ? mov.valor_unitario * mov.quantidade : null,
+      observacoes: mov.observacoes,
+      original: mov,
+    }))
+
+    const doEstoque: HistoricoItem[] = estoqueMovimentos.map((mov) => ({
+      id: `estoque-${mov.id}`,
+      origem: 'estoque',
+      createdAt: mov.created_at,
+      dataExibicao: new Date(mov.created_at).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }),
+      catalogoNome: nomeCatalogo(mov.catalogo_id),
+      tipoKey: mov.tipo,
+      tipoLabel: TIPO_LABELS[mov.tipo] ?? mov.tipo,
+      sinal: mov.tipo === 'ajuste_entrada' || mov.tipo === 'devolucao' ? '+' : '-',
+      quantidade: mov.quantidade,
+      instaladorNome: null,
+      servicoCodigo: mov.servicos?.codigo ?? null,
+      valorTotal: mov.custo_total,
+      observacoes: mov.observacoes,
+      original: null,
+    }))
+
+    return [...doSuporte, ...doEstoque].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [movimentacoes, estoqueMovimentos, catalogoSuportes])
 
   const saldosPorInstalador = useMemo(() => {
     const mapa: Record<string, Record<string, BucketSaldo>> = {}
@@ -207,6 +304,7 @@ export default function Suportes() {
     qc.invalidateQueries({ queryKey: ['movimentacoes-suportes-saldo'] })
     qc.invalidateQueries({ queryKey: ['movimentacoes-suportes-historico'] })
     qc.invalidateQueries({ queryKey: ['estoque-saldo-suportes'] })
+    qc.invalidateQueries({ queryKey: ['estoque-movimentos-historico'] })
   }
 
   const registrarEntrega = useMutation({
@@ -321,16 +419,22 @@ export default function Suportes() {
     },
   })
 
-  const getTipoMovimentoBadge = (tipo: string) => {
+  const getTipoMovimentoBadge = (tipo: string, label?: string) => {
     switch (tipo) {
       case 'entrega':
-        return <Badge className="bg-green-500/20 text-green-700 hover:bg-green-500/20 border-green-500/30">Entrega</Badge>
+        return <Badge className="bg-green-500/20 text-green-700 hover:bg-green-500/20 border-green-500/30">{label ?? 'Entrega'}</Badge>
       case 'devolucao':
-        return <Badge className="bg-blue-500/20 text-blue-700 hover:bg-blue-500/20 border-blue-500/30">Devolução</Badge>
+        return <Badge className="bg-blue-500/20 text-blue-700 hover:bg-blue-500/20 border-blue-500/30">{label ?? 'Devolução'}</Badge>
       case 'uso':
-        return <Badge className="bg-orange-500/20 text-orange-700 hover:bg-orange-500/20 border-orange-500/30">Uso</Badge>
+        return <Badge className="bg-orange-500/20 text-orange-700 hover:bg-orange-500/20 border-orange-500/30">{label ?? 'Uso'}</Badge>
+      case 'baixa':
+        return <Badge className="bg-red-500/20 text-red-700 hover:bg-red-500/20 border-red-500/30">{label ?? 'Baixa'}</Badge>
+      case 'ajuste_entrada':
+        return <Badge className="bg-emerald-500/20 text-emerald-700 hover:bg-emerald-500/20 border-emerald-500/30">{label ?? 'Ajuste entrada'}</Badge>
+      case 'ajuste_saida':
+        return <Badge className="bg-red-500/20 text-red-700 hover:bg-red-500/20 border-red-500/30">{label ?? 'Ajuste saída'}</Badge>
       default:
-        return <Badge variant="outline">{tipo}</Badge>
+        return <Badge variant="outline">{label ?? tipo}</Badge>
     }
   }
 
@@ -614,7 +718,8 @@ export default function Suportes() {
               <CardHeader>
                 <CardTitle>Histórico de Movimentações</CardTitle>
                 <CardDescription>
-                  Últimas 100 movimentações de acessórios
+                  Todas as movimentações de acessórios — entregas/devoluções/uso de instaladores e
+                  baixas/ajustes direto no estoque central (vendas em cotação, ajustes manuais)
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -622,59 +727,55 @@ export default function Suportes() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Data</TableHead>
-                      <TableHead>Instalador</TableHead>
-                      <TableHead>Modelo</TableHead>
+                      <TableHead>Instalador / Serviço</TableHead>
+                      <TableHead>Item</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead className="text-center">Qtd</TableHead>
-                      <TableHead className="text-right">Valor Unit.</TableHead>
-                      <TableHead>Serviço</TableHead>
+                      <TableHead className="text-right">Valor</TableHead>
                       <TableHead>Observações</TableHead>
                       <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {movimentacoes.map((mov) => (
-                      <TableRow key={mov.id}>
+                    {historicoUnificado.map((item) => (
+                      <TableRow key={item.id}>
                         <TableCell>
-                          {format(parseISO(mov.data_movimento), 'dd/MM/yyyy', { locale: ptBR })}
+                          {format(parseISO(item.dataExibicao), 'dd/MM/yyyy', { locale: ptBR })}
                         </TableCell>
                         <TableCell className="font-medium">
-                          {mov.usuarios?.nome || '-'}
+                          {item.instaladorNome || item.servicoCodigo || '-'}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {mov.catalogo_servicos?.nome || '—'}
+                          {item.catalogoNome}
                         </TableCell>
                         <TableCell>
-                          {getTipoMovimentoBadge(mov.tipo_movimento)}
+                          {getTipoMovimentoBadge(item.tipoKey, item.tipoLabel)}
                         </TableCell>
                         <TableCell className="text-center font-medium">
-                          {mov.tipo_movimento === 'entrega' ? '+' : '-'}{mov.quantidade}
+                          {item.sinal}{item.quantidade}
                         </TableCell>
                         <TableCell className="text-right">
-                          {mov.valor_unitario && mov.valor_unitario > 0
-                            ? `R$ ${mov.valor_unitario.toFixed(2)}`
-                            : '-'}
-                        </TableCell>
-                        <TableCell>
-                          {mov.servicos?.codigo || '-'}
+                          {item.valorTotal ? `R$ ${item.valorTotal.toFixed(2)}` : '-'}
                         </TableCell>
                         <TableCell className="text-muted-foreground max-w-[200px] truncate">
-                          {mov.observacoes || '-'}
+                          {item.observacoes || '-'}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => abrirModalEdicao(mov)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
+                          {item.original && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => abrirModalEdicao(item.original!)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
-                    {movimentacoes.length === 0 && (
+                    {historicoUnificado.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                           Nenhuma movimentação registrada
                         </TableCell>
                       </TableRow>
