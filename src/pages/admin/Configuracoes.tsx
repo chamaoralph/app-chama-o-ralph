@@ -7,8 +7,6 @@ import { RFMConfigCard } from '@/components/admin/RFMConfigCard'
 import { TelefonesBloqueadosCard } from '@/components/admin/TelefonesBloqueadosCard'
 import { BackupStorageCard } from '@/components/admin/BackupStorageCard'
 import { TabelaPrecosTVCard } from '@/components/admin/TabelaPrecosTVCard'
-import CatalogoPrecos from '@/components/admin/CatalogoPrecos'
-import EstoqueAcessorios from '@/components/admin/EstoqueAcessorios'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -35,7 +33,6 @@ import {
 } from '@/components/ui/table'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 
 interface TipoServico {
   id: string
@@ -310,14 +307,7 @@ export default function Configuracoes() {
       <div className="max-w-4xl">
         <h1 className="text-3xl font-bold text-gray-900 mb-6">⚙️ Configurações</h1>
 
-        <Tabs defaultValue="geral" className="w-full">
-          <TabsList className="w-full justify-start overflow-x-auto">
-            <TabsTrigger value="geral">Geral</TabsTrigger>
-            <TabsTrigger value="catalogo">Catálogo de Orçamento</TabsTrigger>
-            <TabsTrigger value="estoque">Estoque de Acessórios</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="geral" className="mt-6">
+        <div>
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -488,37 +478,7 @@ export default function Configuracoes() {
                 </CardDescription>
               </CardHeader>
             </Card>
-          </TabsContent>
-
-          <TabsContent value="catalogo" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Catálogo de Orçamento</CardTitle>
-                <CardDescription>
-                  Preços e itens usados no orçamento na hora do instalador, além do
-                  desconto padrão de "fechar agora"
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <CatalogoPrecos />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="estoque" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Estoque de Acessórios</CardTitle>
-                <CardDescription>
-                  Compras, saldo atual e histórico de movimentos dos acessórios
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <EstoqueAcessorios />
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+        </div>
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

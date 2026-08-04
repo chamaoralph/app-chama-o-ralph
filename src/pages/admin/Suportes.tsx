@@ -13,9 +13,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Package, Plus, History, Users, Pencil } from 'lucide-react'
-import { format } from 'date-fns'
+import { Package, Plus, History, Users, Pencil, ListTree, Boxes } from 'lucide-react'
+import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import CatalogoPrecos from '@/components/admin/CatalogoPrecos'
+import EstoqueAcessorios from '@/components/admin/EstoqueAcessorios'
 
 interface Instalador {
   id: string
@@ -57,6 +59,8 @@ interface BucketSaldo {
 }
 
 const BAIXA_FIFO_RESULT_VAZIO = { custo_total: 0, qtd_atendida: 0, qtd_faltante: 0 }
+
+const hojeBrasilia = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
 
 export default function Suportes() {
   const { user } = useAuth()
@@ -235,7 +239,7 @@ export default function Suportes() {
         tipo_movimento: 'entrega',
         valor_unitario: qtd_atendida > 0 ? Number((custo_total / qtd_atendida).toFixed(2)) : 0,
         observacoes: formEntrega.observacoes || null,
-        data_movimento: new Date().toISOString().split('T')[0],
+        data_movimento: hojeBrasilia(),
       })
       if (erroInsert) throw erroInsert
 
@@ -277,13 +281,40 @@ export default function Suportes() {
         catalogo_id: catalogoId,
         quantidade,
         tipo_movimento: 'devolucao',
-        data_movimento: new Date().toISOString().split('T')[0],
+        data_movimento: hojeBrasilia(),
       })
       if (error) throw error
     },
     onSuccess: () => {
       invalidarTudo()
       toast({ title: '✅ Devolução registrada!' })
+    },
+    onError: (error: Error) => {
+      toast({ title: '❌ Erro', description: error.message, variant: 'destructive' })
+    },
+  })
+
+  // Baixa manual: tira do saldo do instalador sem devolver a peça ao estoque
+  // central (perda, quebra, extravio) — mesmo tipo_movimento 'uso' que a baixa
+  // automática na aprovação de serviço, só que lançada manualmente pelo admin.
+  const registrarBaixaManual = useMutation({
+    mutationFn: async ({ instaladorId, catalogoId, quantidade, motivo }: { instaladorId: string; catalogoId: string | null; quantidade: number; motivo: string }) => {
+      if (!empresaQuery.data) throw new Error('Empresa não encontrada.')
+
+      const { error } = await supabase.from('movimentacoes_suportes').insert({
+        empresa_id: empresaQuery.data,
+        instalador_id: instaladorId,
+        catalogo_id: catalogoId,
+        quantidade,
+        tipo_movimento: 'uso',
+        observacoes: motivo,
+        data_movimento: hojeBrasilia(),
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      invalidarTudo()
+      toast({ title: '✅ Baixa manual registrada!' })
     },
     onError: (error: Error) => {
       toast({ title: '❌ Erro', description: error.message, variant: 'destructive' })
@@ -367,7 +398,7 @@ export default function Suportes() {
         </div>
 
         <Tabs defaultValue="entregar" className="w-full">
-          <TabsList className="grid w-full max-w-lg grid-cols-3">
+          <TabsList className="w-full max-w-3xl grid grid-cols-5">
             <TabsTrigger value="entregar" className="gap-2">
               <Plus className="w-4 h-4" />
               Entregar
@@ -379,6 +410,14 @@ export default function Suportes() {
             <TabsTrigger value="historico" className="gap-2">
               <History className="w-4 h-4" />
               Histórico
+            </TabsTrigger>
+            <TabsTrigger value="catalogo" className="gap-2">
+              <ListTree className="w-4 h-4" />
+              Catálogo
+            </TabsTrigger>
+            <TabsTrigger value="estoque" className="gap-2">
+              <Boxes className="w-4 h-4" />
+              Estoque
             </TabsTrigger>
           </TabsList>
 
@@ -519,20 +558,37 @@ export default function Suportes() {
                               <TableCell className="text-center">{b.saldo}</TableCell>
                               <TableCell className="text-right">
                                 {b.saldo > 0 && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={registrarDevolucao.isPending}
-                                    onClick={() => {
-                                      const qtd = prompt(`Quantos "${b.label}" devolver?`, '1')
-                                      const quantidade = qtd ? parseInt(qtd, 10) : 0
-                                      if (quantidade > 0) {
-                                        registrarDevolucao.mutate({ instaladorId: inst.id, catalogoId: b.catalogoId, quantidade })
-                                      }
-                                    }}
-                                  >
-                                    Devolver
-                                  </Button>
+                                  <div className="flex justify-end gap-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      disabled={registrarDevolucao.isPending}
+                                      onClick={() => {
+                                        const qtd = prompt(`Quantos "${b.label}" devolver?`, '1')
+                                        const quantidade = qtd ? parseInt(qtd, 10) : 0
+                                        if (quantidade > 0) {
+                                          registrarDevolucao.mutate({ instaladorId: inst.id, catalogoId: b.catalogoId, quantidade })
+                                        }
+                                      }}
+                                    >
+                                      Devolver
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      disabled={registrarBaixaManual.isPending}
+                                      onClick={() => {
+                                        const qtd = prompt(`Quantos "${b.label}" dar baixa (perda/quebra, sem devolver ao estoque)?`, '1')
+                                        const quantidade = qtd ? parseInt(qtd, 10) : 0
+                                        if (quantidade <= 0) return
+                                        const motivo = prompt('Motivo da baixa (ex: quebra, extravio):')
+                                        if (!motivo || !motivo.trim()) return
+                                        registrarBaixaManual.mutate({ instaladorId: inst.id, catalogoId: b.catalogoId, quantidade, motivo: motivo.trim() })
+                                      }}
+                                    >
+                                      Baixa manual
+                                    </Button>
+                                  </div>
                                 )}
                               </TableCell>
                             </TableRow>
@@ -580,7 +636,7 @@ export default function Suportes() {
                     {movimentacoes.map((mov) => (
                       <TableRow key={mov.id}>
                         <TableCell>
-                          {format(new Date(mov.data_movimento), 'dd/MM/yyyy', { locale: ptBR })}
+                          {format(parseISO(mov.data_movimento), 'dd/MM/yyyy', { locale: ptBR })}
                         </TableCell>
                         <TableCell className="font-medium">
                           {mov.usuarios?.nome || '-'}
@@ -628,6 +684,35 @@ export default function Suportes() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="catalogo" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Catálogo de Orçamento</CardTitle>
+                <CardDescription>
+                  Preços e itens usados no orçamento na hora do instalador, além do
+                  desconto padrão de "fechar agora"
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <CatalogoPrecos />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="estoque" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Estoque de Acessórios</CardTitle>
+                <CardDescription>
+                  Compras, saldo atual e histórico de movimentos dos acessórios
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <EstoqueAcessorios />
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
 
         {/* Modal de Edição */}
@@ -658,7 +743,7 @@ export default function Suportes() {
                   <div>
                     <span className="text-muted-foreground">Data:</span>
                     <p className="font-medium">
-                      {format(new Date(editando.data_movimento), 'dd/MM/yyyy', { locale: ptBR })}
+                      {format(parseISO(editando.data_movimento), 'dd/MM/yyyy', { locale: ptBR })}
                     </p>
                   </div>
                 </div>

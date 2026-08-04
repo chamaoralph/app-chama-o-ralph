@@ -7,6 +7,7 @@ export const TAMANHOS_TV = [
   { value: "58_65", label: '58" – 65"' },
   { value: "70_75", label: '70" – 75"' },
   { value: "85", label: '85"' },
+  { value: "98_100", label: '98" – 100"' },
 ] as const;
 
 export const TIPOS_PAREDE = [

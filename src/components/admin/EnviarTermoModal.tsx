@@ -32,6 +32,7 @@ const TAMANHO_PARA_POLEGADAS: Record<string, string> = {
   "58_65": "65",
   "70_75": "75",
   "85": "85",
+  "98_100": "100",
 };
 
 interface TVFormItem {

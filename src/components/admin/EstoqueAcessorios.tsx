@@ -101,7 +101,7 @@ export default function EstoqueAcessorios() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("estoque_movimentos")
-        .select("id, catalogo_id, tipo, quantidade, custo_total, observacoes, created_at")
+        .select("id, catalogo_id, tipo, quantidade, custo_total, observacoes, created_at, servico_id, servicos(codigo)")
         .order("created_at", { ascending: false })
         .limit(50);
       if (error) throw error;
@@ -113,6 +113,8 @@ export default function EstoqueAcessorios() {
         custo_total: number;
         observacoes: string | null;
         created_at: string;
+        servico_id: string | null;
+        servicos: { codigo: string } | null;
       }[];
     },
   });
@@ -439,6 +441,11 @@ export default function EstoqueAcessorios() {
                       >
                         {rotulo}
                       </span>
+                      {m.servicos?.codigo && (
+                        <span className="ml-2 text-xs font-medium text-primary">
+                          {m.servicos.codigo}
+                        </span>
+                      )}
                       {m.observacoes && (
                         <div className="truncate text-xs text-muted-foreground">
                           {m.observacoes}
