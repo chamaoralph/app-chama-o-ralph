@@ -221,6 +221,14 @@ export default function Suportes() {
 
   const nomeCatalogo = (id: string) => catalogoSuportes.find((c) => c.id === id)?.nome ?? 'Modelo removido'
 
+  // Item do catálogo usado como "dono" das movimentações sem catalogo_id (uso
+  // de suporte próprio do instalador baixado automaticamente na aprovação, ou
+  // lançamentos antigos de antes da coluna catalogo_id existir) — na prática
+  // sempre é este modelo. Unifica o saldo delas com o bucket real do catálogo
+  // em vez de mostrar duas linhas "Suporte Fixo Universal" separadas.
+  const catalogoFixoUniversalId =
+    catalogoSuportes.find((c) => c.nome.toLowerCase().includes('suporte fixo universal'))?.id ?? null
+
   const TIPO_LABELS: Record<string, string> = {
     entrega: 'Entrega',
     devolucao: 'Devolução',
@@ -274,17 +282,17 @@ export default function Suportes() {
   const saldosPorInstalador = useMemo(() => {
     const mapa: Record<string, Record<string, BucketSaldo>> = {}
     for (const mov of movimentacoesSaldoQuery.data ?? []) {
-      const chave = mov.catalogo_id ?? '__sem_modelo__'
+      // Movimentações sem catalogo_id (uso de suporte próprio do instalador
+      // baixado automaticamente na aprovação, ou lançamentos antigos) entram
+      // no mesmo bucket do item real "Suporte Fixo Universal" do catálogo,
+      // quando ele existe — evita duas linhas separadas com o mesmo nome.
+      const catalogoIdEfetivo = mov.catalogo_id ?? catalogoFixoUniversalId
+      const chave = catalogoIdEfetivo ?? '__sem_modelo__'
       if (!mapa[mov.instalador_id]) mapa[mov.instalador_id] = {}
       if (!mapa[mov.instalador_id][chave]) {
         mapa[mov.instalador_id][chave] = {
-          catalogoId: mov.catalogo_id,
-          // Movimentações sem catalogo_id são, na prática, sempre o suporte fixo
-          // universal (baixa automática de suporte próprio do instalador na
-          // aprovação, ou lançamentos antigos de antes do catálogo existir) —
-          // mantém catalogoId null de propósito: são suportes que nunca vieram
-          // do estoque central, então "Devolver" não deve repor estoque_saldo.
-          label: mov.catalogo_id ? nomeCatalogo(mov.catalogo_id) : 'Suporte Fixo Universal',
+          catalogoId: catalogoIdEfetivo,
+          label: catalogoIdEfetivo ? nomeCatalogo(catalogoIdEfetivo) : 'Suporte Fixo Universal',
           saldo: 0,
         }
       }
