@@ -279,7 +279,12 @@ export default function Suportes() {
       if (!mapa[mov.instalador_id][chave]) {
         mapa[mov.instalador_id][chave] = {
           catalogoId: mov.catalogo_id,
-          label: mov.catalogo_id ? nomeCatalogo(mov.catalogo_id) : 'Não especificado',
+          // Movimentações sem catalogo_id são, na prática, sempre o suporte fixo
+          // universal (baixa automática de suporte próprio do instalador na
+          // aprovação, ou lançamentos antigos de antes do catálogo existir) —
+          // mantém catalogoId null de propósito: são suportes que nunca vieram
+          // do estoque central, então "Devolver" não deve repor estoque_saldo.
+          label: mov.catalogo_id ? nomeCatalogo(mov.catalogo_id) : 'Suporte Fixo Universal',
           saldo: 0,
         }
       }
