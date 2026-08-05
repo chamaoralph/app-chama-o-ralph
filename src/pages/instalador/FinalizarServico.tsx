@@ -101,7 +101,6 @@ export default function FinalizarServico() {
   // --- Extras (acessórios vendidos na finalização) ---
   const [quantidadesExtras, setQuantidadesExtras] = useState<Record<string, number>>({});
   const [fornecedoresExtras, setFornecedoresExtras] = useState<Record<string, Fornecedor>>({});
-  const [custosInstaladorExtras, setCustosInstaladorExtras] = useState<Record<string, string>>({});
 
   const { data: catalogoAcessorios } = useQuery({
     queryKey: ["catalogo-acessorios-extra"],
@@ -133,6 +132,50 @@ export default function FinalizarServico() {
     (saldosEstoqueExtras ?? []).forEach((s) => { mapa[s.catalogo_id] = s.saldo; });
     return mapa;
   }, [saldosEstoqueExtras]);
+
+  // --- Saldo PRÓPRIO do instalador (o mesmo controlado em /admin/suportes) ---
+  // Usado quando ele marca "Eu forneci" num extra: em vez de digitar um custo
+  // à mão pra qualquer acessório do catálogo, só deixa escolher o que ele
+  // realmente tem em mãos, com o custo médio do que pagou nas entregas.
+  const { data: movimentacoesProprias } = useQuery({
+    queryKey: ["movimentacoes-suportes-proprio"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+      const { data, error } = await supabase
+        .from("movimentacoes_suportes")
+        .select("catalogo_id, tipo_movimento, quantidade, valor_unitario")
+        .eq("instalador_id", user.id);
+      if (error) throw error;
+      return (data || []) as {
+        catalogo_id: string | null;
+        tipo_movimento: string;
+        quantidade: number;
+        valor_unitario: number | null;
+      }[];
+    },
+  });
+
+  const { saldoInstaladorPorId, custoMedioInstaladorPorId } = useMemo(() => {
+    const saldo: Record<string, number> = {};
+    const custoTotal: Record<string, number> = {};
+    const qtdRecebida: Record<string, number> = {};
+    (movimentacoesProprias ?? []).forEach((m) => {
+      if (!m.catalogo_id) return;
+      if (m.tipo_movimento === "entrega") {
+        saldo[m.catalogo_id] = (saldo[m.catalogo_id] ?? 0) + m.quantidade;
+        custoTotal[m.catalogo_id] = (custoTotal[m.catalogo_id] ?? 0) + (m.valor_unitario ?? 0) * m.quantidade;
+        qtdRecebida[m.catalogo_id] = (qtdRecebida[m.catalogo_id] ?? 0) + m.quantidade;
+      } else if (m.tipo_movimento === "devolucao" || m.tipo_movimento === "uso") {
+        saldo[m.catalogo_id] = (saldo[m.catalogo_id] ?? 0) - m.quantidade;
+      }
+    });
+    const custoMedio: Record<string, number> = {};
+    Object.keys(qtdRecebida).forEach((id) => {
+      custoMedio[id] = qtdRecebida[id] > 0 ? custoTotal[id] / qtdRecebida[id] : 0;
+    });
+    return { saldoInstaladorPorId: saldo, custoMedioInstaladorPorId: custoMedio };
+  }, [movimentacoesProprias]);
 
   // --- Garantia Total: suporte fixo universal usado na instalação ---
   const isGarantiaTotal = servico?.cotacoes?.tv_cobertura === "total";
@@ -207,19 +250,20 @@ export default function FinalizarServico() {
         const fornecedor = fornecedoresExtras[c.id] as Fornecedor;
         const custo =
           fornecedor === "instalador"
-            ? parseFloat(custosInstaladorExtras[c.id] || "0") || 0
+            ? custoMedioInstaladorPorId[c.id] ?? 0
             : custoEstoqueExtraPorId[c.id]?.valor ?? 0;
         return { ...montarItem(c, quantidadesExtras[c.id] ?? 1), custo, fornecedor };
       });
-  }, [catalogoAcessorios, quantidadesExtras, fornecedoresExtras, custosInstaladorExtras, custoEstoqueExtraPorId]);
+  }, [catalogoAcessorios, quantidadesExtras, fornecedoresExtras, custoMedioInstaladorPorId, custoEstoqueExtraPorId]);
 
-  // Acessório sem fornecedor escolhido, sem estoque (empresa) ou sem custo digitado (instalador) — bloqueia envio
+  // Acessório sem fornecedor escolhido, sem estoque (empresa) ou além do que
+  // o instalador tem em mãos (instalador) — bloqueia envio
   const extraComProblema = acessoriosExtrasSelecionados.some((a) => {
     if (!a.fornecedor) return true;
     if (a.fornecedor === "empresa") {
       return (saldoExtraPorId[a.catalogo_id] ?? 0) <= 0 || custoEstoqueExtraPorId[a.catalogo_id]?.valor == null;
     }
-    return !custosInstaladorExtras[a.catalogo_id]?.trim();
+    return a.quantidade > (saldoInstaladorPorId[a.catalogo_id] ?? 0);
   });
 
   const extrasNovos = useMemo(
@@ -237,7 +281,6 @@ export default function FinalizarServico() {
       if (novo <= 0) {
         delete next[catalogoId];
         setFornecedoresExtras((f) => { const n = { ...f }; delete n[catalogoId]; return n; });
-        setCustosInstaladorExtras((c) => { const n = { ...c }; delete n[catalogoId]; return n; });
       } else next[catalogoId] = novo;
       return next;
     });
@@ -593,6 +636,9 @@ export default function FinalizarServico() {
                 const fornecedorEscolhido = fornecedoresExtras[item.id];
                 const semEstoque = (saldoExtraPorId[item.id] ?? 0) <= 0;
                 const custoEmpresaInfo = custoEstoqueExtraPorId[item.id];
+                const saldoProprio = saldoInstaladorPorId[item.id] ?? 0;
+                const semEstoqueProprio = saldoProprio <= 0;
+                const excedeSaldoProprio = (qtd ?? 0) > saldoProprio;
                 return (
                   <div key={item.id} className="border rounded-md p-3">
                     <div className="flex items-center justify-between gap-3">
@@ -633,8 +679,9 @@ export default function FinalizarServico() {
                           </button>
                           <button
                             type="button"
+                            disabled={semEstoqueProprio}
                             onClick={() => setFornecedoresExtras((f) => ({ ...f, [item.id]: "instalador" }))}
-                            className={`h-7 px-3 rounded-md text-xs border ${fornecedorEscolhido === "instalador" ? "bg-blue-600 text-white border-blue-600" : ""}`}
+                            className={`h-7 px-3 rounded-md text-xs border disabled:opacity-40 ${fornecedorEscolhido === "instalador" ? "bg-blue-600 text-white border-blue-600" : ""}`}
                           >
                             Eu forneci
                           </button>
@@ -644,7 +691,10 @@ export default function FinalizarServico() {
                         </div>
 
                         {semEstoque && (
-                          <p className="text-xs text-amber-600">Sem estoque — venda apenas se você forneceu</p>
+                          <p className="text-xs text-amber-600">Sem estoque da empresa — venda apenas se você forneceu</p>
+                        )}
+                        {semEstoqueProprio && (
+                          <p className="text-xs text-amber-600">Você não tem este item em mãos (confira em Controle de Acessórios)</p>
                         )}
 
                         {fornecedorEscolhido === "empresa" && !semEstoque && (
@@ -657,21 +707,12 @@ export default function FinalizarServico() {
                           </p>
                         )}
 
-                        {fornecedorEscolhido === "instalador" && (
-                          <div className="flex items-center gap-2">
-                            <label className="text-xs text-muted-foreground">Custo que você pagou (R$)</label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={custosInstaladorExtras[item.id] ?? ""}
-                              onChange={(e) =>
-                                setCustosInstaladorExtras((c) => ({ ...c, [item.id]: e.target.value }))
-                              }
-                              className="h-7 w-24 border rounded-md px-2 text-right text-sm"
-                              placeholder="0,00"
-                            />
-                          </div>
+                        {fornecedorEscolhido === "instalador" && !semEstoqueProprio && (
+                          <p className={`text-xs ${excedeSaldoProprio ? "text-amber-600" : "text-muted-foreground"}`}>
+                            custo {formatarBRL(custoMedioInstaladorPorId[item.id] ?? 0)} — do que você tem em mãos
+                            {" "}({saldoProprio} {saldoProprio === 1 ? "disponível" : "disponíveis"})
+                            {excedeSaldoProprio && " — reduza a quantidade, você não tem tudo isso"}
+                          </p>
                         )}
                       </div>
                     )}

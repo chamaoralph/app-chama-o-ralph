@@ -67,6 +67,7 @@ interface Servico {
   usou_suporte_garantia_total: boolean
   estoque_suporte_garantia_baixado: boolean
   estoque_suporte_instalador_baixado: boolean
+  estoque_extras_instalador_baixado: boolean
   fotos_conclusao: string[]
   nota_fiscal_url: string | null
   observacoes_instalador: string | null
@@ -348,6 +349,21 @@ export default function Aprovacoes() {
         ? contarSuportesInstalador(servicoAtual)
         : 0
 
+      // Acessórios "Extras" vendidos NA FINALIZAÇÃO com fornecedor = instalador
+      // (peça própria dele, vinda do saldo controlado em /admin/suportes) —
+      // dá baixa real no saldo dele aqui, uma única vez (guard igual ao
+      // suporte de TV acima, evita duplicar em desaprovar+reaprovar).
+      const precisaBaixarExtrasInstalador =
+        !!servicoAtual?.instalador_id && !servicoAtual?.estoque_extras_instalador_baixado
+      const extrasInstaladorPorCatalogo = precisaBaixarExtrasInstalador && servicoAtual
+        ? (servicoAtual.acessorios_vendidos || []).reduce((mapa, item) => {
+            if (item.origem === 'finalizacao' && item.fornecedor === 'instalador' && item.catalogo_id) {
+              mapa[item.catalogo_id] = (mapa[item.catalogo_id] ?? 0) + item.quantidade
+            }
+            return mapa
+          }, {} as Record<string, number>)
+        : {}
+
       const updatePayload: Record<string, unknown> = {
         status: 'concluido',
         valor_total: parseFloat(valor_total) || 0,
@@ -387,6 +403,25 @@ export default function Aprovacoes() {
           })
         if (erroBaixaSuporteInstalador) throw erroBaixaSuporteInstalador
         updatePayload.estoque_suporte_instalador_baixado = true
+      }
+
+      const catalogoIdsExtrasInstalador = Object.keys(extrasInstaladorPorCatalogo)
+      if (catalogoIdsExtrasInstalador.length > 0 && servicoAtual) {
+        const { error: erroBaixaExtrasInstalador } = await supabase
+          .from('movimentacoes_suportes')
+          .insert(
+            catalogoIdsExtrasInstalador.map((catalogoId) => ({
+              empresa_id: servicoAtual.empresa_id,
+              instalador_id: servicoAtual.instalador_id,
+              catalogo_id: catalogoId,
+              quantidade: extrasInstaladorPorCatalogo[catalogoId],
+              tipo_movimento: 'uso',
+              servico_id: servicoId,
+              observacoes: `Baixa automática (extra vendido) na aprovação do serviço ${servicoAtual.codigo}`,
+            }))
+          )
+        if (erroBaixaExtrasInstalador) throw erroBaixaExtrasInstalador
+        updatePayload.estoque_extras_instalador_baixado = true
       }
 
       const { data, error } = await supabase
