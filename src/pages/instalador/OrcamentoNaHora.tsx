@@ -352,7 +352,7 @@ export default function OrcamentoNaHora() {
       setResultadoFinal("aprovada");
       toast({
         title: "Aprovado!",
-        description: "O serviço foi criado e atribuído a você.",
+        description: "Adicionado ao seu serviço em andamento.",
       });
     },
     onError: (e: Error) =>
