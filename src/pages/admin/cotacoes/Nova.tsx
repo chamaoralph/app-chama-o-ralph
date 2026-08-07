@@ -47,6 +47,7 @@ export default function NovaCotacao() {
   const [itensExtras, setItensExtras] = useState<ItemExtra[]>([])
   const [catalogoAcessorios, setCatalogoAcessorios] = useState<CatalogoItem[]>([])
   const [estoqueSaldos, setEstoqueSaldos] = useState<Record<string, number>>({})
+  const [custosAcessorios, setCustosAcessorios] = useState<Record<string, number>>({})
   const [buscandoCep, setBuscandoCep] = useState(false)
   const [cepErro, setCepErro] = useState(false)
 
@@ -119,10 +120,29 @@ export default function NovaCotacao() {
       }
       setEstoqueSaldos(mapa)
     }
+    // Custo REAL do acessório (lote mais antigo com saldo, mesma regra de
+    // custo_atual_acessorio() e baixar_estoque_fifo()) — catalogo_servicos.custo
+    // é um campo estático que não reflete o estoque de verdade, então não pode
+    // ser usado pra calcular o repasse 70/30 aqui.
+    async function fetchCustosAcessorios() {
+      const { data } = await supabase
+        .from('estoque_lotes')
+        .select('catalogo_id, custo_unitario')
+        .gt('qtd_restante', 0)
+        .order('data_compra', { ascending: true })
+        .order('created_at', { ascending: true })
+
+      const mapa: Record<string, number> = {}
+      for (const lote of (data || []) as { catalogo_id: string; custo_unitario: number }[]) {
+        if (mapa[lote.catalogo_id] === undefined) mapa[lote.catalogo_id] = lote.custo_unitario
+      }
+      setCustosAcessorios(mapa)
+    }
     fetchTiposServico()
     fetchEmpresa()
     fetchAcessorios()
     fetchEstoqueSaldos()
+    fetchCustosAcessorios()
   }, [])
 
   const isInstalacaoTV = ehInstalacaoTV(formData.tipo_servico)
@@ -619,13 +639,14 @@ export default function NovaCotacao() {
                           if (!item) return
                           const quantidade = 1
                           const valor = item.preco * quantidade
-                          const repasse = calcularRepasseAcessorio(valor, item.custo * quantidade, 'empresa')
+                          const custoReal = custosAcessorios[item.id] ?? item.custo
+                          const repasse = calcularRepasseAcessorio(valor, custoReal * quantidade, 'empresa')
                           setItensExtras(prev => [...prev, {
                             id: `${Date.now()}`,
                             descricao: item.nome,
                             valor: valor.toString(),
                             catalogoId: item.id,
-                            custoUnitario: item.custo,
+                            custoUnitario: custoReal,
                             quantidade,
                             fornecedor: 'empresa',
                             repasseInstalador: repasse.repasse_instalador,

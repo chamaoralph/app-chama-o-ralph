@@ -11,7 +11,7 @@
 4. Substitua `SEU_EMPRESA_ID` pelo ID da sua empresa no sistema
 5. Substitua `SEU_TOKEN_AQUI` pelo token que você cadastrou
 6. Salve e autorize o script
-7. Configure a frequência: **Diariamente**
+7. Configure a frequência: **De hora em hora** (mantém os números do dashboard bem mais atualizados do que 1x/dia; cliques/impressões/custo refletem quase em tempo real — conversões podem levar mais um pouco pra fechar, isso é atribuição do próprio Google Ads, não do agendamento)
 
 ### 2. Código do Script
 
@@ -97,4 +97,4 @@ function formatDateGAQL(date) {
 
 ### 4. Agendamento
 
-Configure o script para rodar **diariamente** às 6h da manhã para manter os dados sempre atualizados.
+Configure o script para rodar **de hora em hora** — assim o dashboard (Marketing → Funil de Conversão, veja "Última sync" no topo) fica sempre com dado fresco, sem precisar de nenhum botão de "atualizar" no sistema (o webhook só recebe o que o script empurra; não tem como puxar dado do Google Ads sob demanda a partir do nosso sistema sem uma integração OAuth própria com a API do Google Ads).
