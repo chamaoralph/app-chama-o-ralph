@@ -282,7 +282,14 @@ export function calcularRepasseAcessorio(
 /** Um acessório escolhido, já com custo e fornecedor definidos. */
 export interface AcessorioSelecionado extends ItemSelecionado {
   custo: number;          // custo unitário
-  fornecedor: Fornecedor;
+  fornecedor: Fornecedor; // quem fica com o repasse financeiro (custo + 70%/30% do lucro)
+  // De onde a peça saiu fisicamente (estoque central da empresa ou saldo que o
+  // instalador já tinha em mãos) — só usado pra saber de qual saldo dar baixa
+  // e pra exibir informativamente; NÃO deve influenciar o repasse acima. Hoje
+  // todo saldo em mãos do instalador vem de entrega da empresa (ver
+  // /admin/suportes), então mesmo saindo do estoque dele o repasse é sempre
+  // 'empresa' — ele não pagou pela peça do próprio bolso.
+  origemEstoque?: Fornecedor;
 }
 
 /** Soma do repasse de vários acessórios (o que "vem pronto pra pagamento"). */
@@ -348,6 +355,10 @@ export interface ExtraServicoItem {
   repasse_instalador: number;
   repasse_empresa: number;
   origem?: 'cotacao' | 'finalizacao';
+  // De onde a peça saiu fisicamente — ver AcessorioSelecionado.origemEstoque.
+  // Ausente em registros antigos; nesse caso trate como igual a `fornecedor`
+  // (era o mesmo campo antes dessa distinção existir).
+  origem_estoque?: Fornecedor;
 }
 
 /** Converte um acessório selecionado (com fornecedor definido) no item a persistir. */
@@ -364,6 +375,7 @@ export function paraExtraServico(a: AcessorioSelecionado): ExtraServicoItem {
     valor_venda: r.venda,
     valor_compra: r.custo,
     fornecedor: a.fornecedor,
+    origem_estoque: a.origemEstoque ?? a.fornecedor,
     lucro: r.lucro,
     repasse_instalador: r.repasse_instalador,
     repasse_empresa: r.repasse_empresa,

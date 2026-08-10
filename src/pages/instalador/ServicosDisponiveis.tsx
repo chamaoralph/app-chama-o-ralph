@@ -24,6 +24,13 @@ function formatarDataServico(dataString: string): string {
   return dataString;
 }
 
+interface AcessorioVendido {
+  catalogo_id: string | null
+  quantidade: number
+  origem_estoque?: 'empresa' | 'instalador'
+  fornecedor?: 'empresa' | 'instalador'
+}
+
 interface Servico {
   id: string
   codigo: string
@@ -32,6 +39,7 @@ interface Servico {
   endereco_completo: string
   valor_mao_obra_instalador: number
   descricao: string
+  acessorios_vendidos: AcessorioVendido[] | null
   clientes: {
     nome: string
     telefone: string
@@ -68,8 +76,54 @@ export default function ServicosDisponiveis() {
   const { toast } = useToast()
   const isMobile = useIsMobile()
 
+  // Saldo próprio do instalador logado, por catalogo_id (mesmo cálculo de
+  // FinalizarServico.tsx / /admin/suportes) — usado só pra filtrar quais
+  // serviços com acessório "pendente de estoque central" (origem_estoque=
+  // 'instalador' — ver migration 20260810120000) ele consegue de fato
+  // atender.
+  const { data: movimentacoesProprias } = useQuery({
+    queryKey: ['movimentacoes-suportes-proprio-disponiveis', user?.id],
+    queryFn: async () => {
+      if (!user) return []
+      const { data, error } = await supabase
+        .from('movimentacoes_suportes')
+        .select('catalogo_id, tipo_movimento, quantidade')
+        .eq('instalador_id', user.id)
+      if (error) throw error
+      return (data || []) as { catalogo_id: string | null; tipo_movimento: string; quantidade: number }[]
+    },
+    enabled: !!user,
+  })
+
+  const saldoProprioPorCatalogo = (() => {
+    const saldo: Record<string, number> = {}
+    ;(movimentacoesProprias ?? []).forEach((m) => {
+      if (!m.catalogo_id) return
+      if (m.tipo_movimento === 'entrega') saldo[m.catalogo_id] = (saldo[m.catalogo_id] ?? 0) + m.quantidade
+      else if (m.tipo_movimento === 'devolucao' || m.tipo_movimento === 'uso') saldo[m.catalogo_id] = (saldo[m.catalogo_id] ?? 0) - m.quantidade
+    })
+    return saldo
+  })()
+
+  // Some acessório do serviço veio (ou vai vir) do saldo de ALGUM instalador
+  // porque o estoque central não cobria na hora da cotação — só aparece pra
+  // quem tiver, em mãos, a quantidade necessária de cada um desses itens.
+  // Serviço sem acessório "pendente" (ou com acessório coberto pelo estoque
+  // central) aparece normalmente pra todo mundo.
+  const podeAtender = (servico: Servico) => {
+    const itensPendentes = (servico.acessorios_vendidos || []).filter(
+      (item) => item.catalogo_id && (item.origem_estoque ?? item.fornecedor) === 'instalador'
+    )
+    if (itensPendentes.length === 0) return true
+    return itensPendentes.every(
+      (item) => (saldoProprioPorCatalogo[item.catalogo_id!] ?? 0) >= item.quantidade
+    )
+  }
+
+  const servicosAtendiveis = servicos.filter(podeAtender)
+
   // Ordenar serviços
-  const servicosOrdenados = [...servicos].sort((a, b) => {
+  const servicosOrdenados = [...servicosAtendiveis].sort((a, b) => {
     if (ordenacao === 'data') {
       return new Date(a.data_servico_agendada).getTime() - new Date(b.data_servico_agendada).getTime()
     } else {
@@ -159,6 +213,7 @@ export default function ServicosDisponiveis() {
           endereco_completo,
           valor_mao_obra_instalador,
           descricao,
+          acessorios_vendidos,
           clientes!servicos_cliente_id_fkey (
             nome,
             telefone,
@@ -245,7 +300,7 @@ export default function ServicosDisponiveis() {
                 Serviços Disponíveis
               </h1>
               <p className="text-gray-600 mt-1">
-                {servicos.length} {servicos.length === 1 ? 'serviço disponível' : 'serviços disponíveis'}
+                {servicosAtendiveis.length} {servicosAtendiveis.length === 1 ? 'serviço disponível' : 'serviços disponíveis'}
               </p>
             </div>
             
@@ -273,7 +328,7 @@ export default function ServicosDisponiveis() {
           </div>
           
           {/* Botões de ordenação - só aparecem na visualização em lista */}
-          {servicos.length > 1 && visualizacao === 'lista' && (
+          {servicosAtendiveis.length > 1 && visualizacao === 'lista' && (
             <div className="flex gap-2 mt-3">
               <Button
                 variant={ordenacao === 'data' ? 'default' : 'outline'}
@@ -297,7 +352,7 @@ export default function ServicosDisponiveis() {
           )}
         </div>
 
-        {servicos.length === 0 ? (
+        {servicosAtendiveis.length === 0 ? (
           <div className="bg-white rounded-lg shadow p-8 text-center">
             <div className="text-5xl mb-4">📭</div>
             <h2 className="text-xl font-semibold text-gray-700 mb-2">
@@ -309,7 +364,7 @@ export default function ServicosDisponiveis() {
           </div>
         ) : visualizacao === 'agenda' ? (
           <AgendaSemanalDisponiveis
-            servicos={servicos}
+            servicos={servicosAtendiveis}
             certificacoes={certificacoes || []}
             onSolicitar={solicitarServico}
             solicitandoId={solicitando}

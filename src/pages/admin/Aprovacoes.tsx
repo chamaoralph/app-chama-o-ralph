@@ -349,15 +349,37 @@ export default function Aprovacoes() {
         ? contarSuportesInstalador(servicoAtual)
         : 0
 
-      // Acessórios "Extras" vendidos NA FINALIZAÇÃO com fornecedor = instalador
-      // (peça própria dele, vinda do saldo controlado em /admin/suportes) —
-      // dá baixa real no saldo dele aqui, uma única vez (guard igual ao
-      // suporte de TV acima, evita duplicar em desaprovar+reaprovar).
+      // Acessórios cuja peça saiu (ou vai sair) do saldo próprio do instalador
+      // (origem_estoque — ver orcamento.ts; registros antigos sem esse campo
+      // usam `fornecedor`, que era o mesmo campo antes dessa distinção
+      // existir) — dá baixa real no saldo dele aqui, uma única vez (guard
+      // igual ao suporte de TV acima, evita duplicar em desaprovar+reaprovar).
+      // Isso é só controle físico de estoque: não implica que o repasse
+      // financeiro (item.fornecedor) seja dele.
+      //
+      // Cobre dois casos: extras vendidos NA FINALIZAÇÃO (origem='finalizacao')
+      // e itens já incluídos na COTAÇÃO (origem='cotacao') que, na aprovação/
+      // edição da cotação, não tinham estoque central suficiente e ficaram
+      // pendentes (origem_estoque='instalador') — ver migration
+      // 20260810120000. Nesse segundo caso só dá pra saber de qual saldo
+      // tirar agora, porque é aqui que já se sabe quem finalizou o serviço.
       const precisaBaixarExtrasInstalador =
         !!servicoAtual?.instalador_id && !servicoAtual?.estoque_extras_instalador_baixado
       const extrasInstaladorPorCatalogo = precisaBaixarExtrasInstalador && servicoAtual
         ? (servicoAtual.acessorios_vendidos || []).reduce((mapa, item) => {
-            if (item.origem === 'finalizacao' && item.fornecedor === 'instalador' && item.catalogo_id) {
+            if (!item.catalogo_id) return mapa
+            // finalização: comportamento de sempre — fornecedor='instalador'
+            // nesse contexto sempre significou "saldo próprio" (ver
+            // FinalizarServico.tsx), então o fallback pra registros antigos
+            // sem origem_estoque é seguro aqui.
+            // cotação: só o campo NOVO e explícito conta. Registros antigos
+            // com fornecedor='instalador' na cotação eram autodeclarados
+            // (peça que o instalador comprou por fora) e NUNCA tocaram esse
+            // saldo — cair no fallback aqui debitaria saldo errado.
+            const precisaDebitar = item.origem === 'finalizacao'
+              ? (item.origem_estoque ?? item.fornecedor) === 'instalador'
+              : item.origem_estoque === 'instalador'
+            if (precisaDebitar) {
               mapa[item.catalogo_id] = (mapa[item.catalogo_id] ?? 0) + item.quantidade
             }
             return mapa
@@ -786,7 +808,7 @@ export default function Aprovacoes() {
                             <div key={idx} className="bg-gray-50 p-3 rounded-lg flex flex-wrap items-center justify-between gap-2 text-sm">
                               <div>
                                 <span className="font-medium text-gray-900">{item.nome}</span>{' '}
-                                <span className="text-gray-500">— venda {formatarBRL(item.valor_venda)} · forneceu: {item.fornecedor === 'empresa' ? 'empresa' : 'instalador'}</span>
+                                <span className="text-gray-500">— venda {formatarBRL(item.valor_venda)} · peça: {(item.origem_estoque ?? item.fornecedor) === 'empresa' ? 'estoque empresa' : 'saldo do instalador'}</span>
                               </div>
                               <div className="text-gray-700">
                                 inst: reemb {formatarBRL(d.reembolso_instalador)} + ganho <span className="font-semibold">{formatarBRL(d.ganho_instalador)}</span>

@@ -247,27 +247,39 @@ export default function FinalizarServico() {
     return catalogoAcessorios
       .filter((c) => quantidadesExtras[c.id] != null)
       .map((c) => {
-        const fornecedor = fornecedoresExtras[c.id] as Fornecedor;
+        // De onde a peça sai fisicamente: estoque central da empresa, ou o que
+        // o instalador já tem em mãos (saldo controlado em /admin/suportes).
+        const origemEstoque = fornecedoresExtras[c.id] as Fornecedor;
         const custo =
-          fornecedor === "instalador"
+          origemEstoque === "instalador"
             ? custoMedioInstaladorPorId[c.id] ?? 0
             : custoEstoqueExtraPorId[c.id]?.valor ?? 0;
-        return { ...montarItem(c, quantidadesExtras[c.id] ?? 1), custo, fornecedor };
+        // Repasse (split 70/30 do lucro) é sempre como se a empresa tivesse
+        // fornecido: mesmo quando a peça sai do saldo próprio do instalador,
+        // ela chegou até ele por entrega da empresa — ele não pagou do próprio
+        // bolso, então não faz sentido dar a ele o reembolso de custo + 70%
+        // do lucro que cabe a quem de fato comprou a peça.
+        return {
+          ...montarItem(c, quantidadesExtras[c.id] ?? 1),
+          custo,
+          fornecedor: "empresa" as Fornecedor,
+          origemEstoque,
+        };
       });
   }, [catalogoAcessorios, quantidadesExtras, fornecedoresExtras, custoMedioInstaladorPorId, custoEstoqueExtraPorId]);
 
   // Acessório sem fornecedor escolhido, sem estoque (empresa) ou além do que
   // o instalador tem em mãos (instalador) — bloqueia envio
   const extraComProblema = acessoriosExtrasSelecionados.some((a) => {
-    if (!a.fornecedor) return true;
-    if (a.fornecedor === "empresa") {
+    if (!a.origemEstoque) return true;
+    if (a.origemEstoque === "empresa") {
       return (saldoExtraPorId[a.catalogo_id] ?? 0) <= 0 || custoEstoqueExtraPorId[a.catalogo_id]?.valor == null;
     }
     return a.quantidade > (saldoInstaladorPorId[a.catalogo_id] ?? 0);
   });
 
   const extrasNovos = useMemo(
-    () => acessoriosExtrasSelecionados.filter((a) => a.fornecedor).map(paraExtraServico),
+    () => acessoriosExtrasSelecionados.filter((a) => a.origemEstoque).map(paraExtraServico),
     [acessoriosExtrasSelecionados],
   );
 
@@ -683,15 +695,15 @@ export default function FinalizarServico() {
                             onClick={() => setFornecedoresExtras((f) => ({ ...f, [item.id]: "instalador" }))}
                             className={`h-7 px-3 rounded-md text-xs border disabled:opacity-40 ${fornecedorEscolhido === "instalador" ? "bg-blue-600 text-white border-blue-600" : ""}`}
                           >
-                            Eu forneci
+                            Já tenho em mãos
                           </button>
                           {!fornecedorEscolhido && (
-                            <span className="text-xs text-amber-600">Escolha quem forneceu</span>
+                            <span className="text-xs text-amber-600">Escolha de onde saiu a peça</span>
                           )}
                         </div>
 
                         {semEstoque && (
-                          <p className="text-xs text-amber-600">Sem estoque da empresa — venda apenas se você forneceu</p>
+                          <p className="text-xs text-amber-600">Sem estoque da empresa — venda só se você já tiver a peça em mãos</p>
                         )}
                         {semEstoqueProprio && (
                           <p className="text-xs text-amber-600">Você não tem este item em mãos (confira em Controle de Acessórios)</p>

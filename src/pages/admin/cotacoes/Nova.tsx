@@ -658,9 +658,14 @@ export default function NovaCotacao() {
                         <option value="">+ Acessório do catálogo...</option>
                         {catalogoAcessorios.map(item => {
                           const saldo = estoqueSaldos[item.id] ?? 0
+                          // Sem estoque central não bloqueia mais: a peça pode
+                          // estar em mãos de um instalador (entregue por
+                          // /admin/suportes — continua sendo estoque da
+                          // empresa, só descentralizado). Serviços Disponíveis
+                          // filtra depois quem pode atender.
                           return (
-                            <option key={item.id} value={item.id} disabled={saldo === 0}>
-                              {item.nome} — {saldo} em estoque
+                            <option key={item.id} value={item.id}>
+                              {item.nome} — {saldo > 0 ? `${saldo} em estoque` : 'sem estoque central'}
                             </option>
                           )
                         })}
