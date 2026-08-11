@@ -100,7 +100,14 @@ export default function FinalizarServico() {
 
   // --- Extras (acessórios vendidos na finalização) ---
   const [quantidadesExtras, setQuantidadesExtras] = useState<Record<string, number>>({});
+  // Fornecedor do RESTANTE além do que o instalador já tem em mãos — só é
+  // perguntado quando a quantidade pedida excede o saldo próprio dele (ver
+  // acessoriosExtrasSelecionados abaixo: enquanto o saldo próprio cobrir, não
+  // existe escolha nenhuma, é automático).
   const [fornecedoresExtras, setFornecedoresExtras] = useState<Record<string, Fornecedor>>({});
+  // Custo que o instalador diz ter pago do próprio bolso, só pra a parte do
+  // restante que ele mesmo comprou (fornecedor do restante = 'instalador').
+  const [custosCompraPropriaExtras, setCustosCompraPropriaExtras] = useState<Record<string, string>>({});
 
   const { data: catalogoAcessorios } = useQuery({
     queryKey: ["catalogo-acessorios-extra"],
@@ -242,44 +249,96 @@ export default function FinalizarServico() {
     return mapa;
   }, [acessoriosExtrasEmpresaIds, custoEstoqueExtraQueries]);
 
+  // Cada acessório pode virar até 2 linhas de venda:
+  //   1) a parte coberta pelo que ele já tem em mãos (saldo próprio, entregue
+  //      pela empresa) — obrigatória, sem escolha, sempre repasse 'empresa'
+  //      (regra: ele tem que usar o que já foi entregue antes de puxar de
+  //      qualquer outro lugar, senão fica peça e dinheiro da empresa parados
+  //      na mochila dele).
+  //   2) a parte restante, se a quantidade pedida for maior que o saldo
+  //      próprio — aí sim é uma escolha real: vem do estoque central da
+  //      empresa, ou o instalador comprou essa sobra com o próprio dinheiro
+  //      (nesse caso ele digita o que pagou, e o repasse 70/30 é dele).
   const acessoriosExtrasSelecionados = useMemo<AcessorioSelecionado[]>(() => {
     if (!catalogoAcessorios) return [];
-    return catalogoAcessorios
-      .filter((c) => quantidadesExtras[c.id] != null)
-      .map((c) => {
-        // De onde a peça sai fisicamente: estoque central da empresa, ou o que
-        // o instalador já tem em mãos (saldo controlado em /admin/suportes).
-        const origemEstoque = fornecedoresExtras[c.id] as Fornecedor;
-        const custo =
-          origemEstoque === "instalador"
-            ? custoMedioInstaladorPorId[c.id] ?? 0
-            : custoEstoqueExtraPorId[c.id]?.valor ?? 0;
-        // Repasse (split 70/30 do lucro) é sempre como se a empresa tivesse
-        // fornecido: mesmo quando a peça sai do saldo próprio do instalador,
-        // ela chegou até ele por entrega da empresa — ele não pagou do próprio
-        // bolso, então não faz sentido dar a ele o reembolso de custo + 70%
-        // do lucro que cabe a quem de fato comprou a peça.
-        return {
-          ...montarItem(c, quantidadesExtras[c.id] ?? 1),
-          custo,
-          fornecedor: "empresa" as Fornecedor,
-          origemEstoque,
-        };
-      });
-  }, [catalogoAcessorios, quantidadesExtras, fornecedoresExtras, custoMedioInstaladorPorId, custoEstoqueExtraPorId]);
+    const itens: AcessorioSelecionado[] = [];
 
-  // Acessório sem fornecedor escolhido, sem estoque (empresa) ou além do que
-  // o instalador tem em mãos (instalador) — bloqueia envio
-  const extraComProblema = acessoriosExtrasSelecionados.some((a) => {
-    if (!a.origemEstoque) return true;
-    if (a.origemEstoque === "empresa") {
-      return (saldoExtraPorId[a.catalogo_id] ?? 0) <= 0 || custoEstoqueExtraPorId[a.catalogo_id]?.valor == null;
+    catalogoAcessorios
+      .filter((c) => quantidadesExtras[c.id] != null)
+      .forEach((c) => {
+        const qtd = quantidadesExtras[c.id] ?? 1;
+        const saldoProprio = saldoInstaladorPorId[c.id] ?? 0;
+        const qtdSaldoProprio = Math.min(qtd, saldoProprio);
+        const qtdRestante = qtd - qtdSaldoProprio;
+
+        if (qtdSaldoProprio > 0) {
+          itens.push({
+            ...montarItem(c, qtdSaldoProprio),
+            custo: custoMedioInstaladorPorId[c.id] ?? 0,
+            fornecedor: "empresa",
+            // origemEstoque='instalador': precisa debitar do saldo próprio
+            // dele (movimentacoes_suportes) na aprovação do serviço.
+            origemEstoque: "instalador",
+          });
+        }
+
+        if (qtdRestante > 0) {
+          const fornecedorRestante = fornecedoresExtras[c.id];
+          if (fornecedorRestante === "instalador") {
+            const custoDigitado = parseFloat(custosCompraPropriaExtras[c.id] || "0") || 0;
+            itens.push({
+              ...montarItem(c, qtdRestante),
+              custo: custoDigitado,
+              fornecedor: "instalador",
+              // origemEstoque='empresa': não é saldo rastreado em
+              // movimentacoes_suportes (ele comprou por fora), nada a
+              // debitar na aprovação além do repasse financeiro normal.
+              origemEstoque: "empresa",
+            });
+          } else if (fornecedorRestante === "empresa") {
+            itens.push({
+              ...montarItem(c, qtdRestante),
+              custo: custoEstoqueExtraPorId[c.id]?.valor ?? 0,
+              fornecedor: "empresa",
+              origemEstoque: "empresa",
+            });
+          }
+          // Sem fornecedorRestante escolhido: não empurra linha nenhuma pro
+          // restante — extraComProblema abaixo pega esse caso e bloqueia envio.
+        }
+      });
+
+    return itens;
+  }, [
+    catalogoAcessorios,
+    quantidadesExtras,
+    fornecedoresExtras,
+    custosCompraPropriaExtras,
+    saldoInstaladorPorId,
+    custoMedioInstaladorPorId,
+    custoEstoqueExtraPorId,
+  ]);
+
+  // Acessório com sobra além do saldo próprio, sem fornecedor do restante
+  // escolhido, sem estoque central pra cobrir o restante, ou sem custo
+  // digitado pra sobra que ele diz ter comprado — bloqueia envio.
+  const extraComProblema = (catalogoAcessorios ?? []).some((c) => {
+    const qtd = quantidadesExtras[c.id];
+    if (qtd == null) return false;
+    const saldoProprio = saldoInstaladorPorId[c.id] ?? 0;
+    const qtdRestante = qtd - Math.min(qtd, saldoProprio);
+    if (qtdRestante <= 0) return false;
+
+    const fornecedorRestante = fornecedoresExtras[c.id];
+    if (!fornecedorRestante) return true;
+    if (fornecedorRestante === "empresa") {
+      return (saldoExtraPorId[c.id] ?? 0) < qtdRestante || custoEstoqueExtraPorId[c.id]?.valor == null;
     }
-    return a.quantidade > (saldoInstaladorPorId[a.catalogo_id] ?? 0);
+    return !custosCompraPropriaExtras[c.id]?.trim();
   });
 
   const extrasNovos = useMemo(
-    () => acessoriosExtrasSelecionados.filter((a) => a.origemEstoque).map(paraExtraServico),
+    () => acessoriosExtrasSelecionados.map(paraExtraServico),
     [acessoriosExtrasSelecionados],
   );
 
@@ -293,6 +352,7 @@ export default function FinalizarServico() {
       if (novo <= 0) {
         delete next[catalogoId];
         setFornecedoresExtras((f) => { const n = { ...f }; delete n[catalogoId]; return n; });
+        setCustosCompraPropriaExtras((c) => { const n = { ...c }; delete n[catalogoId]; return n; });
       } else next[catalogoId] = novo;
       return next;
     });
@@ -645,12 +705,12 @@ export default function FinalizarServico() {
               {catalogoAcessorios.map((item) => {
                 const qtd = quantidadesExtras[item.id];
                 const selecionado = qtd != null;
-                const fornecedorEscolhido = fornecedoresExtras[item.id];
-                const semEstoque = (saldoExtraPorId[item.id] ?? 0) <= 0;
+                const fornecedorRestante = fornecedoresExtras[item.id];
                 const custoEmpresaInfo = custoEstoqueExtraPorId[item.id];
                 const saldoProprio = saldoInstaladorPorId[item.id] ?? 0;
-                const semEstoqueProprio = saldoProprio <= 0;
-                const excedeSaldoProprio = (qtd ?? 0) > saldoProprio;
+                const qtdSaldoProprio = Math.min(qtd ?? 0, saldoProprio);
+                const qtdRestante = (qtd ?? 0) - qtdSaldoProprio;
+                const semEstoqueParaRestante = (saldoExtraPorId[item.id] ?? 0) < qtdRestante;
                 return (
                   <div key={item.id} className="border rounded-md p-3">
                     <div className="flex items-center justify-between gap-3">
@@ -680,51 +740,77 @@ export default function FinalizarServico() {
 
                     {selecionado && (
                       <div className="mt-2 space-y-1.5">
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            disabled={semEstoque}
-                            onClick={() => setFornecedoresExtras((f) => ({ ...f, [item.id]: "empresa" }))}
-                            className={`h-7 px-3 rounded-md text-xs border disabled:opacity-40 ${fornecedorEscolhido === "empresa" ? "bg-blue-600 text-white border-blue-600" : ""}`}
-                          >
-                            Empresa
-                          </button>
-                          <button
-                            type="button"
-                            disabled={semEstoqueProprio}
-                            onClick={() => setFornecedoresExtras((f) => ({ ...f, [item.id]: "instalador" }))}
-                            className={`h-7 px-3 rounded-md text-xs border disabled:opacity-40 ${fornecedorEscolhido === "instalador" ? "bg-blue-600 text-white border-blue-600" : ""}`}
-                          >
-                            Já tenho em mãos
-                          </button>
-                          {!fornecedorEscolhido && (
-                            <span className="text-xs text-amber-600">Escolha de onde saiu a peça</span>
-                          )}
-                        </div>
-
-                        {semEstoque && (
-                          <p className="text-xs text-amber-600">Sem estoque da empresa — venda só se você já tiver a peça em mãos</p>
-                        )}
-                        {semEstoqueProprio && (
-                          <p className="text-xs text-amber-600">Você não tem este item em mãos (confira em Controle de Acessórios)</p>
-                        )}
-
-                        {fornecedorEscolhido === "empresa" && !semEstoque && (
+                        {/* Parte obrigatória: sai do que ele já tem em mãos, sem
+                            escolha — regra: usar o que a empresa já entregou
+                            antes de puxar de qualquer outro lugar. */}
+                        {qtdSaldoProprio > 0 && (
                           <p className="text-xs text-muted-foreground">
-                            {custoEmpresaInfo?.carregando
-                              ? "Buscando custo…"
-                              : custoEmpresaInfo?.valor != null
-                              ? `custo ${formatarBRL(custoEmpresaInfo.valor)} — do estoque`
-                              : "Custo indisponível — tente novamente"}
+                            ✓ {qtdSaldoProprio} {qtdSaldoProprio === 1 ? "sai" : "saem"} do que você já tem em mãos
+                            {" "}— custo {formatarBRL(custoMedioInstaladorPorId[item.id] ?? 0)}/un
                           </p>
                         )}
 
-                        {fornecedorEscolhido === "instalador" && !semEstoqueProprio && (
-                          <p className={`text-xs ${excedeSaldoProprio ? "text-amber-600" : "text-muted-foreground"}`}>
-                            custo {formatarBRL(custoMedioInstaladorPorId[item.id] ?? 0)} — do que você tem em mãos
-                            {" "}({saldoProprio} {saldoProprio === 1 ? "disponível" : "disponíveis"})
-                            {excedeSaldoProprio && " — reduza a quantidade, você não tem tudo isso"}
-                          </p>
+                        {/* Parte restante (só existe se pediu mais do que ele
+                            tem em mãos): aqui sim é uma escolha real. */}
+                        {qtdRestante > 0 && (
+                          <>
+                            <p className="text-xs text-muted-foreground">
+                              {qtdSaldoProprio > 0
+                                ? `Faltam ${qtdRestante} além do que você já tem — de onde vêm?`
+                                : "De onde vem essa peça?"}
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                disabled={semEstoqueParaRestante}
+                                onClick={() => setFornecedoresExtras((f) => ({ ...f, [item.id]: "empresa" }))}
+                                className={`h-7 px-3 rounded-md text-xs border disabled:opacity-40 ${fornecedorRestante === "empresa" ? "bg-blue-600 text-white border-blue-600" : ""}`}
+                              >
+                                Estoque da empresa
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setFornecedoresExtras((f) => ({ ...f, [item.id]: "instalador" }))}
+                                className={`h-7 px-3 rounded-md text-xs border ${fornecedorRestante === "instalador" ? "bg-blue-600 text-white border-blue-600" : ""}`}
+                              >
+                                Comprei por fora
+                              </button>
+                              {!fornecedorRestante && (
+                                <span className="text-xs text-amber-600">Escolha uma opção</span>
+                              )}
+                            </div>
+
+                            {semEstoqueParaRestante && (
+                              <p className="text-xs text-amber-600">Sem estoque da empresa pra cobrir o restante</p>
+                            )}
+
+                            {fornecedorRestante === "empresa" && !semEstoqueParaRestante && (
+                              <p className="text-xs text-muted-foreground">
+                                {custoEmpresaInfo?.carregando
+                                  ? "Buscando custo…"
+                                  : custoEmpresaInfo?.valor != null
+                                  ? `custo ${formatarBRL(custoEmpresaInfo.valor)}/un — do estoque`
+                                  : "Custo indisponível — tente novamente"}
+                              </p>
+                            )}
+
+                            {fornecedorRestante === "instalador" && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">Quanto você pagou (total, {qtdRestante} un)?</span>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  placeholder="0,00"
+                                  value={custosCompraPropriaExtras[item.id] ?? ""}
+                                  onChange={(e) =>
+                                    setCustosCompraPropriaExtras((c) => ({ ...c, [item.id]: e.target.value }))
+                                  }
+                                  className="w-24 h-7 px-2 border rounded-md text-xs"
+                                />
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     )}
@@ -735,9 +821,11 @@ export default function FinalizarServico() {
 
             {extrasNovos.length > 0 && (
               <div className="mt-4 border-t pt-3 space-y-1">
-                {extrasNovos.map((e) => (
-                  <div key={e.catalogo_id} className="flex justify-between text-xs text-muted-foreground">
-                    <span>{e.nome} — lucro {formatarBRL(e.lucro)}</span>
+                {extrasNovos.map((e, idx) => (
+                  <div key={`${e.catalogo_id}-${idx}`} className="flex justify-between text-xs text-muted-foreground">
+                    <span>
+                      {e.nome} (x{e.quantidade}{e.fornecedor === "instalador" ? ", comprou" : ""}) — lucro {formatarBRL(e.lucro)}
+                    </span>
                     <span>você {formatarBRL(e.repasse_instalador)} · empresa {formatarBRL(e.repasse_empresa)}</span>
                   </div>
                 ))}
