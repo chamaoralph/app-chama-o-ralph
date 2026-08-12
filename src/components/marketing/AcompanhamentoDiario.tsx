@@ -38,6 +38,7 @@ interface DiaTabela {
   jobsRayana: number
   receita: number
   despesa: number
+  despesaInstalador: number
   lucroDia: number
   lucroAcumulado: number
   percentMeta: number
@@ -219,7 +220,7 @@ export function AcompanhamentoDiario() {
         // 3. Recibos diários pagos no mês
         supabase
           .from("servicos")
-          .select("valor_mao_obra_instalador")
+          .select("valor_mao_obra_instalador, data_conclusao")
           .eq("empresa_id", userData.empresa_id)
           .eq("status", "concluido")
           .gte("data_conclusao", startDate)
@@ -269,6 +270,17 @@ export function AcompanhamentoDiario() {
       }
     }
 
+    // Mão de obra dos instaladores por dia de conclusão do serviço — igual à
+    // fonte do card "Instaladores" do resumo (recibos), só que bucketado por
+    // dia. Antes ficava de fora da tabela diária (só entrava no total do
+    // mês), fazendo a soma dos dias não bater com o Lucro Líquido do topo.
+    const instaladorPorDia: Record<string, number> = {}
+    for (const r of recibos) {
+      if (!r.data_conclusao) continue
+      const dia = toTZDateStr(r.data_conclusao)
+      instaladorPorDia[dia] = (instaladorPorDia[dia] ?? 0) + Number(r.valor_mao_obra_instalador || 0)
+    }
+
     // Resumo global
     const totalReceitas = lancamentos
       .filter((l) => l.tipo === "receita" && l.categoria !== "Reembolso Materiais")
@@ -314,7 +326,8 @@ export function AcompanhamentoDiario() {
       }).length
 
       const lanc = isDom ? { receita: 0, despesa: 0 } : (lancPorDia[dStr] || { receita: 0, despesa: 0 })
-      const lucroDia = lanc.receita - lanc.despesa
+      const despesaInstalador = isDom ? 0 : (instaladorPorDia[dStr] || 0)
+      const lucroDia = lanc.receita - lanc.despesa - despesaInstalador
       if (!isDom) lucroAcum += lucroDia
 
       const pct = metas.lucroLiquidoMes > 0 ? (lucroAcum / metas.lucroLiquidoMes) * 100 : 0
@@ -329,6 +342,7 @@ export function AcompanhamentoDiario() {
         jobsRayana: rayana,
         receita: lanc.receita,
         despesa: lanc.despesa,
+        despesaInstalador,
         lucroDia,
         lucroAcumulado: lucroAcum,
         percentMeta: pct,
@@ -567,6 +581,7 @@ export function AcompanhamentoDiario() {
               <th className="px-3 py-2 text-right font-medium text-muted-foreground">Rayana</th>
               <th className="px-3 py-2 text-right font-medium text-muted-foreground">Receita</th>
               <th className="px-3 py-2 text-right font-medium text-muted-foreground">Despesa</th>
+              <th className="px-3 py-2 text-right font-medium text-muted-foreground">Instaladores</th>
               <th className="px-3 py-2 text-right font-medium text-muted-foreground">Lucro Dia</th>
               <th className="px-3 py-2 text-right font-medium text-muted-foreground">Acumulado</th>
               <th className="px-3 py-2 text-right font-medium text-muted-foreground">% Meta</th>
@@ -576,7 +591,7 @@ export function AcompanhamentoDiario() {
             {loading
               ? Array.from({ length: 10 }).map((_, i) => (
                   <tr key={i}>
-                    {Array.from({ length: 11 }).map((_, j) => (
+                    {Array.from({ length: 12 }).map((_, j) => (
                       <td key={j} className="px-3 py-2">
                         <Skeleton className="h-4 w-full" />
                       </td>
@@ -617,6 +632,9 @@ export function AcompanhamentoDiario() {
                       </td>
                       <td className="px-3 py-2 text-right text-red-600">
                         {row.isDomingo ? "–" : `R$ ${fmt(row.despesa)}`}
+                      </td>
+                      <td className="px-3 py-2 text-right text-orange-600">
+                        {row.isDomingo ? "–" : `R$ ${fmt(row.despesaInstalador)}`}
                       </td>
                       <td className={`px-3 py-2 text-right font-medium ${
                         !row.isDomingo && row.lucroDia >= 0 ? "text-green-700" : !row.isDomingo ? "text-red-600" : ""
