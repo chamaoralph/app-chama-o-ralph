@@ -51,6 +51,7 @@ interface Cotacao {
     observacao_alerta: string | null
   }
   instalador_nome?: string | null
+  instalador_id?: string | null
 }
 
 interface EditForm {
@@ -167,6 +168,41 @@ export default function ListaCotacoes() {
   const [cotacaoParaNaoGerou, setCotacaoParaNaoGerou] = useState<string | null>(null)
   const [cotacaoParaAprovarSemTermo, setCotacaoParaAprovarSemTermo] = useState<{ id: string; clienteTemTermo: boolean } | null>(null)
   const [cotacaoParaEditar, setCotacaoParaEditar] = useState<Cotacao | null>(null)
+  // Saldo próprio (movimentacoes_suportes) do instalador atribuído à cotação
+  // sendo editada — usado pra travar automaticamente "sai do que ele já tem
+  // em mãos" ao adicionar um acessório, sem perguntar (regra: ele tem que
+  // usar o que a empresa já entregou antes de puxar do estoque central).
+  const [saldoInstaladorAtribuido, setSaldoInstaladorAtribuido] = useState<Record<string, number>>({})
+
+  useEffect(() => {
+    const instaladorId = cotacaoParaEditar?.instalador_id
+    if (!instaladorId) {
+      setSaldoInstaladorAtribuido({})
+      return
+    }
+    supabase
+      .from('movimentacoes_suportes')
+      .select('catalogo_id, tipo_movimento, quantidade')
+      .eq('instalador_id', instaladorId)
+      .then(({ data }) => {
+        const saldo: Record<string, number> = {}
+        ;(data || []).forEach((m: any) => {
+          if (!m.catalogo_id) return
+          if (m.tipo_movimento === 'entrega') saldo[m.catalogo_id] = (saldo[m.catalogo_id] ?? 0) + m.quantidade
+          else if (m.tipo_movimento === 'devolucao' || m.tipo_movimento === 'uso') saldo[m.catalogo_id] = (saldo[m.catalogo_id] ?? 0) - m.quantidade
+        })
+        setSaldoInstaladorAtribuido(saldo)
+      })
+  }, [cotacaoParaEditar?.instalador_id])
+
+  // Quantas unidades de um catalogo_id já estão travadas como "sai do saldo
+  // próprio" nas linhas atuais de itensExtrasEdit — pra saber se a PRÓXIMA
+  // linha do mesmo item ainda cabe no saldo dele ou já precisa perguntar.
+  function qtdJaTravadaNoSaldoProprio(catalogoId: string) {
+    return itensExtrasEdit
+      .filter(i => i.catalogoId === catalogoId && i.origemEstoque === 'instalador')
+      .reduce((s, i) => s + (i.quantidade ?? 1), 0)
+  }
   const [editForm, setEditForm] = useState<EditForm>({
     cliente_nome: '',
     cliente_telefone: '',
@@ -216,6 +252,11 @@ export default function ListaCotacoes() {
     custoUnitario?: number
     quantidade?: number
     fornecedor?: Fornecedor
+    // De qual saldo a peça sai: 'instalador' = saldo próprio do instalador
+    // atribuído (entregue por /admin/suportes, usado automaticamente antes
+    // de qualquer outra fonte — ver helper saldoInstaladorClaimedAte). Não
+    // aparece pra fornecedor='instalador' autodeclarado (comprou por fora).
+    origemEstoque?: Fornecedor
     repasseInstalador?: number
     repasseEmpresa?: number
   }[]>([])
@@ -295,6 +336,7 @@ export default function ListaCotacoes() {
       // (não filtramos por .in(cotacaoIds) aqui: com centenas de cotações essa lista de IDs
       // estoura o limite de tamanho de URL do PostgREST e a query falha silenciosamente)
       let instaladorNomePorCotacao: Record<string, string> = {}
+      const instaladorIdPorCotacao: Record<string, string> = {}
       if (cotacoesRaw.length > 0) {
         const { data: servData, error: servError } = await supabase
           .from('servicos')
@@ -316,12 +358,17 @@ export default function ListaCotacoes() {
           servData.forEach(s => {
             if (s.cotacao_id && s.instalador_id && nomeMap[s.instalador_id]) {
               instaladorNomePorCotacao[s.cotacao_id] = nomeMap[s.instalador_id]
+              instaladorIdPorCotacao[s.cotacao_id] = s.instalador_id as string
             }
           })
         }
       }
-      
-      setCotacoes(cotacoesRaw.map(c => ({ ...c, instalador_nome: instaladorNomePorCotacao[c.id] ?? null })) as any)
+
+      setCotacoes(cotacoesRaw.map(c => ({
+        ...c,
+        instalador_nome: instaladorNomePorCotacao[c.id] ?? null,
+        instalador_id: instaladorIdPorCotacao[c.id] ?? null,
+      })) as any)
 
       // Buscar clientes que já assinaram pelo menos 1 termo
       const { data: termos } = await supabase
@@ -428,6 +475,7 @@ export default function ListaCotacoes() {
             custoUnitario: i.custo_unitario ?? undefined,
             quantidade: i.quantidade ?? undefined,
             fornecedor: i.fornecedor ?? undefined,
+            origemEstoque: i.origem_estoque ?? undefined,
           }))
         : []
     )
@@ -539,6 +587,13 @@ export default function ListaCotacoes() {
                 quantidade: i.quantidade ?? 1,
                 custo_unitario: i.custoUnitario ?? 0,
                 fornecedor: i.fornecedor,
+                // Só manda origem_estoque quando travado no saldo próprio do
+                // instalador atribuído — o banco (sincronizar_servico_ao_
+                // editar_cotacao) respeita esse hint e não tenta puxar do
+                // estoque central mesmo que ele tenha saldo (ver migration
+                // 20260811090000). Sem isso, o banco decide sozinho pelo
+                // estoque central disponível.
+                ...(i.origemEstoque === 'instalador' ? { origem_estoque: 'instalador' } : {}),
                 repasse_instalador: repasse.repasse_instalador,
                 repasse_empresa: repasse.repasse_empresa,
               }
@@ -1644,6 +1699,15 @@ export default function ListaCotacoes() {
                             const quantidade = 1
                             const valor = item.preco * quantidade
                             const repasse = calcularRepasseAcessorio(valor, item.custo * quantidade, 'empresa')
+                            // Se o instalador atribuído a esta cotação já tem
+                            // (em mãos) uma unidade desse item que ainda não
+                            // foi usada por outra linha desta mesma edição,
+                            // trava automático nela — sem perguntar. Regra:
+                            // ele usa o que a empresa já entregou antes de
+                            // puxar de qualquer outro lugar.
+                            const jaTravado = qtdJaTravadaNoSaldoProprio(item.id)
+                            const saldoDisponivel = (saldoInstaladorAtribuido[item.id] ?? 0) - jaTravado
+                            const travaNoSaldoProprio = !!cotacaoParaEditar?.instalador_id && saldoDisponivel >= quantidade
                             setItensExtrasEdit(prev => [...prev, {
                               id: `${Date.now()}`,
                               descricao: item.nome,
@@ -1652,6 +1716,7 @@ export default function ListaCotacoes() {
                               custoUnitario: item.custo,
                               quantidade,
                               fornecedor: 'empresa',
+                              origemEstoque: travaNoSaldoProprio ? 'instalador' : undefined,
                               repasseInstalador: repasse.repasse_instalador,
                               repasseEmpresa: repasse.repasse_empresa,
                             }])
@@ -1713,7 +1778,14 @@ export default function ListaCotacoes() {
                           <Trash2 className="w-4 h-4 text-muted-foreground" />
                         </Button>
                       </div>
-                      {item.catalogoId && (
+                      {item.catalogoId && item.origemEstoque === 'instalador' && (
+                        <div className="flex items-center gap-2 pl-1">
+                          <span className="text-xs text-muted-foreground">
+                            ✓ Sai do que {cotacaoParaEditar?.instalador_nome || 'o instalador'} já tem em mãos
+                          </span>
+                        </div>
+                      )}
+                      {item.catalogoId && item.origemEstoque !== 'instalador' && (
                         <div className="flex items-center gap-2 pl-1">
                           <span className="text-xs text-muted-foreground">Acessório · Fornecedor:</span>
                           <Button
@@ -1723,7 +1795,7 @@ export default function ListaCotacoes() {
                             className="h-6 px-2 text-xs"
                             onClick={() => setItensExtrasEdit(prev => prev.map(i => i.id === item.id ? { ...i, fornecedor: 'empresa' } : i))}
                           >
-                            Empresa
+                            Estoque da empresa
                           </Button>
                           <Button
                             type="button"
@@ -1732,7 +1804,7 @@ export default function ListaCotacoes() {
                             className="h-6 px-2 text-xs"
                             onClick={() => setItensExtrasEdit(prev => prev.map(i => i.id === item.id ? { ...i, fornecedor: 'instalador' } : i))}
                           >
-                            Instalador
+                            Instalador comprou por fora
                           </Button>
                           {!item.fornecedor && (
                             <span className="text-xs text-amber-600">Escolha quem forneceu</span>
