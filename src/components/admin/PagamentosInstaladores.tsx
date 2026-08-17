@@ -51,10 +51,16 @@ interface ReciboComInstalador {
   valor_mao_obra: number
   valor_reembolso: number
   valor_total: number
+  valor_recebido_cliente: number
+  /** mão de obra + reembolso − recebido em mãos pelo instalador. > 0 = empresa deve pagar; < 0 = instalador deve devolver */
+  saldo: number
   status_pagamento: string
   data_pagamento: string | null
   comprovante_pix_url: string | null
 }
+
+/** Categorias que já existiram em lancamentos_caixa para o pagamento de um recibo diário (inclui legado). */
+const CATEGORIAS_LANCAMENTO_RECIBO = ['Pagamento Instalador', 'Reembolso Materiais', 'Recebimento Instalador']
 
 interface ReciboFaltante {
   instalador_id: string
@@ -77,6 +83,7 @@ export function PagamentosInstaladores() {
   const [loading, setLoading] = useState(true)
   const [filtroMes, setFiltroMes] = useState('')
   const [filtroStatus, setFiltroStatus] = useState('todos')
+  const [filtroDirecao, setFiltroDirecao] = useState('todos') // todos | a_pagar | a_receber
   
   // Modal de pagamento
   const [modalPagamento, setModalPagamento] = useState(false)
@@ -104,6 +111,7 @@ export function PagamentosInstaladores() {
   const [editValorReembolso, setEditValorReembolso] = useState(0)
   const [editQtdServicos, setEditQtdServicos] = useState(0)
   const [editValorTotal, setEditValorTotal] = useState(0)
+  const [editValorRecebido, setEditValorRecebido] = useState(0)
   const [salvandoEdicaoValores, setSalvandoEdicaoValores] = useState(false)
 
   // Exclusão de recibo
@@ -119,6 +127,7 @@ export function PagamentosInstaladores() {
   const [manualValorMaoObra, setManualValorMaoObra] = useState(0)
   const [manualValorReembolso, setManualValorReembolso] = useState(0)
   const [manualValorTotal, setManualValorTotal] = useState(0)
+  const [manualValorRecebido, setManualValorRecebido] = useState(0)
   const [salvandoManual, setSalvandoManual] = useState(false)
   const [instaladoresAtivos, setInstaladoresAtivos] = useState<{id: string, nome: string}[]>([])
 
@@ -128,14 +137,23 @@ export function PagamentosInstaladores() {
   const [gerandoTodos, setGerandoTodos] = useState(false)
   const [empresaId, setEmpresaId] = useState<string | null>(null)
 
-  // Cálculos
-  const totalPendente = recibos
-    .filter(r => r.status_pagamento === 'pendente')
-    .reduce((sum, r) => sum + r.valor_total, 0)
-  
-  const totalPago = recibos
-    .filter(r => r.status_pagamento === 'pago')
-    .reduce((sum, r) => sum + r.valor_total, 0)
+  // Cálculos — separados por direção: saldo > 0 é a empresa que deve pagar o instalador,
+  // saldo < 0 é o instalador que deve devolver/pagar a empresa.
+  const totalAPagarPendente = recibos
+    .filter(r => r.status_pagamento === 'pendente' && r.saldo > 0)
+    .reduce((sum, r) => sum + r.saldo, 0)
+
+  const totalAReceberPendente = recibos
+    .filter(r => r.status_pagamento === 'pendente' && r.saldo < 0)
+    .reduce((sum, r) => sum + Math.abs(r.saldo), 0)
+
+  const totalPagoNoMes = recibos
+    .filter(r => r.status_pagamento === 'pago' && r.saldo > 0)
+    .reduce((sum, r) => sum + r.saldo, 0)
+
+  const totalRecebidoNoMes = recibos
+    .filter(r => r.status_pagamento === 'pago' && r.saldo < 0)
+    .reduce((sum, r) => sum + Math.abs(r.saldo), 0)
 
   useEffect(() => {
     const mesAtual = format(new Date(), 'yyyy-MM')
@@ -175,7 +193,7 @@ export function PagamentosInstaladores() {
           .from('recibos_diarios')
           .select(`
             id, data_referencia, instalador_id, quantidade_servicos,
-            valor_mao_obra, valor_reembolso, valor_total,
+            valor_mao_obra, valor_reembolso, valor_total, valor_recebido_cliente,
             status_pagamento, data_pagamento, comprovante_pix_url
           `)
           .eq('empresa_id', userData.empresa_id)
@@ -211,19 +229,26 @@ export function PagamentosInstaladores() {
 
       const instaladoresMap = new Map<string, string>(instaladores?.map(i => [i.id, i.nome] as [string, string]) || [])
 
-      const recibosFormatados: ReciboComInstalador[] = data.map(r => ({
-        id: r.id,
-        data_referencia: r.data_referencia,
-        instalador_id: r.instalador_id,
-        instalador_nome: instaladoresMap.get(r.instalador_id) || 'Desconhecido',
-        quantidade_servicos: r.quantidade_servicos,
-        valor_mao_obra: Number(r.valor_mao_obra),
-        valor_reembolso: Number(r.valor_reembolso),
-        valor_total: Number(r.valor_total),
-        status_pagamento: r.status_pagamento || 'pendente',
-        data_pagamento: r.data_pagamento,
-        comprovante_pix_url: r.comprovante_pix_url
-      }))
+      const recibosFormatados: ReciboComInstalador[] = data.map(r => {
+        const valorMaoObra = Number(r.valor_mao_obra)
+        const valorReembolso = Number(r.valor_reembolso)
+        const valorRecebidoCliente = Number(r.valor_recebido_cliente) || 0
+        return {
+          id: r.id,
+          data_referencia: r.data_referencia,
+          instalador_id: r.instalador_id,
+          instalador_nome: instaladoresMap.get(r.instalador_id) || 'Desconhecido',
+          quantidade_servicos: r.quantidade_servicos,
+          valor_mao_obra: valorMaoObra,
+          valor_reembolso: valorReembolso,
+          valor_total: Number(r.valor_total),
+          valor_recebido_cliente: valorRecebidoCliente,
+          saldo: valorMaoObra + valorReembolso - valorRecebidoCliente,
+          status_pagamento: r.status_pagamento || 'pendente',
+          data_pagamento: r.data_pagamento,
+          comprovante_pix_url: r.comprovante_pix_url
+        }
+      })
 
       setRecibos(recibosFormatados)
 
@@ -409,9 +434,12 @@ export function PagamentosInstaladores() {
 
       if (error) throw error
 
+      const recebendoDoInstalador = reciboSelecionado.saldo < 0
       toast({
         title: 'Sucesso',
-        description: 'Pagamento registrado e despesa lançada no caixa!'
+        description: recebendoDoInstalador
+          ? 'Recebimento confirmado e receita lançada no caixa!'
+          : 'Pagamento registrado e despesa lançada no caixa!'
       })
 
       setModalPagamento(false)
@@ -501,26 +529,15 @@ export function PagamentosInstaladores() {
 
       if (error) throw error
 
-      // Atualizar lançamentos no caixa com a nova data de pagamento
+      // Atualizar lançamento(s) no caixa com a nova data (cobre categorias legadas e a atual)
       const dataReferenciaFormatada = format(new Date(reciboSelecionado.data_referencia + 'T12:00:00'), 'dd/MM/yyyy')
-      
-      // Atualizar despesa de mão de obra
+
       await supabase
         .from('lancamentos_caixa')
         .update({ data_lancamento: dataPagamento })
-        .eq('categoria', 'Pagamento Instalador')
+        .in('categoria', CATEGORIAS_LANCAMENTO_RECIBO)
         .ilike('descricao', `%${dataReferenciaFormatada}%`)
         .ilike('descricao', `%${reciboSelecionado.instalador_nome}%`)
-      
-      // Atualizar despesa de reembolso (se houver)
-      if (reciboSelecionado.valor_reembolso > 0) {
-        await supabase
-          .from('lancamentos_caixa')
-          .update({ data_lancamento: dataPagamento })
-          .eq('categoria', 'Reembolso Materiais')
-          .ilike('descricao', `%${dataReferenciaFormatada}%`)
-          .ilike('descricao', `%${reciboSelecionado.instalador_nome}%`)
-      }
 
       toast({
         title: 'Sucesso',
@@ -597,6 +614,7 @@ export function PagamentosInstaladores() {
     setManualValorMaoObra(0)
     setManualValorReembolso(0)
     setManualValorTotal(0)
+    setManualValorRecebido(0)
 
     // Carregar instaladores ativos
     try {
@@ -656,6 +674,7 @@ export function PagamentosInstaladores() {
           valor_mao_obra: manualValorMaoObra,
           valor_reembolso: manualValorReembolso,
           valor_total: manualValorTotal,
+          valor_recebido_cliente: manualValorRecebido,
           servicos_ids: [],
           status_pagamento: 'pendente'
         })
@@ -678,6 +697,7 @@ export function PagamentosInstaladores() {
     setEditValorReembolso(recibo.valor_reembolso)
     setEditQtdServicos(recibo.quantidade_servicos)
     setEditValorTotal(recibo.valor_total)
+    setEditValorRecebido(recibo.valor_recebido_cliente)
     setModalEditarValores(true)
   }
 
@@ -694,39 +714,46 @@ export function PagamentosInstaladores() {
           valor_reembolso: editValorReembolso,
           quantidade_servicos: editQtdServicos,
           valor_total: editValorTotal,
+          valor_recebido_cliente: editValorRecebido,
         })
         .eq('id', reciboSelecionado.id)
 
       if (error) throw error
 
-      // Se recibo já pago, atualizar lançamentos no caixa
+      // Se recibo já pago/confirmado, refazer o lançamento no caixa com o saldo líquido novo
       if (reciboSelecionado.status_pagamento === 'pago') {
         const dataReferenciaFormatada = format(new Date(reciboSelecionado.data_referencia + 'T12:00:00'), 'dd/MM/yyyy')
+        const novoSaldo = editValorMaoObra + editValorReembolso - editValorRecebido
 
-        // Atualizar valor da mão de obra no caixa
+        // Remove qualquer lançamento anterior deste recibo (categorias legadas + atual)
         await supabase
           .from('lancamentos_caixa')
-          .update({ valor: editValorMaoObra })
-          .eq('categoria', 'Pagamento Instalador')
+          .delete()
+          .in('categoria', CATEGORIAS_LANCAMENTO_RECIBO)
           .ilike('descricao', `%${dataReferenciaFormatada}%`)
           .ilike('descricao', `%${reciboSelecionado.instalador_nome}%`)
 
-        // Atualizar reembolso no caixa
-        if (editValorReembolso > 0) {
-          await supabase
-            .from('lancamentos_caixa')
-            .update({ valor: editValorReembolso })
-            .eq('categoria', 'Reembolso Materiais')
-            .ilike('descricao', `%${dataReferenciaFormatada}%`)
-            .ilike('descricao', `%${reciboSelecionado.instalador_nome}%`)
-        } else {
-          // Se reembolso zerado, deletar lançamento de reembolso
-          await supabase
-            .from('lancamentos_caixa')
-            .delete()
-            .eq('categoria', 'Reembolso Materiais')
-            .ilike('descricao', `%${dataReferenciaFormatada}%`)
-            .ilike('descricao', `%${reciboSelecionado.instalador_nome}%`)
+        // Relança com o saldo líquido correto, na direção certa
+        if (novoSaldo > 0) {
+          await supabase.from('lancamentos_caixa').insert({
+            empresa_id: empresaId,
+            tipo: 'despesa',
+            categoria: 'Pagamento Instalador',
+            descricao: `Pagamento recibo ${reciboSelecionado.instalador_nome} - ${dataReferenciaFormatada}`,
+            valor: novoSaldo,
+            data_lancamento: reciboSelecionado.data_pagamento,
+            forma_pagamento: 'PIX'
+          })
+        } else if (novoSaldo < 0) {
+          await supabase.from('lancamentos_caixa').insert({
+            empresa_id: empresaId,
+            tipo: 'receita',
+            categoria: 'Recebimento Instalador',
+            descricao: `Recebimento de ${reciboSelecionado.instalador_nome} - ${dataReferenciaFormatada}`,
+            valor: Math.abs(novoSaldo),
+            data_lancamento: reciboSelecionado.data_pagamento,
+            forma_pagamento: 'PIX'
+          })
         }
       }
 
@@ -752,25 +779,16 @@ export function PagamentosInstaladores() {
     try {
       setApagando(true)
 
-      // Se pago, deletar lançamentos correspondentes no caixa
+      // Se pago/confirmado, deletar lançamento(s) correspondentes no caixa (categorias legadas + atual)
       if (reciboApagar.status_pagamento === 'pago') {
         const dataReferenciaFormatada = format(new Date(reciboApagar.data_referencia + 'T12:00:00'), 'dd/MM/yyyy')
 
         await supabase
           .from('lancamentos_caixa')
           .delete()
-          .eq('categoria', 'Pagamento Instalador')
+          .in('categoria', CATEGORIAS_LANCAMENTO_RECIBO)
           .ilike('descricao', `%${dataReferenciaFormatada}%`)
           .ilike('descricao', `%${reciboApagar.instalador_nome}%`)
-
-        if (reciboApagar.valor_reembolso > 0) {
-          await supabase
-            .from('lancamentos_caixa')
-            .delete()
-            .eq('categoria', 'Reembolso Materiais')
-            .ilike('descricao', `%${dataReferenciaFormatada}%`)
-            .ilike('descricao', `%${reciboApagar.instalador_nome}%`)
-        }
       }
 
       const { error } = await supabase
@@ -793,21 +811,32 @@ export function PagamentosInstaladores() {
   }
 
   const recibosFiltrados = recibos.filter(r => {
-    if (filtroStatus === 'todos') return true
-    return r.status_pagamento === filtroStatus
+    if (filtroStatus !== 'todos' && r.status_pagamento !== filtroStatus) return false
+    if (filtroDirecao === 'a_pagar' && !(r.saldo > 0)) return false
+    if (filtroDirecao === 'a_receber' && !(r.saldo < 0)) return false
+    return true
   })
 
   return (
     <div className="space-y-6">
       {/* Cards de Resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-gradient-to-br from-amber-500 to-amber-600 text-white rounded-lg shadow-lg p-6">
           <div className="flex items-center justify-between mb-2">
             <Clock className="h-8 w-8" />
             <span className="text-3xl opacity-30">⏳</span>
           </div>
-          <div className="text-2xl font-bold">R$ {totalPendente.toFixed(2)}</div>
-          <div className="text-sm opacity-90">Pendente de Pagamento</div>
+          <div className="text-2xl font-bold">R$ {totalAPagarPendente.toFixed(2)}</div>
+          <div className="text-sm opacity-90">Você Deve Pagar</div>
+        </div>
+
+        <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-lg shadow-lg p-6">
+          <div className="flex items-center justify-between mb-2">
+            <Clock className="h-8 w-8" />
+            <span className="text-3xl opacity-30">⏳</span>
+          </div>
+          <div className="text-2xl font-bold">R$ {totalAReceberPendente.toFixed(2)}</div>
+          <div className="text-sm opacity-90">Instaladores Devem a Você</div>
         </div>
 
         <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg shadow-lg p-6">
@@ -815,8 +844,17 @@ export function PagamentosInstaladores() {
             <DollarSign className="h-8 w-8" />
             <span className="text-3xl opacity-30">✅</span>
           </div>
-          <div className="text-2xl font-bold">R$ {totalPago.toFixed(2)}</div>
+          <div className="text-2xl font-bold">R$ {totalPagoNoMes.toFixed(2)}</div>
           <div className="text-sm opacity-90">Pago no Mês</div>
+        </div>
+
+        <div className="bg-gradient-to-br from-teal-500 to-teal-600 text-white rounded-lg shadow-lg p-6">
+          <div className="flex items-center justify-between mb-2">
+            <DollarSign className="h-8 w-8" />
+            <span className="text-3xl opacity-30">✅</span>
+          </div>
+          <div className="text-2xl font-bold">R$ {totalRecebidoNoMes.toFixed(2)}</div>
+          <div className="text-sm opacity-90">Recebido no Mês</div>
         </div>
       </div>
 
@@ -840,7 +878,19 @@ export function PagamentosInstaladores() {
           >
             <option value="todos">Todos</option>
             <option value="pendente">Pendentes</option>
-            <option value="pago">Pagos</option>
+            <option value="pago">Pagos/Recebidos</option>
+          </select>
+        </div>
+        <div>
+          <Label className="text-sm font-medium mb-2 block">Direção</Label>
+          <select
+            value={filtroDirecao}
+            onChange={(e) => setFiltroDirecao(e.target.value)}
+            className="px-3 py-2 border rounded-md bg-background"
+          >
+            <option value="todos">Todos</option>
+            <option value="a_pagar">Você deve pagar</option>
+            <option value="a_receber">Instalador deve pagar</option>
           </select>
         </div>
         <div className="ml-auto">
@@ -881,13 +931,15 @@ export function PagamentosInstaladores() {
                   <TableHead className="text-center">Serviços</TableHead>
                   <TableHead className="text-right">Mão de Obra</TableHead>
                   <TableHead className="text-right">Reembolso</TableHead>
-                  <TableHead className="text-right">Total Est.</TableHead>
+                  <TableHead className="text-right">Recebido</TableHead>
+                  <TableHead className="text-right">Saldo Est.</TableHead>
                   <TableHead className="text-center">Ação</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {recibosFaltantes.map((f) => {
                   const chave = `${f.data}|${f.instalador_id}`
+                  const saldoEst = f.totalGeral - f.totalRecebidoCliente
                   return (
                     <TableRow key={chave}>
                       <TableCell className="font-medium">{f.instalador_nome}</TableCell>
@@ -895,7 +947,12 @@ export function PagamentosInstaladores() {
                       <TableCell className="text-center">{f.servicos.length}</TableCell>
                       <TableCell className="text-right">R$ {f.totalMaoObra.toFixed(2)}</TableCell>
                       <TableCell className="text-right">R$ {f.totalReembolso.toFixed(2)}</TableCell>
-                      <TableCell className="text-right font-bold">R$ {f.totalGeral.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">
+                        {f.totalRecebidoCliente > 0 ? `R$ ${f.totalRecebidoCliente.toFixed(2)}` : '—'}
+                      </TableCell>
+                      <TableCell className={`text-right font-bold ${saldoEst >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        R$ {Math.abs(saldoEst).toFixed(2)} {saldoEst >= 0 ? '(a pagar)' : '(a receber)'}
+                      </TableCell>
                       <TableCell className="text-center">
                         <div className="flex items-center justify-center gap-1">
                           <Button
@@ -954,13 +1011,16 @@ export function PagamentosInstaladores() {
                 <TableHead className="text-center">Serviços</TableHead>
                 <TableHead className="text-right">Mão de Obra</TableHead>
                 <TableHead className="text-right">Reembolso</TableHead>
-                <TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-right">Recebido</TableHead>
+                <TableHead className="text-right">Saldo</TableHead>
                 <TableHead className="text-center">Status</TableHead>
                 <TableHead className="text-center">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {recibosFiltrados.map((recibo) => (
+              {recibosFiltrados.map((recibo) => {
+                const aReceberDoInstalador = recibo.saldo < 0
+                return (
                 <TableRow key={recibo.id}>
                   <TableCell>
                     {formatarDataBR(recibo.data_referencia)}
@@ -969,10 +1029,19 @@ export function PagamentosInstaladores() {
                   <TableCell className="text-center">{recibo.quantidade_servicos}</TableCell>
                   <TableCell className="text-right">R$ {recibo.valor_mao_obra.toFixed(2)}</TableCell>
                   <TableCell className="text-right">R$ {recibo.valor_reembolso.toFixed(2)}</TableCell>
-                  <TableCell className="text-right font-bold">R$ {recibo.valor_total.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">
+                    {recibo.valor_recebido_cliente > 0 ? (
+                      <span className="text-orange-600">R$ {recibo.valor_recebido_cliente.toFixed(2)}</span>
+                    ) : '—'}
+                  </TableCell>
+                  <TableCell className={`text-right font-bold ${aReceberDoInstalador ? 'text-red-600' : 'text-green-600'}`}>
+                    R$ {Math.abs(recibo.saldo).toFixed(2)}
+                  </TableCell>
                   <TableCell className="text-center">
                     <Badge variant={recibo.status_pagamento === 'pago' ? 'default' : 'secondary'}>
-                      {recibo.status_pagamento === 'pago' ? 'Pago' : 'Pendente'}
+                      {recibo.status_pagamento === 'pago'
+                        ? (aReceberDoInstalador ? 'Recebido' : 'Pago')
+                        : (aReceberDoInstalador ? 'A Receber' : 'A Pagar')}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -998,13 +1067,17 @@ export function PagamentosInstaladores() {
                       </Button>
 
                       {recibo.status_pagamento === 'pendente' ? (
-                        <Button
-                          size="sm"
-                          onClick={() => abrirModalPagamento(recibo)}
-                        >
-                          <Check className="h-4 w-4 mr-1" />
-                          Pagar
-                        </Button>
+                        recibo.saldo === 0 ? (
+                          <span className="text-xs text-muted-foreground self-center">Quitado</span>
+                        ) : (
+                          <Button
+                            size="sm"
+                            onClick={() => abrirModalPagamento(recibo)}
+                          >
+                            <Check className="h-4 w-4 mr-1" />
+                            {aReceberDoInstalador ? 'Confirmar Recebimento' : 'Pagar'}
+                          </Button>
+                        )
                       ) : (
                         <>
                           <Button
@@ -1013,7 +1086,7 @@ export function PagamentosInstaladores() {
                             onClick={() => abrirModalEdicao(recibo)}
                           >
                             <Pencil className="h-4 w-4 mr-1" />
-                            Pgto
+                            {aReceberDoInstalador ? 'Recebimento' : 'Pgto'}
                           </Button>
                           {recibo.comprovante_pix_url && (
                             <Button
@@ -1027,7 +1100,7 @@ export function PagamentosInstaladores() {
                           )}
                           {recibo.data_pagamento && (
                             <span className="text-xs text-muted-foreground self-center">
-                              Pago em {format(new Date(recibo.data_pagamento), 'dd/MM')}
+                              {aReceberDoInstalador ? 'Recebido em' : 'Pago em'} {format(new Date(recibo.data_pagamento), 'dd/MM')}
                             </span>
                           )}
                         </>
@@ -1044,33 +1117,40 @@ export function PagamentosInstaladores() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+              )})}
             </TableBody>
           </Table>
         )}
       </div>
 
-      {/* Modal de Pagamento */}
+      {/* Modal de Pagamento / Recebimento */}
       <Dialog open={modalPagamento} onOpenChange={setModalPagamento}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirmar Pagamento</DialogTitle>
+            <DialogTitle>
+              {reciboSelecionado && reciboSelecionado.saldo < 0 ? 'Confirmar Recebimento' : 'Confirmar Pagamento'}
+            </DialogTitle>
           </DialogHeader>
           
-          {reciboSelecionado && (
+          {reciboSelecionado && (() => {
+            const receber = reciboSelecionado.saldo < 0
+            return (
             <div className="space-y-4">
               <div className="bg-muted p-4 rounded-lg space-y-2">
                 <p><strong>Instalador:</strong> {reciboSelecionado.instalador_nome}</p>
                 <p><strong>Data do Recibo:</strong> {formatarDataBR(reciboSelecionado.data_referencia)}</p>
                 <p><strong>Mão de Obra:</strong> R$ {reciboSelecionado.valor_mao_obra.toFixed(2)}</p>
                 <p><strong>Reembolso:</strong> R$ {reciboSelecionado.valor_reembolso.toFixed(2)}</p>
-                <p className="text-lg font-bold text-primary">
-                  Total a Pagar: R$ {reciboSelecionado.valor_total.toFixed(2)}
+                {reciboSelecionado.valor_recebido_cliente > 0 && (
+                  <p><strong>Recebido em mãos pelo instalador:</strong> R$ {reciboSelecionado.valor_recebido_cliente.toFixed(2)}</p>
+                )}
+                <p className={`text-lg font-bold ${receber ? 'text-red-600' : 'text-primary'}`}>
+                  {receber ? 'Total a Receber' : 'Total a Pagar'}: R$ {Math.abs(reciboSelecionado.saldo).toFixed(2)}
                 </p>
               </div>
 
               <div>
-                <Label htmlFor="dataPagamento">Data do Pagamento *</Label>
+                <Label htmlFor="dataPagamento">Data do {receber ? 'Recebimento' : 'Pagamento'} *</Label>
                 <Input
                   id="dataPagamento"
                   type="date"
@@ -1081,7 +1161,9 @@ export function PagamentosInstaladores() {
               </div>
 
               <div>
-                <Label htmlFor="comprovante">Comprovante PIX (opcional)</Label>
+                <Label htmlFor="comprovante">
+                  {receber ? 'Comprovante PIX enviado pelo instalador (opcional)' : 'Comprovante PIX (opcional)'}
+                </Label>
                 <div className="mt-1 flex items-center gap-2">
                   <Input
                     id="comprovante"
@@ -1100,17 +1182,20 @@ export function PagamentosInstaladores() {
               </div>
 
               <p className="text-sm text-muted-foreground">
-                ⚡ Ao confirmar, uma despesa será registrada automaticamente no Caixa.
+                {receber
+                  ? '⚡ Ao confirmar, uma receita será registrada automaticamente no Caixa.'
+                  : '⚡ Ao confirmar, uma despesa será registrada automaticamente no Caixa.'}
               </p>
             </div>
-          )}
+            )
+          })()}
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setModalPagamento(false)}>
               Cancelar
             </Button>
             <Button onClick={confirmarPagamento} disabled={salvando}>
-              {salvando ? 'Salvando...' : 'Confirmar Pagamento'}
+              {salvando ? 'Salvando...' : (reciboSelecionado?.saldo ?? 0) < 0 ? 'Confirmar Recebimento' : 'Confirmar Pagamento'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1137,25 +1222,27 @@ export function PagamentosInstaladores() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal de Edição de Pagamento */}
+      {/* Modal de Edição de Pagamento/Recebimento */}
       <Dialog open={modalEdicao} onOpenChange={setModalEdicao}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Editar Pagamento</DialogTitle>
+            <DialogTitle>
+              {reciboSelecionado && reciboSelecionado.saldo < 0 ? 'Editar Recebimento' : 'Editar Pagamento'}
+            </DialogTitle>
           </DialogHeader>
-          
+
           {reciboSelecionado && (
             <div className="space-y-4">
               <div className="bg-muted p-4 rounded-lg space-y-2">
                 <p><strong>Instalador:</strong> {reciboSelecionado.instalador_nome}</p>
                 <p><strong>Data do Recibo:</strong> {formatarDataBR(reciboSelecionado.data_referencia)}</p>
-                <p className="text-lg font-bold text-primary">
-                  Total: R$ {reciboSelecionado.valor_total.toFixed(2)}
+                <p className={`text-lg font-bold ${reciboSelecionado.saldo < 0 ? 'text-red-600' : 'text-primary'}`}>
+                  Total: R$ {Math.abs(reciboSelecionado.saldo).toFixed(2)}
                 </p>
               </div>
 
               <div>
-                <Label htmlFor="dataPagamentoEdit">Data do Pagamento *</Label>
+                <Label htmlFor="dataPagamentoEdit">Data do {reciboSelecionado.saldo < 0 ? 'Recebimento' : 'Pagamento'} *</Label>
                 <Input
                   id="dataPagamentoEdit"
                   type="date"
@@ -1380,6 +1467,36 @@ export function PagamentosInstaladores() {
               />
               <p className="text-xs text-muted-foreground mt-1">Calculado automaticamente, mas pode ser editado.</p>
             </div>
+
+            <div>
+              <Label htmlFor="manualRecebido">Recebido em Mãos pelo Instalador</Label>
+              <Input
+                id="manualRecebido"
+                type="number"
+                min="0"
+                step="0.01"
+                value={manualValorRecebido || ''}
+                onChange={(e) => setManualValorRecebido(parseFloat(e.target.value) || 0)}
+                className="mt-1"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Se o instalador já recolheu esse valor do cliente, informe aqui. Deixe 0 se você é quem paga.
+              </p>
+            </div>
+
+            {(() => {
+              const saldoManual = manualValorTotal - manualValorRecebido
+              return (
+                <div className="bg-muted p-3 rounded-lg flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">
+                    {saldoManual >= 0 ? 'Você deve pagar:' : 'Instalador deve pagar:'}
+                  </span>
+                  <span className={`text-lg font-bold ${saldoManual >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    R$ {Math.abs(saldoManual).toFixed(2)}
+                  </span>
+                </div>
+              )
+            })()}
           </div>
 
           <DialogFooter>
@@ -1410,7 +1527,7 @@ export function PagamentosInstaladores() {
                 </Badge>
                 {reciboSelecionado.status_pagamento === 'pago' && (
                   <p className="text-xs text-amber-600 mt-2">
-                    ⚠️ Este recibo já foi pago. Os lançamentos no caixa serão atualizados automaticamente.
+                    ⚠️ Este recibo já foi confirmado. O lançamento no caixa será refeito automaticamente.
                   </p>
                 )}
               </div>
@@ -1475,6 +1592,36 @@ export function PagamentosInstaladores() {
                 />
                 <p className="text-xs text-muted-foreground mt-1">Calculado automaticamente, mas pode ser editado.</p>
               </div>
+
+              <div>
+                <Label htmlFor="editRecebido">Recebido em Mãos pelo Instalador</Label>
+                <Input
+                  id="editRecebido"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editValorRecebido || ''}
+                  onChange={(e) => setEditValorRecebido(parseFloat(e.target.value) || 0)}
+                  className="mt-1"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Quanto o instalador já recolheu do cliente. Isso define quem deve pra quem.
+                </p>
+              </div>
+
+              {(() => {
+                const saldoEdit = editValorMaoObra + editValorReembolso - editValorRecebido
+                return (
+                  <div className="bg-muted p-3 rounded-lg flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">
+                      {saldoEdit >= 0 ? 'Você deve pagar:' : 'Instalador deve pagar:'}
+                    </span>
+                    <span className={`text-lg font-bold ${saldoEdit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      R$ {Math.abs(saldoEdit).toFixed(2)}
+                    </span>
+                  </div>
+                )
+              })()}
             </div>
           )}
 
@@ -1497,10 +1644,10 @@ export function PagamentosInstaladores() {
             <AlertDialogDescription>
               {reciboApagar && (
                 <>
-                  Tem certeza que deseja apagar o recibo de <strong>{reciboApagar.instalador_nome}</strong> do dia <strong>{formatarDataBR(reciboApagar.data_referencia)}</strong> (R$ {reciboApagar.valor_total.toFixed(2)})?
+                  Tem certeza que deseja apagar o recibo de <strong>{reciboApagar.instalador_nome}</strong> do dia <strong>{formatarDataBR(reciboApagar.data_referencia)}</strong> (R$ {Math.abs(reciboApagar.saldo).toFixed(2)} {reciboApagar.saldo < 0 ? 'a receber' : 'a pagar'})?
                   {reciboApagar.status_pagamento === 'pago' && (
                     <span className="block mt-2 text-destructive font-medium">
-                      ⚠️ Este recibo já foi pago. Os lançamentos correspondentes no caixa também serão removidos.
+                      ⚠️ Este recibo já foi confirmado. O lançamento correspondente no caixa também será removido.
                     </span>
                   )}
                 </>

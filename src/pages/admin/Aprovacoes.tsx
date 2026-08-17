@@ -349,39 +349,30 @@ export default function Aprovacoes() {
         ? contarSuportesInstalador(servicoAtual)
         : 0
 
-      // Acessórios cuja peça saiu (ou vai sair) do saldo próprio do instalador
-      // (origem_estoque — ver orcamento.ts; registros antigos sem esse campo
-      // usam `fornecedor`, que era o mesmo campo antes dessa distinção
-      // existir) — dá baixa real no saldo dele aqui, uma única vez (guard
-      // igual ao suporte de TV acima, evita duplicar em desaprovar+reaprovar).
-      // Isso é só controle físico de estoque: não implica que o repasse
+      // TODO acessório com catalogo_id vendido nesse serviço gera uma
+      // movimentação 'uso' pro instalador que finalizou — independente de
+      // origem_estoque. Regra confirmada pelo usuário em 2026-08-12: o saldo
+      // sempre é debitado de quem finalizou o serviço, mesmo quando a peça
+      // saiu direto do estoque central na cotação (fornecedor='empresa'),
+      // não só quando saiu do saldo pessoal dele (origem_estoque='instalador').
+      // Antes disso só o segundo caso gerava 'uso', deixando toda peça
+      // central-direto sem nenhum instalador atribuído na movimentação
+      // (aparecia como "Vendido direto (sem instalador)" mesmo quando o
+      // serviço tinha instalador — ver histórico/memória do projeto).
+      // Quando não existe 'entrega' correspondente (peça nunca passou pela
+      // mochila dele), a movimentação de 'uso' fica sem lastro de saldo — é
+      // esperado, HistoricoCascataAcessorios.tsx já clampa "em mãos" em 0
+      // em vez de deixar negativo.
+      // Guard (estoque_extras_instalador_baixado) evita duplicar em
+      // desaprovar+reaprovar, igual ao suporte de TV acima. Isso é só
+      // controle físico/atribuição de estoque: não implica que o repasse
       // financeiro (item.fornecedor) seja dele.
-      //
-      // Cobre dois casos: extras vendidos NA FINALIZAÇÃO (origem='finalizacao')
-      // e itens já incluídos na COTAÇÃO (origem='cotacao') que, na aprovação/
-      // edição da cotação, não tinham estoque central suficiente e ficaram
-      // pendentes (origem_estoque='instalador') — ver migration
-      // 20260810120000. Nesse segundo caso só dá pra saber de qual saldo
-      // tirar agora, porque é aqui que já se sabe quem finalizou o serviço.
-      const precisaBaixarExtrasInstalador =
+      const precisaLancarUsoAcessorios =
         !!servicoAtual?.instalador_id && !servicoAtual?.estoque_extras_instalador_baixado
-      const extrasInstaladorPorCatalogo = precisaBaixarExtrasInstalador && servicoAtual
+      const usoAcessoriosPorCatalogo = precisaLancarUsoAcessorios && servicoAtual
         ? (servicoAtual.acessorios_vendidos || []).reduce((mapa, item) => {
             if (!item.catalogo_id) return mapa
-            // finalização: comportamento de sempre — fornecedor='instalador'
-            // nesse contexto sempre significou "saldo próprio" (ver
-            // FinalizarServico.tsx), então o fallback pra registros antigos
-            // sem origem_estoque é seguro aqui.
-            // cotação: só o campo NOVO e explícito conta. Registros antigos
-            // com fornecedor='instalador' na cotação eram autodeclarados
-            // (peça que o instalador comprou por fora) e NUNCA tocaram esse
-            // saldo — cair no fallback aqui debitaria saldo errado.
-            const precisaDebitar = item.origem === 'finalizacao'
-              ? (item.origem_estoque ?? item.fornecedor) === 'instalador'
-              : item.origem_estoque === 'instalador'
-            if (precisaDebitar) {
-              mapa[item.catalogo_id] = (mapa[item.catalogo_id] ?? 0) + item.quantidade
-            }
+            mapa[item.catalogo_id] = (mapa[item.catalogo_id] ?? 0) + item.quantidade
             return mapa
           }, {} as Record<string, number>)
         : {}
@@ -396,28 +387,54 @@ export default function Aprovacoes() {
         custo_suporte: parseFloat(custo_suporte) || 0,
       }
 
-      if (precisaBaixarSuporteGarantia) {
+      // Suporte Fixo Universal usado na Garantia Total: o instalador pega da
+      // PRÓPRIA mochila (do que ele já recebeu antes) — o central já foi
+      // debitado lá na entrega pra ele, não de novo agora. Antes esse bloco
+      // chamava baixar_estoque_fifo (baixa central) aqui, descontando o
+      // central DUAS vezes pra mesma peça física (uma na entrega, outra no
+      // uso) — bug real encontrado e corrigido em 2026-08-13, confirmado
+      // pelo usuário ("ele pega da mochila dele"). Agora só registra o uso,
+      // que reduz o saldo em mãos dele (mesmo mecanismo de qualquer outro
+      // acessório usado do saldo próprio) — ver memória do projeto.
+      if (precisaBaixarSuporteGarantia && servicoAtual) {
         if (!catalogoSuporteGarantiaId) {
-          throw new Error('Item "Suporte Fixo Universal" não encontrado no catálogo — não é possível dar baixa no estoque.')
+          throw new Error('Item "Suporte Fixo Universal" não encontrado no catálogo — não é possível registrar o uso.')
         }
-        const { error: erroBaixa } = await supabase.rpc('baixar_estoque_fifo', {
-          p_catalogo_id: catalogoSuporteGarantiaId,
-          p_quantidade: 1,
-          p_servico_id: servicoId,
-        })
-        if (erroBaixa) throw erroBaixa
+        const { error: erroUsoGarantia } = await supabase
+          .from('movimentacoes_suportes')
+          .insert({
+            empresa_id: servicoAtual.empresa_id,
+            instalador_id: servicoAtual.instalador_id,
+            catalogo_id: catalogoSuporteGarantiaId,
+            quantidade: 1,
+            tipo_movimento: 'uso',
+            servico_id: servicoId,
+            observacoes: `Uso em Garantia Total na aprovação do serviço ${servicoAtual.codigo}`,
+          })
+        if (erroUsoGarantia) throw erroUsoGarantia
         updatePayload.estoque_suporte_garantia_baixado = true
       }
 
-      // Baixa de suporte(s) do instalador: só insere movimentação se houver
-      // efetivamente ao menos 1 suporte de origem 'instalador' — não lança
-      // linha à toa com quantidade 0.
+      // Suporte(s) de TV marcado(s) como origem_suporte='instalador' na cotação:
+      // esse campo não existe mais na tela de Nova Cotação, mas cotações
+      // antigas ainda podem ter esse valor salvo. Mesmo raciocínio do bloco
+      // acima: o instalador pega da própria mochila, não é uma peça nova vinda
+      // do central — só registra o uso (com catalogo_id real, pra entrar
+      // certinho na conferência de estoque), sem chamar baixar_estoque_fifo.
+      // Antes desse fix a movimentação era gravada sem catalogo_id nenhum,
+      // ficando órfã de qualquer saldo (bug real encontrado e corrigido em
+      // 2026-08-13 — ver memória do projeto: 36 unidades "usadas" sem
+      // nenhuma entrega correspondente).
       if (quantidadeSuporteInstalador > 0 && servicoAtual) {
+        if (!catalogoSuporteGarantiaId) {
+          throw new Error('Item "Suporte Fixo Universal" não encontrado no catálogo — não é possível registrar o uso.')
+        }
         const { error: erroBaixaSuporteInstalador } = await supabase
           .from('movimentacoes_suportes')
           .insert({
             empresa_id: servicoAtual.empresa_id,
             instalador_id: servicoAtual.instalador_id,
+            catalogo_id: catalogoSuporteGarantiaId,
             quantidade: quantidadeSuporteInstalador,
             tipo_movimento: 'uso',
             servico_id: servicoId,
@@ -427,22 +444,22 @@ export default function Aprovacoes() {
         updatePayload.estoque_suporte_instalador_baixado = true
       }
 
-      const catalogoIdsExtrasInstalador = Object.keys(extrasInstaladorPorCatalogo)
-      if (catalogoIdsExtrasInstalador.length > 0 && servicoAtual) {
-        const { error: erroBaixaExtrasInstalador } = await supabase
+      const catalogoIdsUsoAcessorios = Object.keys(usoAcessoriosPorCatalogo)
+      if (catalogoIdsUsoAcessorios.length > 0 && servicoAtual) {
+        const { error: erroLancarUsoAcessorios } = await supabase
           .from('movimentacoes_suportes')
           .insert(
-            catalogoIdsExtrasInstalador.map((catalogoId) => ({
+            catalogoIdsUsoAcessorios.map((catalogoId) => ({
               empresa_id: servicoAtual.empresa_id,
               instalador_id: servicoAtual.instalador_id,
               catalogo_id: catalogoId,
-              quantidade: extrasInstaladorPorCatalogo[catalogoId],
+              quantidade: usoAcessoriosPorCatalogo[catalogoId],
               tipo_movimento: 'uso',
               servico_id: servicoId,
-              observacoes: `Baixa automática (extra vendido) na aprovação do serviço ${servicoAtual.codigo}`,
+              observacoes: `Baixa automática (acessório vendido) na aprovação do serviço ${servicoAtual.codigo}`,
             }))
           )
-        if (erroBaixaExtrasInstalador) throw erroBaixaExtrasInstalador
+        if (erroLancarUsoAcessorios) throw erroLancarUsoAcessorios
         updatePayload.estoque_extras_instalador_baixado = true
       }
 

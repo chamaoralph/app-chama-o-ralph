@@ -13,11 +13,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Package, Plus, History, Users, Pencil, ListTree, Boxes } from 'lucide-react'
+import { Package, Plus, History, Users, Pencil, ListTree, Boxes, Layers } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import CatalogoPrecos from '@/components/admin/CatalogoPrecos'
 import EstoqueAcessorios from '@/components/admin/EstoqueAcessorios'
+import HistoricoCascataAcessorios from '@/components/admin/HistoricoCascataAcessorios'
 
 interface Instalador {
   id: string
@@ -515,7 +516,7 @@ export default function Suportes() {
         </div>
 
         <Tabs defaultValue="entregar" className="w-full">
-          <TabsList className="w-full max-w-3xl grid grid-cols-5">
+          <TabsList className="w-full max-w-4xl grid grid-cols-6">
             <TabsTrigger value="entregar" className="gap-2">
               <Plus className="w-4 h-4" />
               Entregar
@@ -527,6 +528,10 @@ export default function Suportes() {
             <TabsTrigger value="historico" className="gap-2">
               <History className="w-4 h-4" />
               Histórico
+            </TabsTrigger>
+            <TabsTrigger value="cascata" className="gap-2">
+              <Layers className="w-4 h-4" />
+              Resumo
             </TabsTrigger>
             <TabsTrigger value="catalogo" className="gap-2">
               <ListTree className="w-4 h-4" />
@@ -795,6 +800,21 @@ export default function Suportes() {
                     )}
                   </TableBody>
                 </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="cascata" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Resumo em Cascata</CardTitle>
+                <CardDescription>
+                  Por acessório: total lançado de entrada, quanto está no estoque central, pra quem foi
+                  distribuído e quanto cada instalador já usou, devolveu ou ainda tem em mãos
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <HistoricoCascataAcessorios />
               </CardContent>
             </Card>
           </TabsContent>

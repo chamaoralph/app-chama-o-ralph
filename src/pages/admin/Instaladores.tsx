@@ -57,7 +57,7 @@ export default function Instaladores() {
 
   // Estado para Desempenho
   const [mesDesempenho, setMesDesempenho] = useState(new Date())
-  const [desempenhoData, setDesempenhoData] = useState<{ instalador_id: string; nome: string; total_servicos: number; receita: number; mao_obra: number }[]>([])
+  const [desempenhoData, setDesempenhoData] = useState<{ instalador_id: string; nome: string; total_servicos: number; receita: number; mao_obra: number; lucro_acessorios: number }[]>([])
   const [loadingDesempenho, setLoadingDesempenho] = useState(false)
 
   // Estado para Convites
@@ -165,7 +165,7 @@ export default function Instaladores() {
 
       const { data: servicos, error } = await supabase
         .from('servicos')
-        .select('instalador_id, valor_total, valor_mao_obra_instalador')
+        .select('instalador_id, valor_total, valor_mao_obra_instalador, ganho_acessorios_instalador')
         .eq('empresa_id', userData.empresa_id)
         .eq('status', 'concluido')
         .gte('data_conclusao', `${inicio}T00:00:00`)
@@ -183,15 +183,16 @@ export default function Instaladores() {
       const nomesMap = new Map((instaladoresData || []).map(i => [i.id, i.nome]))
 
       // Agrupar por instalador
-      const agrupado = new Map<string, { total_servicos: number; receita: number; mao_obra: number }>()
+      const agrupado = new Map<string, { total_servicos: number; receita: number; mao_obra: number; lucro_acessorios: number }>()
 
       for (const s of servicos || []) {
         if (!s.instalador_id) continue
-        const atual = agrupado.get(s.instalador_id) || { total_servicos: 0, receita: 0, mao_obra: 0 }
+        const atual = agrupado.get(s.instalador_id) || { total_servicos: 0, receita: 0, mao_obra: 0, lucro_acessorios: 0 }
         atual.total_servicos += 1
         const maoObra = s.valor_mao_obra_instalador || 0
         atual.receita += maoObra === 0 ? (s.valor_total || 0) : maoObra * 2
         atual.mao_obra += maoObra
+        atual.lucro_acessorios += s.ganho_acessorios_instalador || 0
         agrupado.set(s.instalador_id, atual)
       }
 
@@ -613,6 +614,7 @@ export default function Instaladores() {
                         <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Serviços Concluídos</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Receita Gerada</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Mão de Obra</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Lucro Acessórios</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -622,6 +624,7 @@ export default function Instaladores() {
                           <td className="px-4 py-3 text-sm text-right">{item.total_servicos}</td>
                           <td className="px-4 py-3 text-sm text-right font-bold text-green-600">R$ {item.receita.toFixed(2)}</td>
                           <td className="px-4 py-3 text-sm text-right">R$ {item.mao_obra.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-sm text-right">R$ {item.lucro_acessorios.toFixed(2)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -631,6 +634,7 @@ export default function Instaladores() {
                         <td className="px-4 py-3 text-sm text-right font-bold">{desempenhoData.reduce((s, d) => s + d.total_servicos, 0)}</td>
                         <td className="px-4 py-3 text-sm text-right font-bold text-green-600">R$ {desempenhoData.reduce((s, d) => s + d.receita, 0).toFixed(2)}</td>
                         <td className="px-4 py-3 text-sm text-right font-bold">R$ {desempenhoData.reduce((s, d) => s + d.mao_obra, 0).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-sm text-right font-bold">R$ {desempenhoData.reduce((s, d) => s + d.lucro_acessorios, 0).toFixed(2)}</td>
                       </tr>
                     </tfoot>
                   </table>

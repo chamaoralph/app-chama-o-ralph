@@ -127,6 +127,13 @@ export default function Caixa() {
     .filter((l) => l.tipo === "receita" && l.categoria !== "Reembolso Materiais")
     .reduce((acc, l) => acc + Number(l.valor), 0);
 
+  // Lucro da empresa na venda de acessórios (já somado em totalReceitas acima,
+  // aqui só pra destacar separadamente — sem isso fica escondido dentro do
+  // total genérico de Receitas)
+  const totalLucroAcessorios = lancamentos
+    .filter((l) => l.tipo === "receita" && l.categoria === "Lucro Acessórios")
+    .reduce((acc, l) => acc + Number(l.valor), 0);
+
   const totalDespesasGerais = lancamentos
     .filter((l) => l.tipo === "despesa" && !CATEGORIAS_INSTALADORES.has(l.categoria))
     .reduce((acc, l) => acc + Number(l.valor), 0);
@@ -239,6 +246,11 @@ export default function Caixa() {
           >
             <p className="text-sm text-green-600 font-medium mb-1">RECEITAS</p>
             <p className="text-3xl font-bold text-green-700">R$ {totalReceitas.toFixed(2)}</p>
+            {totalLucroAcessorios > 0 && (
+              <p className="text-xs text-green-600 mt-1">
+                inclui R$ {totalLucroAcessorios.toFixed(2)} de lucro em acessórios
+              </p>
+            )}
           </div>
 
           <div 
