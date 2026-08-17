@@ -1,8 +1,10 @@
 import { Phone, MapPin, Play, CheckCircle, Clock, User, Zap } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
+import { decomporExtra, formatarBRL, type ExtraServicoItem } from "@/lib/orcamento";
 
 interface Cliente {
   nome: string;
@@ -17,9 +19,11 @@ interface Servico {
   status: string;
   data_servico_agendada: string;
   tipo_servico: string[];
+  valor_total?: number;
   valor_mao_obra_instalador: number;
   descricao?: string;
   observacoes_instalador?: string;
+  acessorios_vendidos?: ExtraServicoItem[] | null;
   clientes: Cliente;
 }
 
@@ -63,6 +67,16 @@ export function AgendaServicoCard({ servico, onIniciar, onFinalizar }: AgendaSer
   };
 
   const statusConfig = getStatusConfig(servico.status);
+
+  // Quanto cobrar do cliente = mão de obra combinada no orçamento (valor_total,
+  // que já sai SEM os acessórios — ver criar_servico_ao_confirmar()) + venda de
+  // cada acessório (da cotação e/ou vendido na hora, ambos ficam em
+  // acessorios_vendidos). É diferente da "sua parte" mostrada no card: aqui é o
+  // valor cheio que o cliente paga, não o que o instalador recebe.
+  const acessorios = servico.acessorios_vendidos ?? [];
+  const totalAcessorios = acessorios.reduce((soma, item) => soma + (item.valor_venda ?? 0), 0);
+  const valorMaoObraCliente = servico.valor_total ?? 0;
+  const totalCobrarCliente = valorMaoObraCliente + totalAcessorios;
 
   const abrirWhatsApp = () => {
     const telefone = servico.clientes.telefone.replace(/\D/g, "");
@@ -127,49 +141,108 @@ export function AgendaServicoCard({ servico, onIniciar, onFinalizar }: AgendaSer
         </SheetHeader>
 
         <div className="mt-4 space-y-4">
-          {/* Informações do Serviço */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <span>
-                {formatarDataServico(servico.data_servico_agendada)}
-              </span>
-            </div>
+          <Tabs defaultValue="detalhes">
+            <TabsList className="w-full grid grid-cols-2">
+              <TabsTrigger value="detalhes">Detalhes</TabsTrigger>
+              <TabsTrigger value="cobranca">Cobrar do Cliente</TabsTrigger>
+            </TabsList>
 
-            <div className="flex items-center gap-2 text-sm">
-              <User className="h-4 w-4 text-muted-foreground" />
-              <span>{servico.clientes.nome}</span>
-            </div>
-
-            <div className="flex items-start gap-2 text-sm">
-              <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
-              <span>{servico.clientes.endereco_completo}</span>
-            </div>
-
-            <div className="flex items-center gap-2 text-sm">
-              <Phone className="h-4 w-4 text-muted-foreground" />
-              <span>{servico.clientes.telefone}</span>
-            </div>
-
-            <div className="text-sm">
-              <span className="font-medium">Serviço: </span>
-              {servico.tipo_servico?.join(", ")}
-            </div>
-
-            {servico.descricao && (
-              <div className="text-sm">
-                <span className="font-medium">Descrição: </span>
-                {servico.descricao}
+            {/* Informações do Serviço */}
+            <TabsContent value="detalhes" className="space-y-2">
+              <div className="flex items-center gap-2 text-sm">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <span>
+                  {formatarDataServico(servico.data_servico_agendada)}
+                </span>
               </div>
-            )}
 
-            <div className="flex items-center justify-between pt-2 border-t">
-              <span className="text-sm text-muted-foreground">Sua parte:</span>
-              <span className="text-xl font-bold text-green-600">
-                R$ {servico.valor_mao_obra_instalador?.toFixed(2)}
-              </span>
-            </div>
-          </div>
+              <div className="flex items-center gap-2 text-sm">
+                <User className="h-4 w-4 text-muted-foreground" />
+                <span>{servico.clientes.nome}</span>
+              </div>
+
+              <div className="flex items-start gap-2 text-sm">
+                <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
+                <span>{servico.clientes.endereco_completo}</span>
+              </div>
+
+              <div className="flex items-center gap-2 text-sm">
+                <Phone className="h-4 w-4 text-muted-foreground" />
+                <span>{servico.clientes.telefone}</span>
+              </div>
+
+              <div className="text-sm">
+                <span className="font-medium">Serviço: </span>
+                {servico.tipo_servico?.join(", ")}
+              </div>
+
+              {servico.descricao && (
+                <div className="text-sm">
+                  <span className="font-medium">Descrição: </span>
+                  {servico.descricao}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-2 border-t">
+                <span className="text-sm text-muted-foreground">Sua parte:</span>
+                <span className="text-xl font-bold text-green-600">
+                  R$ {servico.valor_mao_obra_instalador?.toFixed(2)}
+                </span>
+              </div>
+            </TabsContent>
+
+            {/* Quanto cobrar do cliente, e o porquê */}
+            <TabsContent value="cobranca" className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Total a cobrar</span>
+                <span className="text-2xl font-bold text-foreground">
+                  {formatarBRL(totalCobrarCliente)}
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <div className="border rounded-md p-2.5">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">Mão de obra (combinada no orçamento)</span>
+                    <span className="font-semibold">{formatarBRL(valorMaoObraCliente)}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    → sua parte: {formatarBRL(servico.valor_mao_obra_instalador ?? 0)}
+                  </p>
+                </div>
+
+                {acessorios.map((item, idx) => {
+                  const d = decomporExtra(item);
+                  const pecaDaEmpresa = (item.origem_estoque ?? item.fornecedor) === "empresa";
+                  const vendidoNaHora = item.origem === "finalizacao";
+                  return (
+                    <div key={idx} className="border rounded-md p-2.5">
+                      <div className="flex items-center justify-between text-sm gap-2">
+                        <span className="font-medium">
+                          {item.nome}
+                          {item.quantidade > 1 ? ` (x${item.quantidade})` : ""}
+                          <span className="text-muted-foreground font-normal">
+                            {" "}
+                            {vendidoNaHora ? "(vendido na hora)" : "(combinado no orçamento)"}
+                          </span>
+                        </span>
+                        <span className="font-semibold shrink-0">{formatarBRL(item.valor_venda)}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        → peça {pecaDaEmpresa ? "do estoque da empresa" : "do seu estoque"}; sua parte do lucro:{" "}
+                        {formatarBRL(d.ganho_instalador)}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <p className="text-xs text-muted-foreground pt-1 border-t">
+                ℹ️ Esse é o valor combinado no orçamento do cliente. Se vender algum acessório extra
+                durante o atendimento, registre em "Orçamento na hora" pra entrar na conta.
+              </p>
+            </TabsContent>
+          </Tabs>
 
           {/* Botões de Ação */}
           <div className="grid grid-cols-2 gap-2">

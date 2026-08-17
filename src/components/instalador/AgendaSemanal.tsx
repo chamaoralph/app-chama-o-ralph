@@ -21,8 +21,10 @@ interface Servico {
   status: string;
   data_servico_agendada: string;
   tipo_servico: string[];
+  valor_total?: number;
   valor_mao_obra_instalador: number;
   descricao?: string;
+  acessorios_vendidos?: any;
   clientes: Cliente;
 }
 
