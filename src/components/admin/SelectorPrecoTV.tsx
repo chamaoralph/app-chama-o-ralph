@@ -213,7 +213,7 @@ export function SelectorPrecoTV({ empresaId, items, onItemsChange, onTotaisChang
   }
 
   return (
-    <div className="col-span-2 border rounded-md p-4 bg-muted/30 space-y-4">
+    <div className="col-span-1 sm:col-span-2 border rounded-md p-4 bg-muted/30 space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold">📺 Calculadora de Instalação de TV</h3>
         <span className="text-xs text-muted-foreground">{items.length} TV{items.length > 1 ? "s" : ""}</span>

@@ -440,13 +440,13 @@ export default function NovaCotacao() {
             <h2 className="text-xl font-semibold mb-4">Dados do Cliente</h2>
             
             {/* Linha de busca - sempre visível */}
-            <div className="flex gap-4 items-end mb-4">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-end mb-4">
               <div className="flex-1">
                 <label className="block text-sm font-medium mb-2">Telefone *</label>
-                <Input 
-                  type="tel" 
-                  required 
-                  value={formData.cliente_telefone} 
+                <Input
+                  type="tel"
+                  required
+                  value={formData.cliente_telefone}
                   onChange={(e) => {
                     // Normaliza o telefone removendo caracteres especiais (incluindo Unicode do WhatsApp)
                     const telefoneNormalizado = normalizarTelefone(e.target.value)
@@ -455,26 +455,26 @@ export default function NovaCotacao() {
                       setClienteBuscado(false)
                       setClienteEncontrado(false)
                     }
-                  }} 
+                  }}
                   placeholder="Ex: 11999998888"
                 />
               </div>
               {!clienteBuscado ? (
-                <Button 
-                  type="button" 
+                <Button
+                  type="button"
                   onClick={buscarCliente}
                   disabled={buscandoCliente || !formData.cliente_telefone}
-                  className="gap-2"
+                  className="gap-2 w-full sm:w-auto"
                 >
                   {buscandoCliente ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                   Buscar Cliente
                 </Button>
               ) : (
-                <Button 
-                  type="button" 
+                <Button
+                  type="button"
                   variant="outline"
                   onClick={limparBusca}
-                  className="gap-2"
+                  className="gap-2 w-full sm:w-auto"
                 >
                   <X className="h-4 w-4" /> Limpar
                 </Button>
@@ -492,8 +492,8 @@ export default function NovaCotacao() {
             
             {/* Campos expandidos - só aparecem após busca */}
             {clienteBuscado && (
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2 flex gap-2 items-end">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="col-span-1 sm:col-span-2 flex flex-col sm:flex-row gap-2 sm:items-end">
                   <div className="flex-1">
                     <label className="block text-sm font-medium mb-2">CEP</label>
                     <Input
@@ -510,7 +510,7 @@ export default function NovaCotacao() {
                       <p className="text-xs text-red-600 mt-1">CEP não encontrado. Preencha o endereço manualmente.</p>
                     )}
                   </div>
-                  <Button type="button" variant="outline" onClick={seguirSemCep}>
+                  <Button type="button" variant="outline" onClick={seguirSemCep} className="w-full sm:w-auto">
                     Seguir sem CEP
                   </Button>
                 </div>
@@ -535,7 +535,7 @@ export default function NovaCotacao() {
                   <label className="block text-sm font-medium mb-2">Idade</label>
                   <Input type="number" value={formData.cliente_idade} onChange={(e) => setFormData({...formData, cliente_idade: e.target.value})} placeholder="Ex: 35" />
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-1 sm:col-span-2">
                   <label className="block text-sm font-medium mb-2">Endereço *</label>
                   <Input type="text" required value={formData.endereco_completo} onChange={(e) => setFormData({...formData, endereco_completo: e.target.value})} placeholder="Rua, número, complemento" />
                 </div>
@@ -545,7 +545,7 @@ export default function NovaCotacao() {
 
           <div>
             <h2 className="text-xl font-semibold mb-4">Dados do Serviço</h2>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-2">Data Desejada *</label>
                 <input type="date" required value={formData.data_servico_desejada} onChange={(e) => setFormData({...formData, data_servico_desejada: e.target.value})} className="w-full px-3 py-2 border rounded-md" />
@@ -587,7 +587,7 @@ export default function NovaCotacao() {
                   </p>
                 )}
               </div>
-              <div className="col-span-2">
+              <div className="col-span-1 sm:col-span-2">
                 <label className="block text-sm font-medium mb-2">Tipo de Serviço *</label>
                 <select 
                   required 
@@ -606,7 +606,7 @@ export default function NovaCotacao() {
                 </select>
               </div>
               {showOutroInput && (
-                <div className="col-span-2">
+                <div className="col-span-1 sm:col-span-2">
                   <label className="block text-sm font-medium mb-2">Especifique o serviço *</label>
                   <Input 
                     type="text" 
@@ -627,10 +627,10 @@ export default function NovaCotacao() {
               )}
 
               {/* Itens extras */}
-              <div className="col-span-2 border rounded-md p-4 space-y-3">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="col-span-1 sm:col-span-2 border rounded-md p-4 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <span className="text-sm font-medium">Itens Extras</span>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     {catalogoAcessorios.length > 0 && (
                       <select
                         value=""
@@ -653,7 +653,7 @@ export default function NovaCotacao() {
                             repasseEmpresa: repasse.repasse_empresa,
                           }])
                         }}
-                        className="px-2 py-1 border rounded-md text-sm bg-white"
+                        className="w-full sm:w-auto px-2 py-2 border rounded-md text-sm bg-white"
                       >
                         <option value="">+ Acessório do catálogo...</option>
                         {catalogoAcessorios.map(item => {
@@ -675,6 +675,7 @@ export default function NovaCotacao() {
                       type="button"
                       variant="outline"
                       size="sm"
+                      className="w-full sm:w-auto"
                       onClick={() => setItensExtras(prev => [...prev, { id: `${Date.now()}`, descricao: '', valor: '' }])}
                     >
                       <Plus className="w-4 h-4 mr-1" /> Adicionar Item
@@ -686,7 +687,7 @@ export default function NovaCotacao() {
                 )}
                 {itensExtras.map((item) => (
                   <div key={item.id} className="space-y-1">
-                    <div className="flex gap-2 items-center">
+                    <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
                       <input
                         type="text"
                         placeholder="Descrição do item"
@@ -694,22 +695,24 @@ export default function NovaCotacao() {
                         onChange={(e) => setItensExtras(prev => prev.map(i => i.id === item.id ? { ...i, descricao: e.target.value } : i))}
                         className="flex-1 px-3 py-2 border rounded-md text-sm"
                       />
-                      <input
-                        type="number"
-                        step="0.01"
-                        placeholder="0,00"
-                        value={item.valor}
-                        onChange={(e) => setItensExtras(prev => prev.map(i => i.id === item.id ? { ...i, valor: e.target.value } : i))}
-                        className="w-28 px-3 py-2 border rounded-md text-sm"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setItensExtras(prev => prev.filter(i => i.id !== item.id))}
-                      >
-                        <Trash2 className="w-4 h-4 text-muted-foreground" />
-                      </Button>
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="0,00"
+                          value={item.valor}
+                          onChange={(e) => setItensExtras(prev => prev.map(i => i.id === item.id ? { ...i, valor: e.target.value } : i))}
+                          className="flex-1 sm:w-28 sm:flex-none px-3 py-2 border rounded-md text-sm"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setItensExtras(prev => prev.filter(i => i.id !== item.id))}
+                        >
+                          <Trash2 className="w-4 h-4 text-muted-foreground" />
+                        </Button>
+                      </div>
                     </div>
                     {item.catalogoId && (
                       <p className="text-xs text-muted-foreground pl-1">
@@ -735,7 +738,7 @@ export default function NovaCotacao() {
                 )}
               </div>
 
-              <div className="col-span-2">
+              <div className="col-span-1 sm:col-span-2">
                 <label className="block text-sm font-medium mb-2">Descrição do Serviço</label>
                 <textarea 
                   value={formData.descricao} 
@@ -749,9 +752,9 @@ export default function NovaCotacao() {
             </div>
           </div>
 
-              <div className="flex gap-3">
-                <button type="button" onClick={() => navigate('/admin/cotacoes')} className="px-6 py-2 border rounded-md">Cancelar</button>
-                <button type="submit" disabled={loading || tvIndisponivel} className="flex-1 bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">{loading ? 'Salvando...' : tvIndisponivel ? 'Combinação indisponível' : 'Criar Cotação'}</button>
+              <div className="flex flex-col-reverse sm:flex-row gap-3">
+                <button type="button" onClick={() => navigate('/admin/cotacoes')} className="px-6 py-3 sm:py-2 border rounded-md">Cancelar</button>
+                <button type="submit" disabled={loading || tvIndisponivel} className="flex-1 bg-blue-600 text-white py-3 sm:py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">{loading ? 'Salvando...' : tvIndisponivel ? 'Combinação indisponível' : 'Criar Cotação'}</button>
               </div>
             </form>
           </TabsContent>
