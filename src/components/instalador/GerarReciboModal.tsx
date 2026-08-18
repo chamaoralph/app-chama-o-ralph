@@ -80,6 +80,12 @@ export function GerarReciboModal({
   )
   const totalGeral = totalMaoObra + totalReembolso + totalGanhoAcessorios
   const saldoLiquido = totalInst - totalRecebidoPeloInstalador
+  // Só a fatia que é DELE (reembolso próprio + ganho em acessórios dele) — exclui
+  // custo_suporte e ganho_acessorios_empresa, que são reembolso da EMPRESA (ele deve
+  // devolver, não soma no que ele recebe). totalReembolso/totalGanhoAcessorios acima
+  // misturam os dois lados e servem só pro "Total Bruto" exibido na tela, não pra
+  // persistir no recibo — ver totalInst logo acima, que já isola certo.
+  const totalReembolsoInstalador = totalInst - totalMaoObra
 
   async function gerarImagem(): Promise<Blob | null> {
     const hiddenContainer = hiddenContainerRef.current
@@ -137,8 +143,8 @@ export function GerarReciboModal({
           .from('recibos_diarios')
           .update({
             valor_mao_obra: totalMaoObra,
-            valor_reembolso: totalReembolso,
-            valor_total: totalMaoObra,
+            valor_reembolso: totalReembolsoInstalador,
+            valor_total: totalInst,
             quantidade_servicos: servicos.length,
             servicos_ids: servicos.map(s => s.id),
             valor_recebido_cliente: totalRecebidoPeloInstalador
@@ -155,8 +161,8 @@ export function GerarReciboModal({
             instalador_id: user.id,
             data_referencia: dataFormatada,
             valor_mao_obra: totalMaoObra,
-            valor_reembolso: totalReembolso,
-            valor_total: totalMaoObra,
+            valor_reembolso: totalReembolsoInstalador,
+            valor_total: totalInst,
             quantidade_servicos: servicos.length,
             servicos_ids: servicos.map(s => s.id),
             valor_recebido_cliente: totalRecebidoPeloInstalador
