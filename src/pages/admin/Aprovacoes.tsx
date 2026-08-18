@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { ExtraServicoItem, formatarBRL, decomporExtra } from '@/lib/orcamento'
 import type { TVItem } from '@/components/admin/SelectorPrecoTV'
@@ -95,6 +96,8 @@ interface AprovacaoModal {
   ganho_acessorios_instalador: string
   ganho_acessorios_empresa: string
   percentual_mao_obra: number
+  /** Instalador marcou (ou o admin está marcando agora, na aprovação) que usou o suporte fixo universal da empresa. */
+  usou_suporte_garantia_total: boolean
 }
 
 // Acessório incluído na COTAÇÃO (cotacoes.itens_extras), não na finalização.
@@ -177,7 +180,13 @@ export default function Aprovacoes() {
     ganho_acessorios_instalador: '',
     ganho_acessorios_empresa: '',
     percentual_mao_obra: 50,
+    usou_suporte_garantia_total: false,
   })
+  // Quanto do custo_suporte do modal veio do toggle manual "usou suporte" marcado
+  // pelo admin (não pelo instalador) — guardado pra poder tirar de volta se ele
+  // desmarcar antes de confirmar. 0 = nada adicionado manualmente ainda.
+  const [custoGarantiaAdicionadoManualmente, setCustoGarantiaAdicionadoManualmente] = useState(0)
+  const [carregandoCustoGarantia, setCarregandoCustoGarantia] = useState(false)
 
   useEffect(() => {
     fetchServicos()
@@ -325,20 +334,63 @@ export default function Aprovacoes() {
       ganho_acessorios_instalador: String(servico.ganho_acessorios_instalador ?? '0'),
       ganho_acessorios_empresa: String(servico.ganho_acessorios_empresa ?? '0'),
       percentual_mao_obra: servico.percentual_mao_obra ?? 50,
+      usou_suporte_garantia_total: servico.usou_suporte_garantia_total ?? false,
     })
+    setCustoGarantiaAdicionadoManualmente(0)
+  }
+
+  // Admin marcando na aprovação (não o instalador na finalização) que usou o
+  // suporte fixo universal — pro caso dele esquecer de marcar. Soma/retira o
+  // custo real (FIFO) do campo Reembolso Empresa e liga/desliga a baixa de
+  // estoque que vai rolar em confirmarAprovacao(), do mesmo jeito que rola
+  // quando é o instalador que marca na finalização.
+  async function alternarSuporteGarantiaManual(marcado: boolean) {
+    if (marcado) {
+      if (!catalogoSuporteGarantiaId) {
+        toast.error('Item "Suporte Fixo Universal" não encontrado no catálogo.')
+        return
+      }
+      setCarregandoCustoGarantia(true)
+      try {
+        const { data, error } = await supabase.rpc('custo_atual_acessorio', { p_catalogo_id: catalogoSuporteGarantiaId })
+        if (error) throw error
+        const custoFifo = (data as number | null) ?? 0
+        setCustoGarantiaAdicionadoManualmente(custoFifo)
+        setAprovacaoModal(prev => ({
+          ...prev,
+          usou_suporte_garantia_total: true,
+          custo_suporte: ((parseFloat(prev.custo_suporte) || 0) + custoFifo).toFixed(2),
+        }))
+      } catch (error: any) {
+        toast.error('Erro ao calcular o custo do suporte', { description: error.message })
+      } finally {
+        setCarregandoCustoGarantia(false)
+      }
+    } else {
+      setAprovacaoModal(prev => ({
+        ...prev,
+        usou_suporte_garantia_total: false,
+        custo_suporte: Math.max(0, (parseFloat(prev.custo_suporte) || 0) - custoGarantiaAdicionadoManualmente).toFixed(2),
+      }))
+      setCustoGarantiaAdicionadoManualmente(0)
+    }
   }
 
   async function confirmarAprovacao() {
     const { servicoId, valor_total, valor_mao_obra_instalador, recebimento_cliente,
-            valor_recebido_cliente, valor_reembolso_despesas, custo_suporte } = aprovacaoModal
+            valor_recebido_cliente, valor_reembolso_despesas, custo_suporte,
+            usou_suporte_garantia_total } = aprovacaoModal
     if (!servicoId) return
 
     try {
       setProcessingId(servicoId)
 
       const servicoAtual = servicos.find(s => s.id === servicoId)
+      // Considera tanto o que o instalador já tinha marcado na finalização quanto
+      // o toggle manual do admin aqui na aprovação (pro caso dele ter esquecido).
+      const usouSuporteGarantiaFinal = usou_suporte_garantia_total || !!servicoAtual?.usou_suporte_garantia_total
       const precisaBaixarSuporteGarantia =
-        !!servicoAtual?.usou_suporte_garantia_total && !servicoAtual?.estoque_suporte_garantia_baixado
+        usouSuporteGarantiaFinal && !servicoAtual?.estoque_suporte_garantia_baixado
 
       // Suporte(s) de propriedade do instalador usado(s) na(s) TV(s) deste serviço.
       // Guard: precisa ter instalador atribuído e ainda não ter sido baixado antes
@@ -385,6 +437,7 @@ export default function Aprovacoes() {
         valor_recebido_cliente: parseFloat(valor_recebido_cliente) || 0,
         valor_reembolso_despesas: parseFloat(valor_reembolso_despesas) || 0,
         custo_suporte: parseFloat(custo_suporte) || 0,
+        usou_suporte_garantia_total: usouSuporteGarantiaFinal,
       }
 
       // Suporte Fixo Universal usado na Garantia Total: o instalador pega da
@@ -1085,11 +1138,33 @@ export default function Aprovacoes() {
                 />
                 {(() => {
                   const modalServico = servicos.find(s => s.id === aprovacaoModal.servicoId)
-                  if (!modalServico?.usou_suporte_garantia_total || modalServico.estoque_suporte_garantia_baixado) return null
+                  if (!modalServico) return null
+
+                  // Instalador já marcou na finalização — só mostra o aviso, nada pra editar.
+                  if (modalServico.usou_suporte_garantia_total) {
+                    if (modalServico.estoque_suporte_garantia_baixado) return null
+                    return (
+                      <p className="text-xs text-blue-700 mt-1">
+                        Já inclui o custo estimado do suporte fixo universal (Garantia Total). A baixa real do estoque acontece ao confirmar.
+                      </p>
+                    )
+                  }
+
+                  // Instalador NÃO marcou — deixa o admin marcar aqui na aprovação
+                  // (ex: ele esqueceu), pra entrar o custo real e dar baixa no estoque certinho.
                   return (
-                    <p className="text-xs text-blue-700">
-                      Já inclui o custo estimado do suporte fixo universal (Garantia Total). A baixa real do estoque acontece ao confirmar.
-                    </p>
+                    <div className="flex items-start gap-2 mt-2">
+                      <Checkbox
+                        id="ap-usou-suporte-garantia"
+                        checked={aprovacaoModal.usou_suporte_garantia_total}
+                        disabled={carregandoCustoGarantia}
+                        onCheckedChange={(checked) => alternarSuporteGarantiaManual(checked === true)}
+                      />
+                      <Label htmlFor="ap-usou-suporte-garantia" className="text-xs font-normal leading-tight cursor-pointer">
+                        Instalador usou o suporte fixo universal (Garantia Total) da empresa, mas esqueceu de marcar
+                        {carregandoCustoGarantia && ' — calculando custo...'}
+                      </Label>
+                    </div>
                   )
                 })()}
               </div>
