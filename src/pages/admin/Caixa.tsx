@@ -4,8 +4,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import { formatarDataBR } from "@/lib/utils";
 
-// Categorias consideradas como custos de instaladores
-const CATEGORIAS_INSTALADORES = new Set(["Pagamento Instalador", "Reembolso Materiais"]);
+// Categorias que são acerto de caixa com o instalador (ele pagando a empresa
+// ou a empresa pagando ele), não receita/despesa nova — a receita do serviço
+// já foi lançada em "Receita de Serviço" na aprovação; isso aqui é só o
+// dinheiro que ele já tinha em mãos voltando pra empresa (ou vice-versa).
+// Fica de fora de Receitas/Despesas Gerais; aparece só no card "Instaladores"
+// (fonte: recibos_diarios) e no filtro "Instaladores" da lista.
+const CATEGORIAS_INSTALADORES = new Set(["Pagamento Instalador", "Reembolso Materiais", "Recebimento Instalador"]);
 
 // Cores para o gráfico pizza
 const CORES_PIZZA = [
@@ -124,7 +129,7 @@ export default function Caixa() {
   }
 
   const totalReceitas = lancamentos
-    .filter((l) => l.tipo === "receita" && l.categoria !== "Reembolso Materiais")
+    .filter((l) => l.tipo === "receita" && !CATEGORIAS_INSTALADORES.has(l.categoria))
     .reduce((acc, l) => acc + Number(l.valor), 0);
 
   // Lucro da empresa na venda de acessórios (já somado em totalReceitas acima,
@@ -145,7 +150,7 @@ export default function Caixa() {
 
   // Lançamentos filtrados para exibição
   const lancamentosFiltrados = lancamentos.filter((l) => {
-    if (filtroTipo === "receitas") return l.tipo === "receita";
+    if (filtroTipo === "receitas") return l.tipo === "receita" && !CATEGORIAS_INSTALADORES.has(l.categoria);
     if (filtroTipo === "despesas_gerais") return l.tipo === "despesa" && !CATEGORIAS_INSTALADORES.has(l.categoria);
     if (filtroTipo === "instaladores") return CATEGORIAS_INSTALADORES.has(l.categoria);
     return true;
