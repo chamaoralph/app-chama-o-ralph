@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
+import { formatarTipoServicoComTamanho } from '@/lib/precosTV'
 
 interface Cotacao {
   id: string
@@ -25,6 +26,8 @@ interface Cotacao {
   descricao_servico: string | null
   observacoes: string | null
   instalador_nome?: string | null
+  tv_tamanho?: string | null
+  tvs_itens?: { tamanho?: string | null }[] | null
   clientes: {
     id: string
     nome: string
@@ -259,7 +262,7 @@ export function CalendarioCotacoesSemanal({ cotacoes, onAprovar, onEditar, onExc
                                 )}
                               </div>
                               <div className="text-xs truncate mt-1">
-                                {[cotacao.tipo_servico?.join(', '), cotacao.clientes.bairro].filter(Boolean).join(' - ')}
+                                {[formatarTipoServicoComTamanho(cotacao.tipo_servico, cotacao.tv_tamanho, cotacao.tvs_itens), cotacao.clientes.bairro].filter(Boolean).join(' - ')}
                               </div>
                               {cotacao.instalador_nome && (
                                 <div className="text-xs truncate mt-0.5 opacity-70">
@@ -415,7 +418,9 @@ export function CalendarioCotacoesSemanal({ cotacoes, onAprovar, onEditar, onExc
 
                   <div>
                     <p className="text-sm font-medium text-gray-700">Tipo de Serviço</p>
-                    <p className="text-sm">{cotacaoSelecionada.tipo_servico?.join(', ') || '-'}</p>
+                    <p className="text-sm">
+                      {formatarTipoServicoComTamanho(cotacaoSelecionada.tipo_servico, cotacaoSelecionada.tv_tamanho, cotacaoSelecionada.tvs_itens) || '-'}
+                    </p>
                   </div>
 
                   {cotacaoSelecionada.valor_estimado && (

@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label'
 import { CalendarioCotacoesSemanal } from '@/components/admin/CalendarioCotacoesSemanal'
 import { CalendarioCotacoesMensal } from '@/components/admin/CalendarioCotacoesMensal'
 import { SelectorPrecoTV, type TVItem, type TotaisTV, novoItemTV } from '@/components/admin/SelectorPrecoTV'
-import { ehInstalacaoTV } from '@/lib/precosTV'
+import { ehInstalacaoTV, formatarTipoServicoComTamanho } from '@/lib/precosTV'
 import { CatalogoItem, Fornecedor, calcularRepasseAcessorio, formatarBRL } from '@/lib/orcamento'
 import { TermoAceiteCard } from '@/components/admin/TermoAceiteCard'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -52,6 +52,8 @@ interface Cotacao {
   }
   instalador_nome?: string | null
   instalador_id?: string | null
+  tv_tamanho?: string | null
+  tvs_itens?: { tamanho?: string | null }[] | null
 }
 
 interface EditForm {
@@ -1207,7 +1209,7 @@ export default function ListaCotacoes() {
                           </td>
                           <td className="px-6 py-4">
                             <div className="text-sm text-gray-900">
-                              {cotacao.tipo_servico?.join(', ') || '-'}
+                              {formatarTipoServicoComTamanho(cotacao.tipo_servico, cotacao.tv_tamanho, cotacao.tvs_itens) || '-'}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
