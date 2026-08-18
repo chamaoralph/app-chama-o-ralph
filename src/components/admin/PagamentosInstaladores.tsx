@@ -84,6 +84,7 @@ export function PagamentosInstaladores() {
   const [filtroMes, setFiltroMes] = useState('')
   const [filtroStatus, setFiltroStatus] = useState('todos')
   const [filtroDirecao, setFiltroDirecao] = useState('todos') // todos | a_pagar | a_receber
+  const [filtroInstalador, setFiltroInstalador] = useState('todos') // 'todos' ou instalador_id
   
   // Modal de pagamento
   const [modalPagamento, setModalPagamento] = useState(false)
@@ -158,7 +159,34 @@ export function PagamentosInstaladores() {
   useEffect(() => {
     const mesAtual = format(new Date(), 'yyyy-MM')
     setFiltroMes(mesAtual)
+    carregarInstaladoresAtivos()
   }, [])
+
+  // Lista de instaladores pro filtro (e reaproveitada pelo modal de Lançar Recibo Manual)
+  async function carregarInstaladoresAtivos() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: userData } = await supabase
+        .from('usuarios')
+        .select('empresa_id')
+        .eq('id', user.id)
+        .single()
+      if (!userData) return
+
+      const { data: inst } = await supabase
+        .from('usuarios')
+        .select('id, nome')
+        .eq('empresa_id', userData.empresa_id)
+        .eq('tipo', 'instalador')
+        .eq('ativo', true)
+        .order('nome')
+
+      setInstaladoresAtivos(inst || [])
+    } catch (e) {
+      console.error('Erro ao carregar instaladores:', e)
+    }
+  }
 
   useEffect(() => {
     if (filtroMes) {
@@ -616,29 +644,8 @@ export function PagamentosInstaladores() {
     setManualValorTotal(0)
     setManualValorRecebido(0)
 
-    // Carregar instaladores ativos
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: userData } = await supabase
-        .from('usuarios')
-        .select('empresa_id')
-        .eq('id', user.id)
-        .single()
-      if (!userData) return
-
-      const { data: inst } = await supabase
-        .from('usuarios')
-        .select('id, nome')
-        .eq('empresa_id', userData.empresa_id)
-        .eq('tipo', 'instalador')
-        .eq('ativo', true)
-        .order('nome')
-
-      setInstaladoresAtivos(inst || [])
-    } catch (e) {
-      console.error('Erro ao carregar instaladores:', e)
-    }
+    // Reforça a lista de instaladores ativos (já carregada no mount, mas garante que está fresca)
+    await carregarInstaladoresAtivos()
 
     setModalManual(true)
   }
@@ -814,6 +821,7 @@ export function PagamentosInstaladores() {
     if (filtroStatus !== 'todos' && r.status_pagamento !== filtroStatus) return false
     if (filtroDirecao === 'a_pagar' && !(r.saldo > 0)) return false
     if (filtroDirecao === 'a_receber' && !(r.saldo < 0)) return false
+    if (filtroInstalador !== 'todos' && r.instalador_id !== filtroInstalador) return false
     return true
   })
 
@@ -868,6 +876,19 @@ export function PagamentosInstaladores() {
             onChange={(e) => setFiltroMes(e.target.value)}
             className="w-48"
           />
+        </div>
+        <div>
+          <Label className="text-sm font-medium mb-2 block">Instalador</Label>
+          <select
+            value={filtroInstalador}
+            onChange={(e) => setFiltroInstalador(e.target.value)}
+            className="px-3 py-2 border rounded-md bg-background"
+          >
+            <option value="todos">Todos</option>
+            {instaladoresAtivos.map((inst) => (
+              <option key={inst.id} value={inst.id}>{inst.nome}</option>
+            ))}
+          </select>
         </div>
         <div>
           <Label className="text-sm font-medium mb-2 block">Status</Label>
