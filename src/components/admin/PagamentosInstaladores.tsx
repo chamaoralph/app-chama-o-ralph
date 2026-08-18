@@ -48,12 +48,20 @@ interface ReciboComInstalador {
   instalador_id: string
   instalador_nome: string
   quantidade_servicos: number
+  servicos_codigos: string
   valor_mao_obra: number
   valor_reembolso: number
+  /** mão de obra + reembolso — a fatia que é do instalador. */
   valor_total: number
   valor_recebido_cliente: number
+  /** fatia que fica com a empresa nesses serviços (mão de obra dela + custo de suporte + ganho em acessórios dela). Só informativo — não entra na conta de pagar/receber. */
+  parte_empresa: number
   /** mão de obra + reembolso − recebido em mãos pelo instalador. > 0 = empresa deve pagar; < 0 = instalador deve devolver */
   saldo: number
+  /** quanto o INSTALADOR deve devolver pra empresa (0 se não deve nada) */
+  a_pagar: number
+  /** quanto a EMPRESA deve pagar pro instalador (0 se não deve nada) */
+  a_receber: number
   status_pagamento: string
   data_pagamento: string | null
   comprovante_pix_url: string | null
@@ -220,7 +228,7 @@ export function PagamentosInstaladores() {
         supabase
           .from('recibos_diarios')
           .select(`
-            id, data_referencia, instalador_id, quantidade_servicos,
+            id, data_referencia, instalador_id, quantidade_servicos, servicos_ids,
             valor_mao_obra, valor_reembolso, valor_total, valor_recebido_cliente,
             status_pagamento, data_pagamento, comprovante_pix_url
           `)
@@ -242,6 +250,19 @@ export function PagamentosInstaladores() {
       if (recibosRes.error) throw recibosRes.error
 
       const data = recibosRes.data || []
+
+      // Busca os serviços de CADA recibo (por servicos_ids, não por mês/data_conclusao —
+      // evita perder serviço concluído perto da virada do mês) com os campos que faltam
+      // pra calcular a parte da empresa: mão de obra total do serviço (pré-split), custo
+      // de suporte e ganho em acessórios da empresa, além do código pra exibir.
+      const todosServicosIds = Array.from(new Set(data.flatMap(r => r.servicos_ids || [])))
+      const { data: servicosDetalhados } = todosServicosIds.length > 0
+        ? await supabase
+            .from('servicos')
+            .select('id, codigo, valor_mao_obra_instalador, valor_total, custo_suporte, ganho_acessorios_empresa')
+            .in('id', todosServicosIds)
+        : { data: [] }
+      const servicosPorId = new Map((servicosDetalhados || []).map(s => [s.id, s]))
       const servicosConcluidos = servicosRes.data || []
 
       // Buscar nomes dos instaladores (de recibos + serviços)
@@ -261,17 +282,36 @@ export function PagamentosInstaladores() {
         const valorMaoObra = Number(r.valor_mao_obra)
         const valorReembolso = Number(r.valor_reembolso)
         const valorRecebidoCliente = Number(r.valor_recebido_cliente) || 0
+        const saldo = valorMaoObra + valorReembolso - valorRecebidoCliente
+
+        const servicosDoRecibo = (r.servicos_ids || [])
+          .map((id: string) => servicosPorId.get(id))
+          .filter((s): s is NonNullable<typeof s> => !!s)
+        const parteEmpresa = servicosDoRecibo.reduce(
+          (soma, s) =>
+            soma +
+            (Number(s.valor_total || 0) - Number(s.valor_mao_obra_instalador || 0)) +
+            Number(s.custo_suporte || 0) +
+            Number(s.ganho_acessorios_empresa || 0),
+          0
+        )
+        const servicosCodigos = servicosDoRecibo.map(s => s.codigo).sort().join(', ')
+
         return {
           id: r.id,
           data_referencia: r.data_referencia,
           instalador_id: r.instalador_id,
           instalador_nome: instaladoresMap.get(r.instalador_id) || 'Desconhecido',
           quantidade_servicos: r.quantidade_servicos,
+          servicos_codigos: servicosCodigos,
           valor_mao_obra: valorMaoObra,
           valor_reembolso: valorReembolso,
           valor_total: Number(r.valor_total),
           valor_recebido_cliente: valorRecebidoCliente,
-          saldo: valorMaoObra + valorReembolso - valorRecebidoCliente,
+          parte_empresa: parteEmpresa,
+          saldo,
+          a_pagar: saldo < 0 ? Math.abs(saldo) : 0,
+          a_receber: saldo > 0 ? saldo : 0,
           status_pagamento: r.status_pagamento || 'pendente',
           data_pagamento: r.data_pagamento,
           comprovante_pix_url: r.comprovante_pix_url
@@ -1029,11 +1069,12 @@ export function PagamentosInstaladores() {
               <TableRow>
                 <TableHead>Data</TableHead>
                 <TableHead>Instalador</TableHead>
-                <TableHead className="text-center">Serviços</TableHead>
-                <TableHead className="text-right">Mão de Obra</TableHead>
-                <TableHead className="text-right">Reembolso</TableHead>
-                <TableHead className="text-right">Recebido</TableHead>
-                <TableHead className="text-right">Saldo</TableHead>
+                <TableHead>Serviços</TableHead>
+                <TableHead className="text-right">Recebeu</TableHead>
+                <TableHead className="text-right">Parte dele</TableHead>
+                <TableHead className="text-right">Parte empresa</TableHead>
+                <TableHead className="text-right">Pagar</TableHead>
+                <TableHead className="text-right">Receber</TableHead>
                 <TableHead className="text-center">Status</TableHead>
                 <TableHead className="text-center">Ações</TableHead>
               </TableRow>
@@ -1047,16 +1088,19 @@ export function PagamentosInstaladores() {
                     {formatarDataBR(recibo.data_referencia)}
                   </TableCell>
                   <TableCell className="font-medium">{recibo.instalador_nome}</TableCell>
-                  <TableCell className="text-center">{recibo.quantidade_servicos}</TableCell>
-                  <TableCell className="text-right">R$ {recibo.valor_mao_obra.toFixed(2)}</TableCell>
-                  <TableCell className="text-right">R$ {recibo.valor_reembolso.toFixed(2)}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground max-w-[200px]">{recibo.servicos_codigos || `${recibo.quantidade_servicos} serviço(s)`}</TableCell>
                   <TableCell className="text-right">
                     {recibo.valor_recebido_cliente > 0 ? (
                       <span className="text-orange-600">R$ {recibo.valor_recebido_cliente.toFixed(2)}</span>
                     ) : '—'}
                   </TableCell>
-                  <TableCell className={`text-right font-bold ${aReceberDoInstalador ? 'text-red-600' : 'text-green-600'}`}>
-                    R$ {Math.abs(recibo.saldo).toFixed(2)}
+                  <TableCell className="text-right">R$ {recibo.valor_total.toFixed(2)}</TableCell>
+                  <TableCell className="text-right text-muted-foreground">R$ {recibo.parte_empresa.toFixed(2)}</TableCell>
+                  <TableCell className="text-right font-bold text-red-600">
+                    {recibo.a_pagar > 0 ? `R$ ${recibo.a_pagar.toFixed(2)}` : '—'}
+                  </TableCell>
+                  <TableCell className="text-right font-bold text-green-600">
+                    {recibo.a_receber > 0 ? `R$ ${recibo.a_receber.toFixed(2)}` : '—'}
                   </TableCell>
                   <TableCell className="text-center">
                     <Badge variant={recibo.status_pagamento === 'pago' ? 'default' : 'secondary'}>
