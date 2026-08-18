@@ -1064,19 +1064,20 @@ export function PagamentosInstaladores() {
             <p>Nenhum recibo encontrado no período</p>
           </div>
         ) : (
-          <Table>
+          <div className="overflow-x-auto">
+          <Table className="min-w-[1100px]">
             <TableHeader>
               <TableRow>
-                <TableHead>Data</TableHead>
-                <TableHead>Instalador</TableHead>
-                <TableHead>Serviços</TableHead>
-                <TableHead className="text-right">Recebeu</TableHead>
-                <TableHead className="text-right">Parte dele</TableHead>
-                <TableHead className="text-right">Parte empresa</TableHead>
-                <TableHead className="text-right">Pagar</TableHead>
-                <TableHead className="text-right">Receber</TableHead>
-                <TableHead className="text-center">Status</TableHead>
-                <TableHead className="text-center">Ações</TableHead>
+                <TableHead className="whitespace-nowrap">Data</TableHead>
+                <TableHead className="whitespace-nowrap">Instalador</TableHead>
+                <TableHead className="whitespace-nowrap">Serviços</TableHead>
+                <TableHead className="text-right whitespace-nowrap">Recebeu</TableHead>
+                <TableHead className="text-right whitespace-nowrap">Parte dele</TableHead>
+                <TableHead className="text-right whitespace-nowrap">Parte empresa</TableHead>
+                <TableHead className="text-right whitespace-nowrap">Pagar</TableHead>
+                <TableHead className="text-right whitespace-nowrap">Receber</TableHead>
+                <TableHead className="text-center whitespace-nowrap">Status</TableHead>
+                <TableHead className="text-center whitespace-nowrap">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1084,11 +1085,16 @@ export function PagamentosInstaladores() {
                 const aReceberDoInstalador = recibo.saldo < 0
                 return (
                 <TableRow key={recibo.id}>
-                  <TableCell>
+                  <TableCell className="whitespace-nowrap">
                     {formatarDataBR(recibo.data_referencia)}
                   </TableCell>
-                  <TableCell className="font-medium">{recibo.instalador_nome}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground max-w-[200px]">{recibo.servicos_codigos || `${recibo.quantidade_servicos} serviço(s)`}</TableCell>
+                  <TableCell className="font-medium whitespace-nowrap">{recibo.instalador_nome}</TableCell>
+                  <TableCell
+                    className="text-xs text-muted-foreground max-w-[160px] truncate"
+                    title={recibo.servicos_codigos || undefined}
+                  >
+                    {recibo.servicos_codigos || `${recibo.quantidade_servicos} serviço(s)`}
+                  </TableCell>
                   <TableCell className="text-right">
                     {recibo.valor_recebido_cliente > 0 ? (
                       <span className="text-orange-600">R$ {recibo.valor_recebido_cliente.toFixed(2)}</span>
@@ -1185,6 +1191,7 @@ export function PagamentosInstaladores() {
               )})}
             </TableBody>
           </Table>
+          </div>
         )}
       </div>
 
