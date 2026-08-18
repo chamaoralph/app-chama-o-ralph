@@ -7,6 +7,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { supabase } from '@/integrations/supabase/client'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
+import { useIsMobile } from '@/hooks/use-mobile'
+import { cn } from '@/lib/utils'
 
 interface Cotacao {
   id: string
@@ -86,7 +88,9 @@ export function CalendarioCotacoesSemanal({ cotacoes, onAprovar, onEditar, onExc
   const [dataReferencia, setDataReferencia] = useState(new Date())
   const [cotacaoSelecionada, setCotacaoSelecionada] = useState<Cotacao | null>(null)
   const [indisponibilidades, setIndisponibilidades] = useState<Indisponibilidade[]>([])
-  
+  const [diaSelecionadoMobile, setDiaSelecionadoMobile] = useState<Date | null>(null)
+  const isMobile = useIsMobile()
+
   // Início da semana (segunda-feira)
   const inicioSemana = startOfWeek(dataReferencia, { weekStartsOn: 1 })
   
@@ -124,9 +128,9 @@ export function CalendarioCotacoesSemanal({ cotacoes, onAprovar, onEditar, onExc
     fetchIndisponibilidades()
   }, [dataReferencia])
 
-  const irParaHoje = () => setDataReferencia(new Date())
-  const semanaAnterior = () => setDataReferencia(subWeeks(dataReferencia, 1))
-  const proximaSemana = () => setDataReferencia(addWeeks(dataReferencia, 1))
+  const irParaHoje = () => { setDataReferencia(new Date()); setDiaSelecionadoMobile(null) }
+  const semanaAnterior = () => { setDataReferencia(subWeeks(dataReferencia, 1)); setDiaSelecionadoMobile(null) }
+  const proximaSemana = () => { setDataReferencia(addWeeks(dataReferencia, 1)); setDiaSelecionadoMobile(null) }
 
   // Agrupar cotações por data
   const cotacoesPorDia = diasSemana.map(dia => {
@@ -176,7 +180,109 @@ export function CalendarioCotacoesSemanal({ cotacoes, onAprovar, onEditar, onExc
           </h3>
         </div>
 
-        {/* Grid do calendário */}
+        {/* Mobile: faixa de dias + lista do dia selecionado (ou de todos, agrupado) */}
+        {isMobile ? (
+          <div className="space-y-3">
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+              {cotacoesPorDia.map(({ dia, cotacoes: cotacoesDoDia }) => {
+                const isHojeDia = isSameDay(dia, hoje)
+                const indispDia = getIndisponibilidadesDoDia(dia)
+                const selecionado = !!diaSelecionadoMobile && isSameDay(diaSelecionadoMobile, dia)
+                const totalDia = cotacoesDoDia.length + indispDia.length
+                return (
+                  <button
+                    key={dia.toISOString()}
+                    onClick={() => setDiaSelecionadoMobile(selecionado ? null : dia)}
+                    className={cn(
+                      'flex-shrink-0 w-14 p-2 rounded-lg border text-center transition-colors',
+                      isHojeDia && !selecionado && 'border-blue-600',
+                      selecionado ? 'bg-blue-600 border-blue-600 text-white' : 'bg-gray-50'
+                    )}
+                  >
+                    <p className={cn('text-[10px] uppercase', selecionado ? 'text-white/80' : 'text-gray-500')}>
+                      {format(dia, 'EEE', { locale: ptBR })}
+                    </p>
+                    <p className={cn('text-base font-bold', selecionado ? 'text-white' : isHojeDia ? 'text-blue-600' : 'text-gray-900')}>
+                      {format(dia, 'd')}
+                    </p>
+                    {totalDia > 0 && (
+                      <p className={cn('text-[9px]', selecionado ? 'text-white/80' : 'text-blue-600')}>{totalDia}</p>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+
+            <div className="space-y-4">
+              {cotacoesPorDia
+                .filter(({ dia }) => !diaSelecionadoMobile || isSameDay(dia, diaSelecionadoMobile))
+                .map(({ dia, cotacoes: cotacoesDoDia }) => {
+                  const indispDia = getIndisponibilidadesDoDia(dia)
+                  if (!diaSelecionadoMobile && cotacoesDoDia.length === 0 && indispDia.length === 0) return null
+                  return (
+                    <div key={dia.toISOString()}>
+                      <h4 className="text-sm font-semibold text-gray-700 mb-1.5">
+                        {isSameDay(dia, hoje) ? 'Hoje - ' : ''}
+                        {format(dia, "EEEE, dd/MM", { locale: ptBR })}
+                      </h4>
+                      <div className="space-y-1.5">
+                        {indispDia.map((ind) => (
+                          <div key={ind.id} className="p-2 rounded border bg-red-50 border-red-200 text-red-700">
+                            <div className="text-xs font-medium flex items-center gap-1">
+                              <UserX className="w-3 h-3" />
+                              {ind.instalador_nome} — Indisponível
+                            </div>
+                            {ind.hora_inicio && (
+                              <div className="text-xs opacity-75">
+                                {ind.hora_inicio.substring(0, 5)}
+                                {ind.hora_fim && ` - ${ind.hora_fim.substring(0, 5)}`}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                        {cotacoesDoDia.length === 0 && indispDia.length === 0 ? (
+                          <p className="text-xs text-gray-400 py-2">Sem cotações</p>
+                        ) : (
+                          cotacoesDoDia.map((cotacao) => (
+                            <div
+                              key={cotacao.id}
+                              onClick={() => setCotacaoSelecionada(cotacao)}
+                              className={`p-3 rounded-lg border cursor-pointer active:opacity-70 ${getStatusColor(cotacao.status)}`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-sm font-medium truncate">{cotacao.clientes.nome}</span>
+                                {cotacao.horario_inicio && (
+                                  <span className="text-xs opacity-75 flex items-center gap-1 shrink-0">
+                                    <Clock className="w-3 h-3" />
+                                    {cotacao.horario_inicio.substring(0, 5)}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs truncate mt-1">
+                                {[cotacao.tipo_servico?.join(', '), cotacao.clientes.bairro].filter(Boolean).join(' - ')}
+                              </div>
+                              {cotacao.instalador_nome && (
+                                <div className="text-xs truncate mt-0.5 opacity-70">
+                                  {cotacao.instalador_nome.trim().split(/\s+/).slice(0, 2).join(' ')}
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+
+              {!diaSelecionadoMobile &&
+                cotacoesPorDia.every((d) => d.cotacoes.length === 0) &&
+                indisponibilidades.length === 0 && (
+                  <p className="text-center text-sm text-gray-400 py-8">Nenhuma cotação nesta semana</p>
+                )}
+            </div>
+          </div>
+        ) : (
+        /* Grid do calendário (desktop) */
         <div className="grid grid-cols-6 gap-2">
           {cotacoesPorDia.map(({ dia, cotacoes: cotacoesDoDia }) => {
             const isHoje = isSameDay(dia, hoje)
@@ -270,6 +376,7 @@ export function CalendarioCotacoesSemanal({ cotacoes, onAprovar, onEditar, onExc
             )
           })}
         </div>
+        )}
 
         {/* Sheet de detalhes */}
         <Sheet open={!!cotacaoSelecionada} onOpenChange={() => setCotacaoSelecionada(null)}>
