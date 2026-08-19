@@ -11,17 +11,20 @@
 //    instalador que já recebeu (clica pra ver recebido/usado/devolvido).
 //
 // Fórmulas:
-//   Entrada total  = soma de estoque_lotes.quantidade — EXCETO lotes
-//                     criados por "Ajuste manual: Devolução de acessório
-//                     pelo instalador" (ajustar_estoque_manual sempre cria
-//                     lote novo pra qualquer entrada positiva, inclusive
-//                     devolução). Essas unidades já foram contadas como
-//                     entrada na compra original; contar de novo quando
-//                     voltam pro central duplicaria (bug real encontrado
-//                     e corrigido em 2026-08-12, ver
-//                     project_estoque_acessorios_origem_estoque na memória).
-//                     Correções de contagem por outro motivo continuam
-//                     contando normalmente.
+//   Entrada total  = soma de estoque_lotes.quantidade — EXCETO qualquer lote
+//                     criado por ajuste manual (observações começando com
+//                     "Ajuste manual:" — devolução de acessório pelo
+//                     instalador, contagem física do estoque central, etc).
+//                     "Entrada" é só o que de fato entrou na empresa por
+//                     compra (tem fornecedor) — ajuste não é compra, é
+//                     correção de saldo. Esses lotes também não aparecem
+//                     mais na lista expansível (pedido do usuário em
+//                     2026-08-19 — antes só o total excluía a devolução do
+//                     instalador, mas a lista continuava mostrando ela
+//                     misturada com compras reais; ampliado pra qualquer
+//                     "Ajuste manual:", já que o usuário passou a usar esse
+//                     mecanismo também pra contagem física do central, não
+//                     só devolução).
 //   Estoque central = estoque_saldo.saldo (o que sobrou, nunca saiu)
 //   Distribuído     = soma de movimentacoes_suportes tipo='entrega'
 //   Vendido direto   = soma de estoque_movimentos tipo='baixa' com
@@ -215,17 +218,15 @@ export default function HistoricoCascataAcessorios() {
     const entrada: Record<string, number> = {};
     const lotesPorCatalogo: Record<string, Lote[]> = {};
     for (const l of lotes ?? []) {
-      // devolução ao central não é entrada nova — a unidade já foi contada
-      // quando comprada originalmente (ver comentário da fórmula no topo).
-      // Continua listado em "lotesPorCatalogo" pra aparecer no histórico
-      // clicável, só não soma no total de Entrada.
-      const ehDevolucaoDoInstalador = l.observacoes?.startsWith(
-        "Ajuste manual: Devolução de acessório pelo instalador"
-      );
-      if (!ehDevolucaoDoInstalador) {
+      // Ajuste manual (devolução do instalador, contagem física do central,
+      // etc) não é uma compra — não soma no total de Entrada nem aparece na
+      // lista expansível, que agora só mostra lançamentos reais (ver
+      // comentário da fórmula no topo).
+      const ehAjusteManual = l.observacoes?.startsWith("Ajuste manual:");
+      if (!ehAjusteManual) {
         entrada[l.catalogo_id] = (entrada[l.catalogo_id] ?? 0) + l.quantidade;
+        (lotesPorCatalogo[l.catalogo_id] ??= []).push(l);
       }
-      (lotesPorCatalogo[l.catalogo_id] ??= []).push(l);
     }
 
     const central: Record<string, number> = {};
