@@ -4,7 +4,14 @@ import { Skeleton } from "@/components/ui/skeleton"
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const TZ = "America/Sao_Paulo"
-const CATEGORIAS_INSTALADORES = new Set(["Pagamento Instalador", "Reembolso Materiais"])
+// Mesmo set do Caixa.tsx — categorias que são acerto de caixa com o
+// instalador (ele pagando a empresa ou vice-versa), não receita/despesa
+// nova. "Recebimento Instalador" precisa ficar de fora de Receitas senão
+// dobra a contagem: a receita do serviço já foi lançada inteira em
+// "Receita de Serviço" na aprovação (ver fix 2026-08-18 no Caixa — esse
+// componente tinha ficado pra trás, causando "Entrada" do Marketing
+// diferente do Caixa).
+const CATEGORIAS_INSTALADORES = new Set(["Pagamento Instalador", "Reembolso Materiais", "Recebimento Instalador"])
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function toDateStr(dateInput: string): string {
@@ -156,7 +163,7 @@ function calcularPeriodo(
   // Lançamentos do período
   const lancsDoPeriodo = lancamentos.filter((l) => noPeriodo(l.data_lancamento))
   d.totalReceitas = lancsDoPeriodo
-    .filter((l) => l.tipo === "receita" && l.categoria !== "Reembolso Materiais")
+    .filter((l) => l.tipo === "receita" && !CATEGORIAS_INSTALADORES.has(l.categoria))
     .reduce((s, l) => s + Number(l.valor), 0)
   d.totalDespesasGerais = lancsDoPeriodo
     .filter((l) => l.tipo === "despesa" && !CATEGORIAS_INSTALADORES.has(l.categoria))
