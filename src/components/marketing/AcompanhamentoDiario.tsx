@@ -20,7 +20,12 @@ import { DollarSign, TrendingUp, Briefcase, Percent, Settings, AlertTriangle, Ch
 // ─── Constants ───────────────────────────────────────────────────────────────
 const TZ = "America/Sao_Paulo"
 const STORAGE_KEY = "chama-ralph-metas-tracking"
-const CATEGORIAS_INSTALADORES = new Set(["Pagamento Instalador", "Reembolso Materiais"])
+// Mesmo set do Caixa.tsx — categorias que são acerto de caixa com o
+// instalador, não receita/despesa nova. "Recebimento Instalador" precisa
+// ficar de fora de Receitas senão dobra a contagem (ver fix 2026-08-18 no
+// Caixa — este componente tinha ficado pra trás, causando Lucro Líquido
+// diferente entre Acompanhamento e Caixa).
+const CATEGORIAS_INSTALADORES = new Set(["Pagamento Instalador", "Reembolso Materiais", "Recebimento Instalador"])
 const DIAS_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
 
 interface Metas {
@@ -264,7 +269,7 @@ export function AcompanhamentoDiario() {
       const dia = l.data_lancamento.slice(0, 10)
       if (!lancPorDia[dia]) lancPorDia[dia] = { receita: 0, despesa: 0 }
       if (l.tipo === "receita") {
-        if (l.categoria !== "Reembolso Materiais") lancPorDia[dia].receita += Number(l.valor)
+        if (!CATEGORIAS_INSTALADORES.has(l.categoria)) lancPorDia[dia].receita += Number(l.valor)
       } else {
         if (!CATEGORIAS_INSTALADORES.has(l.categoria)) lancPorDia[dia].despesa += Number(l.valor)
       }
@@ -283,7 +288,7 @@ export function AcompanhamentoDiario() {
 
     // Resumo global
     const totalReceitas = lancamentos
-      .filter((l) => l.tipo === "receita" && l.categoria !== "Reembolso Materiais")
+      .filter((l) => l.tipo === "receita" && !CATEGORIAS_INSTALADORES.has(l.categoria))
       .reduce((s, l) => s + Number(l.valor), 0)
 
     const totalDespesasGerais = lancamentos

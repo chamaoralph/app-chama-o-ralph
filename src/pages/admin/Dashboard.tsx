@@ -260,7 +260,11 @@ export default function AdminDashboard() {
         .gte('data_conclusao', startOfMonth.toISOString().split('T')[0])
         .lte('data_conclusao', new Date().toISOString().split('T')[0] + 'T23:59:59')
 
-      const receitaMes = lancamentos?.filter(l => l.tipo === 'receita' && l.categoria !== 'Reembolso Materiais').reduce((sum, l) => sum + Number(l.valor), 0) || 0
+      // "Recebimento Instalador"/"Pagamento Instalador"/"Reembolso Materiais" são
+      // acerto de caixa com o instalador, não receita/despesa nova — mesma
+      // exclusão do Caixa.tsx (fix 2026-08-18, propagado aqui em 2026-08-19
+      // porque este card também divergia do Caixa).
+      const receitaMes = lancamentos?.filter(l => l.tipo === 'receita' && l.categoria !== 'Reembolso Materiais' && l.categoria !== 'Recebimento Instalador').reduce((sum, l) => sum + Number(l.valor), 0) || 0
       const despesasMes = lancamentos?.filter(l => l.tipo === 'despesa' && l.categoria !== 'Reembolso Materiais' && l.categoria !== 'Pagamento Instalador').reduce((sum, l) => sum + Number(l.valor), 0) || 0
       const instaladoresMes = servicosInstaladores?.reduce((sum, s) => sum + Number(s.valor_mao_obra_instalador || 0), 0) || 0
       const saldoCaixa = receitaMes - despesasMes - instaladoresMes
