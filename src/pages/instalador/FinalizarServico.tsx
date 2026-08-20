@@ -220,12 +220,21 @@ export default function FinalizarServico() {
   const suporteGarantiaComProblema =
     isGarantiaTotal && (usouSuporteGarantia === null || (usouSuporteGarantia === true && (!catalogoSuporteGarantia || saldoSuporteGarantia <= 0)));
 
+  // Antes só buscava o custo de referência do central pra linha "restante
+  // vem do central" (fornecedorRestante==='empresa'). Ampliado pra QUALQUER
+  // item selecionado — serve também de rede de segurança pra linha do saldo
+  // próprio (ver uso em custo: abaixo), que hoje confia inteiramente na
+  // média de valor_unitario das entregas do instalador. Se essa média vier
+  // 0 (ex: um ajuste manual de saldo lançado sem custo — bug real
+  // encontrado e corrigido em 2026-08-19, SRV-2026-672 vendeu uma Fechadura
+  // com reembolso de custo zerado), cai pro custo de referência do catálogo
+  // em vez de tratar como grátis.
   const acessoriosExtrasEmpresaIds = useMemo(() => {
     if (!catalogoAcessorios) return [];
     return catalogoAcessorios
-      .filter((c) => quantidadesExtras[c.id] != null && fornecedoresExtras[c.id] === "empresa")
+      .filter((c) => quantidadesExtras[c.id] != null)
       .map((c) => c.id);
-  }, [catalogoAcessorios, quantidadesExtras, fornecedoresExtras]);
+  }, [catalogoAcessorios, quantidadesExtras]);
 
   const custoEstoqueExtraQueries = useQueries({
     queries: acessoriosExtrasEmpresaIds.map((catalogoId) => ({
@@ -274,7 +283,11 @@ export default function FinalizarServico() {
         if (qtdSaldoProprio > 0) {
           itens.push({
             ...montarItem(c, qtdSaldoProprio),
-            custo: custoMedioInstaladorPorId[c.id] ?? 0,
+            // Prefere a média real do que o instalador recebeu; só cai pro
+            // custo de referência do catálogo se essa média vier 0 (sinal de
+            // que a entrega dele foi registrada sem custo, não que a peça é
+            // de graça — ver comentário acima de acessoriosExtrasEmpresaIds).
+            custo: custoMedioInstaladorPorId[c.id] || custoEstoqueExtraPorId[c.id]?.valor || 0,
             fornecedor: "empresa",
             // origemEstoque='instalador': precisa debitar do saldo próprio
             // dele (movimentacoes_suportes) na aprovação do serviço.
