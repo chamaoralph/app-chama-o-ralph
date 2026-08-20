@@ -183,6 +183,7 @@ export function AcompanhamentoDiario() {
   const [lancamentos, setLancamentos] = useState<any[]>([])
   const [recibos, setRecibos] = useState<any[]>([])
   const [cotacoes, setCotacoes] = useState<any[]>([])
+  const [agendadosPendentes, setAgendadosPendentes] = useState<any[]>([])
 
   useEffect(() => { carregarDados() }, [mesAno])
 
@@ -199,7 +200,7 @@ export function AcompanhamentoDiario() {
       const startDate = `${mesAno}-01`
       const endDate = `${mesAno}-${String(daysInMonth).padStart(2, "0")}`
 
-      const [res1, res2, res3, res4] = await Promise.all([
+      const [res1, res2, res3, res4, res5] = await Promise.all([
         // 1. Serviços concluídos no mês
         supabase
           .from("servicos")
@@ -238,12 +239,25 @@ export function AcompanhamentoDiario() {
           .eq("empresa_id", userData.empresa_id)
           .gte("created_at", startDate + "T00:00:00")
           .lte("created_at", endDate + "T23:59:59"),
+
+        // 5. Serviços agendados no mês que ainda não foram concluídos nem
+        // cancelados — previsão do que ainda vai virar receita (mesma lógica
+        // do card PROJEÇÃO do Caixa.tsx: mão de obra*2, ou valor_total como
+        // fallback pra serviços sem mão de obra rastreada).
+        supabase
+          .from("servicos")
+          .select("valor_total, valor_mao_obra_instalador")
+          .eq("empresa_id", userData.empresa_id)
+          .not("status", "in", "(concluido,cancelado)")
+          .gte("data_servico_agendada", startDate)
+          .lte("data_servico_agendada", endDate + "T23:59:59"),
       ])
 
       setServicos(res1.data || [])
       setLancamentos(res2.data || [])
       setRecibos(res3.data || [])
       setCotacoes(res4.data || [])
+      setAgendadosPendentes(res5.data || [])
     } catch (err) {
       console.error("Erro ao carregar dados de acompanhamento:", err)
     } finally {
@@ -309,6 +323,17 @@ export function AcompanhamentoDiario() {
 
     // Taxa de conversão
     const taxaConversao = cotacoes.length > 0 ? (servicos.length / cotacoes.length) * 100 : 0
+
+    // Previsão — serviços agendados no mês que ainda não foram concluídos
+    // nem cancelados. Empresa opera 50/50 com o instalador: metade do valor
+    // agendado é a fatia prevista dele, a outra metade é o que sobra pra
+    // empresa (antes de descontar despesas gerais do mês).
+    const valorAgendado = agendadosPendentes.reduce((s, a) => {
+      const maoObra = Number(a.valor_mao_obra_instalador || 0)
+      return s + (maoObra === 0 ? Number(a.valor_total || 0) : maoObra * 2)
+    }, 0)
+    const metadeInstaladoresPrevista = valorAgendado / 2
+    const lucroPrevistoEmpresa = valorAgendado - metadeInstaladoresPrevista
 
     // Tabela diária
     const dias: DiaTabela[] = []
@@ -377,8 +402,11 @@ export function AcompanhamentoDiario() {
       rayanasHoje,
       pctMeta,
       pctProj,
+      valorAgendado,
+      metadeInstaladoresPrevista,
+      lucroPrevistoEmpresa,
     }
-  }, [servicos, lancamentos, recibos, cotacoes, mesAno, metas])
+  }, [servicos, lancamentos, recibos, cotacoes, agendadosPendentes, mesAno, metas])
 
   function salvarMetas() {
     const novas: Metas = {
@@ -569,6 +597,29 @@ export function AcompanhamentoDiario() {
           <div className="bg-orange-50 rounded-lg p-3 border border-orange-100">
             <p className="text-orange-700 font-medium">Instaladores</p>
             <p className="text-orange-900 font-bold text-lg">R$ {fmt(computed.totalInstaladores)}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Previsão — serviços agendados no mês, ainda não concluídos nem cancelados */}
+      {!loading && (
+        <div>
+          <p className="text-xs text-muted-foreground mb-2">
+            Previsão — serviços agendados no mês que ainda não foram concluídos (empresa fica com 50%)
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+            <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+              <p className="text-blue-700 font-medium">Agendado</p>
+              <p className="text-blue-900 font-bold text-lg">R$ {fmt(computed.valorAgendado)}</p>
+            </div>
+            <div className="bg-amber-50 rounded-lg p-3 border border-amber-100">
+              <p className="text-amber-700 font-medium">50% Instaladores (previsto)</p>
+              <p className="text-amber-900 font-bold text-lg">R$ {fmt(computed.metadeInstaladoresPrevista)}</p>
+            </div>
+            <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+              <p className="text-blue-700 font-medium">Lucro Previsto (empresa)</p>
+              <p className="text-blue-900 font-bold text-lg">R$ {fmt(computed.lucroPrevistoEmpresa)}</p>
+            </div>
           </div>
         </div>
       )}
