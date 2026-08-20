@@ -574,7 +574,63 @@ export function AcompanhamentoDiario() {
       )}
 
       {/* Tabela diária */}
-      <div className="bg-card rounded-lg shadow-sm border overflow-x-auto">
+      {/* Mobile: cards, sem tabela de 900px pra rolar de lado */}
+      <div className="md:hidden bg-card rounded-lg shadow-sm border divide-y divide-border">
+        {loading
+          ? Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="p-3">
+                <Skeleton className="h-4 w-24 mb-2" />
+                <Skeleton className="h-4 w-full" />
+              </div>
+            ))
+          : computed.dias.map((row) => {
+              const isFuture = `${mesAno}-${String(row.dia).padStart(2, "0")}` > todayTZ()
+
+              if (row.isDomingo) {
+                return (
+                  <div key={row.dia} className="px-3 py-2 flex items-center justify-between text-sm text-gray-400 bg-gray-50">
+                    <span>{String(row.dia).padStart(2, "0")} · {row.diaSemana}</span>
+                    <span>–</span>
+                  </div>
+                )
+              }
+
+              return (
+                <div key={row.dia} className={`p-3 ${isFuture ? "text-muted-foreground" : ""}`}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="font-medium text-sm">
+                      {String(row.dia).padStart(2, "0")} · {row.diaSemana}
+                    </span>
+                    <span className={`text-sm ${semaforoCls(row.percentMeta)}`}>
+                      {semaforo(row.percentMeta)} {row.percentMeta.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground mb-2">
+                    <span className={row.google > 0 ? "text-blue-600" : ""}>Google: {row.google}</span>
+                    <span>Orgânico: {row.organico}</span>
+                    <span className="font-medium text-foreground">Total: {row.total}</span>
+                    {row.jobsRayana > 0 && (
+                      <span className="text-purple-600 font-medium">Rayana: {row.jobsRayana}</span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm">
+                    <span className="text-green-700">Receita: R$ {fmt(row.receita)}</span>
+                    <span className="text-red-600">Despesa: R$ {fmt(row.despesa)}</span>
+                    <span className="text-orange-600">Instaladores: R$ {fmt(row.despesaInstalador)}</span>
+                  </div>
+                  <div className="flex items-center justify-between mt-1.5 text-sm font-medium">
+                    <span className={row.lucroDia >= 0 ? "text-green-700" : "text-red-600"}>
+                      Lucro dia: R$ {fmt(row.lucroDia)}
+                    </span>
+                    <span>Acumulado: R$ {fmt(row.lucroAcumulado)}</span>
+                  </div>
+                </div>
+              )
+            })}
+      </div>
+
+      {/* Desktop: tabela completa */}
+      <div className="hidden md:block bg-card rounded-lg shadow-sm border overflow-x-auto">
         <table className="min-w-[900px] w-full text-sm">
           <thead className="bg-muted/50 border-b">
             <tr>
