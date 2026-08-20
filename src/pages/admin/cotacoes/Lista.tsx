@@ -1072,7 +1072,7 @@ export default function ListaCotacoes() {
                 size="sm"
                 variant="outline"
                 disabled={!habilitado}
-                className="text-green-700 border-green-300 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="order-2 md:order-none text-green-700 border-green-300 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Aprovar sem termo
               </Button>
@@ -1096,7 +1096,7 @@ export default function ListaCotacoes() {
             onClick={() => setCotacaoParaNaoGerou(cotacao.id)}
             size="sm"
             variant="outline"
-            className="text-orange-600 hover:text-orange-700"
+            className="order-1 md:order-none text-orange-600 hover:text-orange-700"
           >
             <XCircle className="w-4 h-4 mr-1" />
             Não Gerou
@@ -1170,7 +1170,7 @@ export default function ListaCotacoes() {
         onClick={() => bloquearTelefone(cotacao)}
         size="sm"
         variant="ghost"
-        className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+        className="order-3 md:order-none text-orange-600 hover:text-orange-700 hover:bg-orange-50"
         disabled={bloqueandoTelefone === cotacao.id}
         title="Bloquear número"
       >
@@ -1180,7 +1180,7 @@ export default function ListaCotacoes() {
         onClick={() => setCotacaoParaExcluir(cotacao.id)}
         size="sm"
         variant="ghost"
-        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+        className="order-4 md:order-none text-red-600 hover:text-red-700 hover:bg-red-50"
       >
         <Trash2 className="w-4 h-4" />
       </Button>
