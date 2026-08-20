@@ -618,11 +618,19 @@ export function AcompanhamentoDiario() {
                     <span className="text-red-600">Despesa: R$ {fmt(row.despesa)}</span>
                     <span className="text-orange-600">Instaladores: R$ {fmt(row.despesaInstalador)}</span>
                   </div>
-                  <div className="flex items-center justify-between mt-1.5 text-sm font-medium">
-                    <span className={row.lucroDia >= 0 ? "text-green-700" : "text-red-600"}>
-                      Lucro dia: R$ {fmt(row.lucroDia)}
-                    </span>
-                    <span>Acumulado: R$ {fmt(row.lucroAcumulado)}</span>
+                  <div className={`mt-2 rounded-md px-3 py-2 flex items-center justify-between ${
+                    row.lucroDia >= 0 ? "bg-green-50" : "bg-red-50"
+                  }`}>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Lucro do dia</p>
+                      <p className={`text-xl font-bold ${row.lucroDia >= 0 ? "text-green-700" : "text-red-600"}`}>
+                        R$ {fmt(row.lucroDia)}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground">Acumulado</p>
+                      <p className="text-sm font-medium">R$ {fmt(row.lucroAcumulado)}</p>
+                    </div>
                   </div>
                 </div>
               )
