@@ -456,7 +456,7 @@ export function AcompanhamentoDiario() {
       )}
 
       {/* 4 Cards de topo */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Lucro Líquido */}
         <Card>
           <CardHeader className="pb-2">
@@ -557,7 +557,7 @@ export function AcompanhamentoDiario() {
 
       {/* Resumo financeiro */}
       {!loading && (
-        <div className="grid grid-cols-3 gap-3 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
           <div className="bg-green-50 rounded-lg p-3 border border-green-100">
             <p className="text-green-700 font-medium">Receitas</p>
             <p className="text-green-900 font-bold text-lg">R$ {fmt(computed.totalReceitas)}</p>
@@ -671,7 +671,7 @@ export function AcompanhamentoDiario() {
         ) : (
           <>
             {/* 4 Cards de acessórios */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -755,7 +755,36 @@ export function AcompanhamentoDiario() {
             </div>
 
             {/* Ranking por instalador */}
-            <div className="bg-card rounded-lg shadow-sm border overflow-x-auto">
+            {/* Mobile: cards, sem tabela de 600px pra rolar de lado */}
+            <div className="md:hidden bg-card rounded-lg shadow-sm border divide-y divide-border">
+              {loadingRankingAcessorios ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="p-3">
+                    <Skeleton className="h-4 w-1/2 mb-2" />
+                    <Skeleton className="h-4 w-2/3" />
+                  </div>
+                ))
+              ) : !rankingAcessoriosInstalador || rankingAcessoriosInstalador.length === 0 ? (
+                <div className="p-4 text-center text-sm text-muted-foreground">
+                  Nenhum instalador com serviços concluídos no período
+                </div>
+              ) : (
+                rankingAcessoriosInstalador.map((row) => (
+                  <div key={row.instalador_id} className="p-3">
+                    <p className="font-medium text-sm mb-1">{row.instalador_nome}</p>
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <span>{row.servicos_concluidos} serviços · {row.itens_vendidos} itens</span>
+                      <span className="text-green-700 font-medium">
+                        {formatarBRL(row.lucro_gerado_empresa ?? 0)}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Desktop: tabela completa */}
+            <div className="hidden md:block bg-card rounded-lg shadow-sm border overflow-x-auto">
               <table className="min-w-[600px] w-full text-sm">
                 <thead className="bg-muted/50 border-b">
                   <tr>
