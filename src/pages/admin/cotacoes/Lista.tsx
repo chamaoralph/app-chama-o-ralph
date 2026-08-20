@@ -1232,7 +1232,7 @@ export default function ListaCotacoes() {
         </div>
 
         <Tabs defaultValue="lista" className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+          <TabsList className="hidden md:grid w-full max-w-md grid-cols-2 mb-6">
             <TabsTrigger value="lista">Lista de Cotações</TabsTrigger>
             <TabsTrigger value="importacao">Importação em Massa</TabsTrigger>
           </TabsList>
