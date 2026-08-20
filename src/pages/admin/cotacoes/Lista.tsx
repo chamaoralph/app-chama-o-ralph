@@ -953,6 +953,207 @@ export default function ListaCotacoes() {
     )
   }
 
+  // Botões de ação de uma cotação — usado tanto na tabela desktop quanto
+  // nos cards mobile, pra não duplicar essa lógica cheia de condicionais.
+  const renderAcoes = (cotacao: Cotacao) => (
+    <div className="flex items-center gap-2 flex-wrap">
+      <Button
+        onClick={() => abrirEdicao(cotacao)}
+        size="sm"
+        variant="outline"
+      >
+        <Pencil className="w-4 h-4 mr-1" />
+        Editar
+      </Button>
+      {cotacao.status === 'pendente' && (
+        <>
+          {(() => {
+            const temValor = (cotacao.valor_estimado ?? 0) > 0
+            const exigeTermo = cotacaoExigeTermo(cotacao.tipo_servico)
+            const aprovarBtn = (
+              <Button
+                onClick={() => {
+                  if (!temValor) {
+                    toast({
+                      title: "Valor não preenchido",
+                      description: "Preencha o tamanho/parede da TV (ou um valor manual) antes de aprovar. Use o botão Editar.",
+                      variant: "destructive",
+                    })
+                    return
+                  }
+                  if (exigeTermo) {
+                    if (confirm('Aprovar esta cotação? O cliente precisará assinar o termo digital antes do serviço ser liberado para os instaladores.')) {
+                      supabase
+                        .from('cotacoes')
+                        .update({ status: 'termo_pendente' })
+                        .eq('id', cotacao.id)
+                        .then(() => {
+                          toast({ title: "Cotação aprovada!", description: "Abra a cotação para enviar o termo de aceite ao cliente." })
+                          fetchCotacoes()
+                        })
+                    }
+                  } else {
+                    // Tipo de serviço não exige termo — libera direto
+                    supabase
+                      .from('cotacoes')
+                      .update({ status: 'aprovada' })
+                      .eq('id', cotacao.id)
+                      .then(() => {
+                        toast({ title: "Cotação aprovada!", description: "Serviço liberado para os instaladores (este tipo não exige termo)." })
+                        fetchCotacoes()
+                      })
+                  }
+                }}
+                size="sm"
+                variant="default"
+                disabled={!temValor}
+                className="bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Aprovar
+              </Button>
+            )
+            if (temValor) return aprovarBtn
+            return (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span tabIndex={0}>{aprovarBtn}</span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Preencha o tamanho/parede da TV (ou valor manual) antes de aprovar. Use Editar.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )
+          })()}
+          {cotacaoExigeTermo(cotacao.tipo_servico) && (() => {
+            const clienteTemTermo = clientesComTermo.has(cotacao.cliente_id)
+            const temValor = (cotacao.valor_estimado ?? 0) > 0
+            const habilitado = temValor
+            const btn = (
+              <Button
+                onClick={() => {
+                  if (!habilitado) return
+                  setCotacaoParaAprovarSemTermo({ id: cotacao.id, clienteTemTermo })
+                }}
+                size="sm"
+                variant="outline"
+                disabled={!habilitado}
+                className="text-green-700 border-green-300 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Aprovar sem termo
+              </Button>
+            )
+            if (habilitado) return btn
+            const motivo = "Preencha o tamanho/parede da TV (ou valor manual) antes de aprovar."
+            return (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span tabIndex={0}>{btn}</span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {motivo}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )
+          })()}
+          <Button
+            onClick={() => setCotacaoParaNaoGerou(cotacao.id)}
+            size="sm"
+            variant="outline"
+            className="text-orange-600 hover:text-orange-700"
+          >
+            <XCircle className="w-4 h-4 mr-1" />
+            Não Gerou
+          </Button>
+        </>
+      )}
+      {cotacao.status === 'termo_pendente' && (
+        <>
+          <Button
+            onClick={() => abrirEdicao(cotacao)}
+            size="sm"
+            variant="default"
+            className="bg-orange-600 hover:bg-orange-700"
+            title="Abrir cotação para enviar/acompanhar o termo"
+          >
+            Enviar Termo
+          </Button>
+          <Button
+            onClick={() => {
+              if (confirm('Voltar esta cotação para pendente?')) {
+                supabase
+                  .from('cotacoes')
+                  .update({ status: 'pendente' })
+                  .eq('id', cotacao.id)
+                  .then(() => {
+                    toast({ title: "Cotação voltou para pendente" })
+                    fetchCotacoes()
+                  })
+              }
+            }}
+            size="sm"
+            variant="outline"
+            className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+          >
+            <Undo2 className="w-4 h-4 mr-1" />
+            Reprovar
+          </Button>
+        </>
+      )}
+      {cotacao.status === 'aprovada' && (
+        <Button
+          onClick={() => {
+            if (confirm('Reprovar esta cotação? O serviço associado será removido (se ainda não iniciado).')) {
+              reprovarCotacao(cotacao.id)
+            }
+          }}
+          size="sm"
+          variant="outline"
+          className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+        >
+          <Undo2 className="w-4 h-4 mr-1" />
+          Reprovar
+        </Button>
+      )}
+      {(cotacao.status === 'reprovada' || cotacao.status === 'perdida' || cotacao.status === 'nao_gerou') && (
+        <Button
+          onClick={() => {
+            if (confirm('Reativar esta cotação? Ela voltará para pendente e poderá ser avaliada novamente.')) {
+              reativarCotacao(cotacao.id)
+            }
+          }}
+          size="sm"
+          variant="outline"
+          className="text-green-600 hover:text-green-700 hover:bg-green-50"
+        >
+          <RotateCcw className="w-4 h-4 mr-1" />
+          Reativar
+        </Button>
+      )}
+      <Button
+        onClick={() => bloquearTelefone(cotacao)}
+        size="sm"
+        variant="ghost"
+        className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+        disabled={bloqueandoTelefone === cotacao.id}
+        title="Bloquear número"
+      >
+        <Ban className="w-4 h-4" />
+      </Button>
+      <Button
+        onClick={() => setCotacaoParaExcluir(cotacao.id)}
+        size="sm"
+        variant="ghost"
+        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+      >
+        <Trash2 className="w-4 h-4" />
+      </Button>
+    </div>
+  )
+
   if (loading) {
     return (
       <AdminLayout>
@@ -976,7 +1177,7 @@ export default function ListaCotacoes() {
   return (
     <AdminLayout>
       <div>
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Cotações</h1>
             <p className="text-gray-600 mt-2">Gerencie todas as cotações de serviços</p>
@@ -1096,7 +1297,57 @@ export default function ListaCotacoes() {
 
             {/* Visualização em Lista */}
             {visualizacao === 'lista' && (
-              <div className="bg-white rounded-lg shadow-md overflow-hidden">
+              <>
+                {/* Mobile: cards, sem tabela de 9 colunas pra rolar de lado */}
+                <div className="md:hidden bg-white rounded-lg shadow-md divide-y divide-gray-200">
+                  {cotacoes.length === 0 ? (
+                    <div className="px-6 py-12 text-center text-gray-500">
+                      <p className="text-lg font-medium">Nenhuma cotação cadastrada</p>
+                      <p className="text-sm mt-1">Clique em "Nova Cotação" para começar</p>
+                    </div>
+                  ) : (
+                    cotacoesPaginadas.map((cotacao) => (
+                      <div key={cotacao.id} className="p-4">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div>
+                            <p className={`text-sm font-bold ${
+                              cotacao.clientes.tipo_alerta === 'problematico'
+                                ? 'text-red-600'
+                                : cotacao.clientes.tipo_alerta === 'atencao'
+                                  ? 'text-amber-600'
+                                  : 'text-gray-900'
+                            }`} title={cotacao.clientes.observacao_alerta || undefined}>
+                              {cotacao.clientes.tipo_alerta === 'problematico' && '💀 '}
+                              {cotacao.clientes.tipo_alerta === 'atencao' && '⚠️ '}
+                              {cotacao.clientes.nome}
+                            </p>
+                            <p className="text-xs text-gray-500">{cotacao.clientes.telefone || '-'}</p>
+                          </div>
+                          {getStatusBadge(cotacao.status)}
+                        </div>
+                        <p className="text-sm text-gray-900 mb-2">
+                          {formatarTipoServicoComTamanho(cotacao.tipo_servico, cotacao.tv_tamanho, cotacao.tvs_itens) || '-'}
+                        </p>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600 mb-1">
+                          <span>📅 {formatarDataLocal(cotacao.data_servico_desejada)}</span>
+                          <span>📍 {cotacao.clientes.bairro || '-'}</span>
+                          <span>
+                            💰 {cotacao.valor_estimado
+                              ? `R$ ${Number(cotacao.valor_estimado).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                              : '-'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-400 mb-3">
+                          Cotado em {formatarTimestampBR(cotacao.created_at)}
+                        </p>
+                        {renderAcoes(cotacao)}
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Desktop: tabela completa com ordenação por coluna */}
+                <div className="hidden md:block bg-white rounded-lg shadow-md overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
@@ -1231,210 +1482,16 @@ export default function ListaCotacoes() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            <div className="flex items-center gap-2">
-                              <Button
-                                onClick={() => abrirEdicao(cotacao)}
-                                size="sm"
-                                variant="outline"
-                              >
-                                <Pencil className="w-4 h-4 mr-1" />
-                                Editar
-                              </Button>
-                              {cotacao.status === 'pendente' && (
-                                <>
-                                  {(() => {
-                                    const temValor = (cotacao.valor_estimado ?? 0) > 0
-                                    const exigeTermo = cotacaoExigeTermo(cotacao.tipo_servico)
-                                    const aprovarBtn = (
-                                      <Button
-                                        onClick={() => {
-                                          if (!temValor) {
-                                            toast({
-                                              title: "Valor não preenchido",
-                                              description: "Preencha o tamanho/parede da TV (ou um valor manual) antes de aprovar. Use o botão Editar.",
-                                              variant: "destructive",
-                                            })
-                                            return
-                                          }
-                                          if (exigeTermo) {
-                                            if (confirm('Aprovar esta cotação? O cliente precisará assinar o termo digital antes do serviço ser liberado para os instaladores.')) {
-                                              supabase
-                                                .from('cotacoes')
-                                                .update({ status: 'termo_pendente' })
-                                                .eq('id', cotacao.id)
-                                                .then(() => {
-                                                  toast({ title: "Cotação aprovada!", description: "Abra a cotação para enviar o termo de aceite ao cliente." })
-                                                  fetchCotacoes()
-                                                })
-                                            }
-                                          } else {
-                                            // Tipo de serviço não exige termo — libera direto
-                                            supabase
-                                              .from('cotacoes')
-                                              .update({ status: 'aprovada' })
-                                              .eq('id', cotacao.id)
-                                              .then(() => {
-                                                toast({ title: "Cotação aprovada!", description: "Serviço liberado para os instaladores (este tipo não exige termo)." })
-                                                fetchCotacoes()
-                                              })
-                                          }
-                                        }}
-                                        size="sm"
-                                        variant="default"
-                                        disabled={!temValor}
-                                        className="bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                                      >
-                                        Aprovar
-                                      </Button>
-                                    )
-                                    if (temValor) return aprovarBtn
-                                    return (
-                                      <TooltipProvider>
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <span tabIndex={0}>{aprovarBtn}</span>
-                                          </TooltipTrigger>
-                                          <TooltipContent>
-                                            Preencha o tamanho/parede da TV (ou valor manual) antes de aprovar. Use Editar.
-                                          </TooltipContent>
-                                        </Tooltip>
-                                      </TooltipProvider>
-                                    )
-                                  })()}
-                                  {cotacaoExigeTermo(cotacao.tipo_servico) && (() => {
-                                    const clienteTemTermo = clientesComTermo.has(cotacao.cliente_id)
-                                    const temValor = (cotacao.valor_estimado ?? 0) > 0
-                                    const habilitado = temValor
-                                    const btn = (
-                                      <Button
-                                        onClick={() => {
-                                          if (!habilitado) return
-                                          setCotacaoParaAprovarSemTermo({ id: cotacao.id, clienteTemTermo })
-                                        }}
-                                        size="sm"
-                                        variant="outline"
-                                        disabled={!habilitado}
-                                        className="text-green-700 border-green-300 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                                      >
-                                        Aprovar sem termo
-                                      </Button>
-                                    )
-                                    if (habilitado) return btn
-                                    const motivo = "Preencha o tamanho/parede da TV (ou valor manual) antes de aprovar."
-                                    return (
-                                      <TooltipProvider>
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <span tabIndex={0}>{btn}</span>
-                                          </TooltipTrigger>
-                                          <TooltipContent>
-                                            {motivo}
-                                          </TooltipContent>
-                                        </Tooltip>
-                                      </TooltipProvider>
-                                    )
-                                  })()}
-                                  <Button
-                                    onClick={() => setCotacaoParaNaoGerou(cotacao.id)}
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-orange-600 hover:text-orange-700"
-                                  >
-                                    <XCircle className="w-4 h-4 mr-1" />
-                                    Não Gerou
-                                  </Button>
-                                </>
-                              )}
-                              {cotacao.status === 'termo_pendente' && (
-                                <>
-                                  <Button
-                                    onClick={() => abrirEdicao(cotacao)}
-                                    size="sm"
-                                    variant="default"
-                                    className="bg-orange-600 hover:bg-orange-700"
-                                    title="Abrir cotação para enviar/acompanhar o termo"
-                                  >
-                                    Enviar Termo
-                                  </Button>
-                                  <Button
-                                    onClick={() => {
-                                      if (confirm('Voltar esta cotação para pendente?')) {
-                                        supabase
-                                          .from('cotacoes')
-                                          .update({ status: 'pendente' })
-                                          .eq('id', cotacao.id)
-                                          .then(() => {
-                                            toast({ title: "Cotação voltou para pendente" })
-                                            fetchCotacoes()
-                                          })
-                                      }
-                                    }}
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-                                  >
-                                    <Undo2 className="w-4 h-4 mr-1" />
-                                    Reprovar
-                                  </Button>
-                                </>
-                              )}
-                              {cotacao.status === 'aprovada' && (
-                                <Button
-                                  onClick={() => {
-                                    if (confirm('Reprovar esta cotação? O serviço associado será removido (se ainda não iniciado).')) {
-                                      reprovarCotacao(cotacao.id)
-                                    }
-                                  }}
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-                                >
-                                  <Undo2 className="w-4 h-4 mr-1" />
-                                  Reprovar
-                                </Button>
-                              )}
-                              {(cotacao.status === 'reprovada' || cotacao.status === 'perdida' || cotacao.status === 'nao_gerou') && (
-                                <Button
-                                  onClick={() => {
-                                    if (confirm('Reativar esta cotação? Ela voltará para pendente e poderá ser avaliada novamente.')) {
-                                      reativarCotacao(cotacao.id)
-                                    }
-                                  }}
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                                >
-                                  <RotateCcw className="w-4 h-4 mr-1" />
-                                  Reativar
-                                </Button>
-                              )}
-                              <Button
-                                onClick={() => bloquearTelefone(cotacao)}
-                                size="sm"
-                                variant="ghost"
-                                className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                                disabled={bloqueandoTelefone === cotacao.id}
-                                title="Bloquear número"
-                              >
-                                <Ban className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                onClick={() => setCotacaoParaExcluir(cotacao.id)}
-                                size="sm"
-                                variant="ghost"
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
+                            {renderAcoes(cotacao)}
                           </td>
                         </tr>
                       ))
                     )}
                   </tbody>
-                </table>
+                  </table>
                 </div>
               </div>
+              </>
             )}
             {visualizacao === 'lista' && totalPaginas > 1 && (
               <div className="mt-4 flex items-center justify-between">
@@ -1482,8 +1539,8 @@ export default function ListaCotacoes() {
           <div className="space-y-6 py-4">
             <div>
               <h3 className="text-lg font-semibold mb-4">Dados do Cliente</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2 space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="col-span-1 sm:col-span-2 space-y-2">
                   <Label>CEP</Label>
                   <Input
                     value={editForm.cep}
@@ -1527,7 +1584,7 @@ export default function ListaCotacoes() {
                     onChange={(e) => setEditForm({...editForm, bairro: e.target.value})}
                   />
                 </div>
-                <div className="col-span-2 space-y-2">
+                <div className="col-span-1 sm:col-span-2 space-y-2">
                   <Label>Endereço Completo</Label>
                   <Input 
                     value={editForm.endereco_completo}
@@ -1539,7 +1596,7 @@ export default function ListaCotacoes() {
 
             <div>
               <h3 className="text-lg font-semibold mb-4">Dados do Serviço</h3>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Data de Criação (dd/mm/aaaa)</Label>
                   <Input 
@@ -1688,7 +1745,7 @@ export default function ListaCotacoes() {
                 )}
 
                 {/* Itens extras */}
-                <div className="col-span-2 border rounded-md p-4 space-y-3">
+                <div className="col-span-1 sm:col-span-2 border rounded-md p-4 space-y-3">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <span className="text-sm font-medium">Itens Extras</span>
                     <div className="flex gap-2">
@@ -1838,7 +1895,7 @@ export default function ListaCotacoes() {
                   )}
                 </div>
 
-                <div className="col-span-2 space-y-2">
+                <div className="col-span-1 sm:col-span-2 space-y-2">
                   <Label>Descrição do Serviço (Detalhes)</Label>
                   <Textarea 
                     value={editForm.descricao_servico}
@@ -1847,7 +1904,7 @@ export default function ListaCotacoes() {
                     rows={3}
                   />
                 </div>
-                <div className="col-span-2 space-y-2">
+                <div className="col-span-1 sm:col-span-2 space-y-2">
                   <Label>Observações</Label>
                   <Textarea 
                     value={editForm.observacoes}
