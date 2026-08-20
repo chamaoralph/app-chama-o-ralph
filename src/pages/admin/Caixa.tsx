@@ -222,7 +222,7 @@ export default function Caixa() {
   return (
     <AdminLayout>
       <div>
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6">
           <h1 className="text-3xl font-bold">Caixa</h1>
 
           <div>
@@ -237,7 +237,7 @@ export default function Caixa() {
         </div>
 
         {/* Cards de Resumo */}
-        <div className="grid grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
           <div className="bg-amber-50 border-2 border-amber-200 rounded-lg p-6">
             <p className="text-sm text-amber-600 font-medium mb-1">PROJEÇÃO</p>
             <p className="text-3xl font-bold text-amber-700">R$ {totalProjecao.toFixed(2)}</p>
@@ -380,7 +380,7 @@ export default function Caixa() {
             <p className="text-gray-500">Nenhum lançamento neste período</p>
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="bg-white rounded-lg shadow overflow-x-auto">
             <table className="min-w-full">
               <thead className="bg-gray-50">
                 <tr>
