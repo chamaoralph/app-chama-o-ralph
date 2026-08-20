@@ -7,10 +7,11 @@ import { useToast } from '@/hooks/use-toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ImportacaoCotacoes } from '@/components/admin/ImportacaoCotacoes'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Trash2, XCircle, Pencil, Users, Undo2, RotateCcw, List, Calendar, CalendarDays, Ban, Plus } from 'lucide-react'
+import { Trash2, XCircle, Pencil, Users, Undo2, RotateCcw, List, Calendar, CalendarDays, Ban, Plus, ListFilter } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -105,6 +106,18 @@ const duracoesDisponiveis = [
   { valor: '360', label: '6 horas' },
   { valor: '420', label: '7 horas' },
   { valor: '480', label: '8 horas' },
+]
+
+// Status possíveis de uma cotação — mesmos valores/labels usados em getStatusBadge,
+// usado tanto pra montar o filtro quanto pra saber quais status existem.
+const STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: 'pendente', label: 'Pendente' },
+  { value: 'termo_pendente', label: 'Aguardando Termo' },
+  { value: 'aprovada', label: 'Aprovada' },
+  { value: 'reprovada', label: 'Reprovada' },
+  { value: 'perdida', label: 'Perdida' },
+  { value: 'sem_resposta', label: 'Sem Resposta' },
+  { value: 'nao_gerou', label: 'Não Gerou' },
 ]
 
 // Formata data sem conversão de timezone (DD/MM/YYYY) - para campos DATE
@@ -233,6 +246,19 @@ export default function ListaCotacoes() {
   const [motivoNaoGerou, setMotivoNaoGerou] = useState<string>('')
   const [observacaoNaoGerou, setObservacaoNaoGerou] = useState<string>('')
   const [paginaAtual, setPaginaAtual] = useState(1)
+  // Todos os status marcados por padrão — filtro não esconde nada até o usuário mexer
+  const [statusFiltro, setStatusFiltro] = useState<Set<string>>(
+    new Set(STATUS_OPTIONS.map(s => s.value))
+  )
+  function alternarStatusFiltro(value: string) {
+    setStatusFiltro(prev => {
+      const proximo = new Set(prev)
+      if (proximo.has(value)) proximo.delete(value)
+      else proximo.add(value)
+      return proximo
+    })
+    setPaginaAtual(1)
+  }
   const [itensPorPagina, setItensPorPagina] = useState(10)
   const [ordenacao, setOrdenacao] = useState<{ campo: string; direcao: 'asc' | 'desc' }>({
     campo: 'created_at',
@@ -906,7 +932,14 @@ export default function ListaCotacoes() {
     }
   }
 
-  const cotacoesOrdenadas = [...cotacoes].sort((a, b) => {
+  // Um status fora do STATUS_OPTIONS (ex: valor legado/inesperado) nunca fica
+  // escondido silenciosamente — só os status conhecidos respeitam o filtro.
+  const statusConhecidos = new Set(STATUS_OPTIONS.map(s => s.value))
+  const cotacoesFiltradas = cotacoes.filter(
+    c => !statusConhecidos.has(c.status) || statusFiltro.has(c.status)
+  )
+
+  const cotacoesOrdenadas = [...cotacoesFiltradas].sort((a, b) => {
     const campo = ordenacao.campo as keyof Cotacao
     let valorA = a[campo]
     let valorB = b[campo]
@@ -1232,8 +1265,54 @@ export default function ListaCotacoes() {
                   <CalendarDays className="w-4 h-4 mr-2" />
                   Mensal
                 </Button>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <ListFilter className="w-4 h-4 mr-2" />
+                      Status
+                      {statusFiltro.size < STATUS_OPTIONS.length && (
+                        <span className="ml-1.5 bg-blue-100 text-blue-700 text-xs rounded-full px-1.5 py-0.5">
+                          {statusFiltro.size}
+                        </span>
+                      )}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-56">
+                    <DropdownMenuLabel className="flex items-center justify-between gap-2">
+                      <span>Mostrar status</span>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          className="text-xs font-normal text-blue-600 hover:underline"
+                          onClick={() => { setStatusFiltro(new Set(STATUS_OPTIONS.map(s => s.value))); setPaginaAtual(1) }}
+                        >
+                          Todos
+                        </button>
+                        <button
+                          type="button"
+                          className="text-xs font-normal text-blue-600 hover:underline"
+                          onClick={() => { setStatusFiltro(new Set()); setPaginaAtual(1) }}
+                        >
+                          Nenhum
+                        </button>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {STATUS_OPTIONS.map(opt => (
+                      <DropdownMenuCheckboxItem
+                        key={opt.value}
+                        checked={statusFiltro.has(opt.value)}
+                        onCheckedChange={() => alternarStatusFiltro(opt.value)}
+                        onSelect={(e) => e.preventDefault()}
+                      >
+                        {opt.label}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
-              
+
               {visualizacao === 'lista' && (
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
@@ -1255,14 +1334,16 @@ export default function ListaCotacoes() {
                     <span className="text-sm text-gray-600">por página</span>
                   </div>
                   <div className="text-sm text-gray-600">
-                    Total: {cotacoes.length} cotações
+                    Total: {cotacoesFiltradas.length}
+                    {cotacoesFiltradas.length !== cotacoes.length && <> de {cotacoes.length}</>} cotações
                   </div>
                 </div>
               )}
-              
+
               {visualizacao !== 'lista' && (
                 <div className="text-sm text-gray-600">
-                  Total: {cotacoes.length} cotações
+                  Total: {cotacoesFiltradas.length}
+                  {cotacoesFiltradas.length !== cotacoes.length && <> de {cotacoes.length}</>} cotações
                 </div>
               )}
             </div>
@@ -1270,7 +1351,7 @@ export default function ListaCotacoes() {
             {/* Visualização em Calendário Semanal */}
             {visualizacao === 'semanal' && (
               <CalendarioCotacoesSemanal
-                cotacoes={cotacoes}
+                cotacoes={cotacoesFiltradas}
                 onAprovar={async (id) => {
                   await supabase.from('cotacoes').update({ status: 'termo_pendente' }).eq('id', id)
                   toast({ title: '✅ Cotação aprovada!', description: 'Envie o termo de aceite ao cliente para liberar o serviço.' })
@@ -1284,7 +1365,7 @@ export default function ListaCotacoes() {
             {/* Visualização em Calendário Mensal */}
             {visualizacao === 'mensal' && (
               <CalendarioCotacoesMensal
-                cotacoes={cotacoes}
+                cotacoes={cotacoesFiltradas}
                 onAprovar={async (id) => {
                   await supabase.from('cotacoes').update({ status: 'termo_pendente' }).eq('id', id)
                   toast({ title: '✅ Cotação aprovada!', description: 'Envie o termo de aceite ao cliente para liberar o serviço.' })
@@ -1300,10 +1381,16 @@ export default function ListaCotacoes() {
               <>
                 {/* Mobile: cards, sem tabela de 9 colunas pra rolar de lado */}
                 <div className="md:hidden bg-white rounded-lg shadow-md divide-y divide-gray-200">
-                  {cotacoes.length === 0 ? (
+                  {cotacoesFiltradas.length === 0 ? (
                     <div className="px-6 py-12 text-center text-gray-500">
-                      <p className="text-lg font-medium">Nenhuma cotação cadastrada</p>
-                      <p className="text-sm mt-1">Clique em "Nova Cotação" para começar</p>
+                      {cotacoes.length === 0 ? (
+                        <>
+                          <p className="text-lg font-medium">Nenhuma cotação cadastrada</p>
+                          <p className="text-sm mt-1">Clique em "Nova Cotação" para começar</p>
+                        </>
+                      ) : (
+                        <p className="text-lg font-medium">Nenhuma cotação com esse filtro de status</p>
+                      )}
                     </div>
                   ) : (
                     cotacoesPaginadas.map((cotacao) => (
@@ -1422,15 +1509,21 @@ export default function ListaCotacoes() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {cotacoes.length === 0 ? (
+                    {cotacoesFiltradas.length === 0 ? (
                       <tr>
                         <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                           <div className="flex flex-col items-center">
                             <svg className="w-16 h-16 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
-                            <p className="text-lg font-medium">Nenhuma cotação cadastrada</p>
-                            <p className="text-sm mt-1">Clique em "Nova Cotação" para começar</p>
+                            {cotacoes.length === 0 ? (
+                              <>
+                                <p className="text-lg font-medium">Nenhuma cotação cadastrada</p>
+                                <p className="text-sm mt-1">Clique em "Nova Cotação" para começar</p>
+                              </>
+                            ) : (
+                              <p className="text-lg font-medium">Nenhuma cotação com esse filtro de status</p>
+                            )}
                           </div>
                         </td>
                       </tr>
