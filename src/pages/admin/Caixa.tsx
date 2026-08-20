@@ -222,7 +222,7 @@ export default function Caixa() {
   return (
     <AdminLayout>
       <div>
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6">
           <h1 className="text-3xl font-bold">Caixa</h1>
 
           <div>
@@ -237,7 +237,7 @@ export default function Caixa() {
         </div>
 
         {/* Cards de Resumo */}
-        <div className="grid grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
           <div className="bg-amber-50 border-2 border-amber-200 rounded-lg p-6">
             <p className="text-sm text-amber-600 font-medium mb-1">PROJEÇÃO</p>
             <p className="text-3xl font-bold text-amber-700">R$ {totalProjecao.toFixed(2)}</p>
@@ -380,8 +380,42 @@ export default function Caixa() {
             <p className="text-gray-500">Nenhum lançamento neste período</p>
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="min-w-full">
+          <>
+            {/* Mobile: lista em cards, sem scroll horizontal nem colunas cortadas */}
+            <div className="md:hidden bg-white rounded-lg shadow divide-y divide-gray-200">
+              {lancamentosOrdenados.map((lanc) => (
+                <div key={lanc.id} className="p-4">
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <span
+                      className={`px-2 py-1 text-xs rounded-full ${
+                        lanc.tipo === "receita" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      {lanc.tipo === "receita" ? "📈 Receita" : "📉 Despesa"}
+                    </span>
+                    <span className="text-xs text-gray-500">{formatarDataBR(lanc.data_lancamento)}</span>
+                  </div>
+                  <p className="text-sm font-medium">{lanc.categoria}</p>
+                  {lanc.descricao && (
+                    <p className="text-sm text-gray-500 mt-0.5">{lanc.descricao}</p>
+                  )}
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-xs text-gray-400">{lanc.forma_pagamento || "-"}</span>
+                    <span
+                      className={`text-base font-semibold ${
+                        lanc.tipo === "receita" ? "text-green-600" : "text-red-600"
+                      }`}
+                    >
+                      {lanc.tipo === "receita" ? "+" : "-"} R$ {parseFloat(lanc.valor).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop: tabela completa com ordenação por coluna */}
+            <div className="hidden md:block bg-white rounded-lg shadow overflow-x-auto">
+              <table className="min-w-full">
               <thead className="bg-gray-50">
                 <tr>
                   <th 
@@ -480,8 +514,9 @@ export default function Caixa() {
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </AdminLayout>
