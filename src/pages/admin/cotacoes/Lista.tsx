@@ -1261,6 +1261,7 @@ export default function ListaCotacoes() {
                   variant={visualizacao === 'mensal' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setVisualizacao('mensal')}
+                  className="hidden md:inline-flex"
                 >
                   <CalendarDays className="w-4 h-4 mr-2" />
                   Mensal
