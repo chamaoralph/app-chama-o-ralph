@@ -98,6 +98,12 @@ export default function FinalizarServico() {
   const [quantidadesDevolver, setQuantidadesDevolver] = useState<Record<string, number>>({});
   const [usouSuporteGarantia, setUsouSuporteGarantia] = useState<boolean | null>(null);
 
+  // --- Outro instalador ajudou? (divide o valor de referência da mão de
+  // obra em 25%/25% — só informativo, não muda o repasse real da empresa
+  // pro instalador principal, ver migration 20260821120000) ---
+  const [teveAjudante, setTeveAjudante] = useState(false);
+  const [instaladorAjudanteId, setInstaladorAjudanteId] = useState<string>("");
+
   // --- Extras (acessórios vendidos na finalização) ---
   const [quantidadesExtras, setQuantidadesExtras] = useState<Record<string, number>>({});
   // Fornecedor do RESTANTE além do que o instalador já tem em mãos — só é
@@ -120,6 +126,24 @@ export default function FinalizarServico() {
         .order("ordem", { ascending: true });
       if (error) throw error;
       return data as CatalogoItem[];
+    },
+  });
+
+  const { data: outrosInstaladores } = useQuery({
+    queryKey: ["outros-instaladores-para-ajudante", servico?.empresa_id],
+    enabled: !!servico?.empresa_id,
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data, error } = await supabase
+        .from("usuarios")
+        .select("id, nome")
+        .eq("tipo", "instalador")
+        .eq("empresa_id", servico.empresa_id)
+        .eq("ativo", true)
+        .neq("id", user?.id ?? "")
+        .order("nome");
+      if (error) throw error;
+      return (data || []) as { id: string; nome: string }[];
     },
   });
 
@@ -487,6 +511,15 @@ export default function FinalizarServico() {
       return;
     }
 
+    if (teveAjudante && !instaladorAjudanteId) {
+      toast({
+        title: "❌ Selecione o instalador que ajudou",
+        description: "Escolha na lista quem te ajudou, ou desmarque a opção.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (suporteGarantiaComProblema) {
       toast({
         title: "❌ Garantia Total incompleta",
@@ -598,6 +631,13 @@ export default function FinalizarServico() {
             : valorEmpresaRecebeu,
           acessorios_vendidos: [...acessoriosCotacao, ...extrasNovos],
           usou_suporte_garantia_total: isGarantiaTotal ? (usouSuporteGarantia ?? false) : false,
+          // Ajudante: só um valor de referência (25% = metade da mão de obra
+          // do principal), congelado agora. Não altera valor_mao_obra_instalador
+          // nem o repasse real — ver comentário na migration 20260821120000.
+          instalador_ajudante_id: teveAjudante && instaladorAjudanteId ? instaladorAjudanteId : null,
+          valor_mao_obra_ajudante: teveAjudante && instaladorAjudanteId
+            ? (servico.valor_mao_obra_instalador || 0) / 2
+            : null,
         })
         .eq("id", servicoId)
         .eq("instalador_id", user.id)
@@ -1044,6 +1084,42 @@ export default function FinalizarServico() {
                 )}
             </div>
           )}
+
+          {/* Outro instalador ajudou */}
+          <div>
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={teveAjudante}
+                onChange={(e) => {
+                  setTeveAjudante(e.target.checked);
+                  if (!e.target.checked) setInstaladorAjudanteId("");
+                }}
+                className="mr-2"
+              />
+              🤝 Outro instalador ajudou nesse serviço?
+            </label>
+            {teveAjudante && (
+              <div className="mt-2">
+                <select
+                  required
+                  value={instaladorAjudanteId}
+                  onChange={(e) => setInstaladorAjudanteId(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-md"
+                >
+                  <option value="">Selecione o instalador...</option>
+                  {(outrosInstaladores || []).map((inst) => (
+                    <option key={inst.id} value={inst.id}>{inst.nome}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  A mão de obra desse serviço fica dividida: 25% pra você, 25% pra ele.
+                  O acerto dos 25% dele é combinado direto entre vocês — não muda o valor
+                  que você recebe. Depois que o serviço for aprovado, isso não pode mais ser alterado.
+                </p>
+              </div>
+            )}
+          </div>
 
           <div>
             <label className="block text-sm font-medium mb-2">📝 Observações (opcional)</label>

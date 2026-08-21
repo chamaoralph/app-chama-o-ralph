@@ -1540,6 +1540,7 @@ export type Database = {
           ganho_acessorios_empresa: number
           ganho_acessorios_instalador: number
           id: string
+          instalador_ajudante_id: string | null
           instalador_id: string | null
           itens_extras: Json | null
           motivo_alteracao_aprovacao: string | null
@@ -1552,6 +1553,7 @@ export type Database = {
           status: string | null
           tipo_servico: string[]
           updated_at: string | null
+          valor_mao_obra_ajudante: number | null
           valor_mao_obra_instalador: number | null
           valor_recebido_cliente: number | null
           valor_reembolso_despesas: number | null
@@ -1575,6 +1577,7 @@ export type Database = {
           ganho_acessorios_empresa?: number
           ganho_acessorios_instalador?: number
           id?: string
+          instalador_ajudante_id?: string | null
           instalador_id?: string | null
           itens_extras?: Json | null
           motivo_alteracao_aprovacao?: string | null
@@ -1587,6 +1590,7 @@ export type Database = {
           status?: string | null
           tipo_servico: string[]
           updated_at?: string | null
+          valor_mao_obra_ajudante?: number | null
           valor_mao_obra_instalador?: number | null
           valor_recebido_cliente?: number | null
           valor_reembolso_despesas?: number | null
@@ -1610,6 +1614,7 @@ export type Database = {
           ganho_acessorios_empresa?: number
           ganho_acessorios_instalador?: number
           id?: string
+          instalador_ajudante_id?: string | null
           instalador_id?: string | null
           itens_extras?: Json | null
           motivo_alteracao_aprovacao?: string | null
@@ -1622,6 +1627,7 @@ export type Database = {
           status?: string | null
           tipo_servico?: string[]
           updated_at?: string | null
+          valor_mao_obra_ajudante?: number | null
           valor_mao_obra_instalador?: number | null
           valor_recebido_cliente?: number | null
           valor_reembolso_despesas?: number | null
@@ -1647,6 +1653,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "servicos_instalador_ajudante_id_fkey"
+            columns: ["instalador_ajudante_id"]
+            isOneToOne: false
+            referencedRelation: "instaladores"
             referencedColumns: ["id"]
           },
           {
