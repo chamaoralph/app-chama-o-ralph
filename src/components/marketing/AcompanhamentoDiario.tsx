@@ -183,6 +183,7 @@ export function AcompanhamentoDiario() {
   const [lancamentos, setLancamentos] = useState<any[]>([])
   const [recibos, setRecibos] = useState<any[]>([])
   const [cotacoes, setCotacoes] = useState<any[]>([])
+  const [agendadosPendentes, setAgendadosPendentes] = useState<any[]>([])
 
   useEffect(() => { carregarDados() }, [mesAno])
 
@@ -199,7 +200,7 @@ export function AcompanhamentoDiario() {
       const startDate = `${mesAno}-01`
       const endDate = `${mesAno}-${String(daysInMonth).padStart(2, "0")}`
 
-      const [res1, res2, res3, res4] = await Promise.all([
+      const [res1, res2, res3, res4, res5] = await Promise.all([
         // 1. Serviços concluídos no mês
         supabase
           .from("servicos")
@@ -238,12 +239,25 @@ export function AcompanhamentoDiario() {
           .eq("empresa_id", userData.empresa_id)
           .gte("created_at", startDate + "T00:00:00")
           .lte("created_at", endDate + "T23:59:59"),
+
+        // 5. Serviços agendados no mês que ainda não foram concluídos nem
+        // cancelados — previsão do que ainda vai virar receita (mesma lógica
+        // do card PROJEÇÃO do Caixa.tsx: mão de obra*2, ou valor_total como
+        // fallback pra serviços sem mão de obra rastreada).
+        supabase
+          .from("servicos")
+          .select("valor_total, valor_mao_obra_instalador")
+          .eq("empresa_id", userData.empresa_id)
+          .not("status", "in", "(concluido,cancelado)")
+          .gte("data_servico_agendada", startDate)
+          .lte("data_servico_agendada", endDate + "T23:59:59"),
       ])
 
       setServicos(res1.data || [])
       setLancamentos(res2.data || [])
       setRecibos(res3.data || [])
       setCotacoes(res4.data || [])
+      setAgendadosPendentes(res5.data || [])
     } catch (err) {
       console.error("Erro ao carregar dados de acompanhamento:", err)
     } finally {
@@ -309,6 +323,17 @@ export function AcompanhamentoDiario() {
 
     // Taxa de conversão
     const taxaConversao = cotacoes.length > 0 ? (servicos.length / cotacoes.length) * 100 : 0
+
+    // Previsão — serviços agendados no mês que ainda não foram concluídos
+    // nem cancelados. Empresa opera 50/50 com o instalador: metade do valor
+    // agendado é a fatia prevista dele, a outra metade é o que sobra pra
+    // empresa (antes de descontar despesas gerais do mês).
+    const valorAgendado = agendadosPendentes.reduce((s, a) => {
+      const maoObra = Number(a.valor_mao_obra_instalador || 0)
+      return s + (maoObra === 0 ? Number(a.valor_total || 0) : maoObra * 2)
+    }, 0)
+    const metadeInstaladoresPrevista = valorAgendado / 2
+    const lucroPrevistoEmpresa = valorAgendado - metadeInstaladoresPrevista
 
     // Tabela diária
     const dias: DiaTabela[] = []
@@ -377,8 +402,11 @@ export function AcompanhamentoDiario() {
       rayanasHoje,
       pctMeta,
       pctProj,
+      valorAgendado,
+      metadeInstaladoresPrevista,
+      lucroPrevistoEmpresa,
     }
-  }, [servicos, lancamentos, recibos, cotacoes, mesAno, metas])
+  }, [servicos, lancamentos, recibos, cotacoes, agendadosPendentes, mesAno, metas])
 
   function salvarMetas() {
     const novas: Metas = {
@@ -456,7 +484,7 @@ export function AcompanhamentoDiario() {
       )}
 
       {/* 4 Cards de topo */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Lucro Líquido */}
         <Card>
           <CardHeader className="pb-2">
@@ -557,7 +585,7 @@ export function AcompanhamentoDiario() {
 
       {/* Resumo financeiro */}
       {!loading && (
-        <div className="grid grid-cols-3 gap-3 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
           <div className="bg-green-50 rounded-lg p-3 border border-green-100">
             <p className="text-green-700 font-medium">Receitas</p>
             <p className="text-green-900 font-bold text-lg">R$ {fmt(computed.totalReceitas)}</p>
@@ -573,8 +601,95 @@ export function AcompanhamentoDiario() {
         </div>
       )}
 
+      {/* Previsão — serviços agendados no mês, ainda não concluídos nem cancelados */}
+      {!loading && (
+        <div>
+          <p className="text-xs text-muted-foreground mb-2">
+            Previsão — serviços agendados no mês que ainda não foram concluídos (empresa fica com 50%)
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+            <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+              <p className="text-blue-700 font-medium">Agendado</p>
+              <p className="text-blue-900 font-bold text-lg">R$ {fmt(computed.valorAgendado)}</p>
+            </div>
+            <div className="bg-amber-50 rounded-lg p-3 border border-amber-100">
+              <p className="text-amber-700 font-medium">50% Instaladores (previsto)</p>
+              <p className="text-amber-900 font-bold text-lg">R$ {fmt(computed.metadeInstaladoresPrevista)}</p>
+            </div>
+            <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+              <p className="text-blue-700 font-medium">Lucro Previsto (empresa)</p>
+              <p className="text-blue-900 font-bold text-lg">R$ {fmt(computed.lucroPrevistoEmpresa)}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tabela diária */}
-      <div className="bg-card rounded-lg shadow-sm border overflow-x-auto">
+      {/* Mobile: cards, sem tabela de 900px pra rolar de lado */}
+      <div className="md:hidden bg-card rounded-lg shadow-sm border divide-y divide-border">
+        {loading
+          ? Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="p-3">
+                <Skeleton className="h-4 w-24 mb-2" />
+                <Skeleton className="h-4 w-full" />
+              </div>
+            ))
+          : computed.dias.map((row) => {
+              const isFuture = `${mesAno}-${String(row.dia).padStart(2, "0")}` > todayTZ()
+
+              if (row.isDomingo) {
+                return (
+                  <div key={row.dia} className="px-3 py-2 flex items-center justify-between text-sm text-gray-400 bg-gray-50">
+                    <span>{String(row.dia).padStart(2, "0")} · {row.diaSemana}</span>
+                    <span>–</span>
+                  </div>
+                )
+              }
+
+              return (
+                <div key={row.dia} className={`p-3 ${isFuture ? "text-muted-foreground" : ""}`}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="font-medium text-sm">
+                      {String(row.dia).padStart(2, "0")} · {row.diaSemana}
+                    </span>
+                    <span className={`text-sm ${semaforoCls(row.percentMeta)}`}>
+                      {semaforo(row.percentMeta)} {row.percentMeta.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground mb-2">
+                    <span className={row.google > 0 ? "text-blue-600" : ""}>Google: {row.google}</span>
+                    <span>Orgânico: {row.organico}</span>
+                    <span className="font-medium text-foreground">Total: {row.total}</span>
+                    {row.jobsRayana > 0 && (
+                      <span className="text-purple-600 font-medium">Rayana: {row.jobsRayana}</span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm">
+                    <span className="text-green-700">Receita: R$ {fmt(row.receita)}</span>
+                    <span className="text-red-600">Despesa: R$ {fmt(row.despesa)}</span>
+                    <span className="text-orange-600">Instaladores: R$ {fmt(row.despesaInstalador)}</span>
+                  </div>
+                  <div className={`mt-2 rounded-md px-3 py-2 flex items-center justify-between ${
+                    row.lucroDia >= 0 ? "bg-green-50" : "bg-red-50"
+                  }`}>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Lucro do dia</p>
+                      <p className={`text-xl font-bold ${row.lucroDia >= 0 ? "text-green-700" : "text-red-600"}`}>
+                        R$ {fmt(row.lucroDia)}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground">Acumulado</p>
+                      <p className="text-sm font-medium">R$ {fmt(row.lucroAcumulado)}</p>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+      </div>
+
+      {/* Desktop: tabela completa */}
+      <div className="hidden md:block bg-card rounded-lg shadow-sm border overflow-x-auto">
         <table className="min-w-[900px] w-full text-sm">
           <thead className="bg-muted/50 border-b">
             <tr>
@@ -671,7 +786,7 @@ export function AcompanhamentoDiario() {
         ) : (
           <>
             {/* 4 Cards de acessórios */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -755,7 +870,36 @@ export function AcompanhamentoDiario() {
             </div>
 
             {/* Ranking por instalador */}
-            <div className="bg-card rounded-lg shadow-sm border overflow-x-auto">
+            {/* Mobile: cards, sem tabela de 600px pra rolar de lado */}
+            <div className="md:hidden bg-card rounded-lg shadow-sm border divide-y divide-border">
+              {loadingRankingAcessorios ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="p-3">
+                    <Skeleton className="h-4 w-1/2 mb-2" />
+                    <Skeleton className="h-4 w-2/3" />
+                  </div>
+                ))
+              ) : !rankingAcessoriosInstalador || rankingAcessoriosInstalador.length === 0 ? (
+                <div className="p-4 text-center text-sm text-muted-foreground">
+                  Nenhum instalador com serviços concluídos no período
+                </div>
+              ) : (
+                rankingAcessoriosInstalador.map((row) => (
+                  <div key={row.instalador_id} className="p-3">
+                    <p className="font-medium text-sm mb-1">{row.instalador_nome}</p>
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <span>{row.servicos_concluidos} serviços · {row.itens_vendidos} itens</span>
+                      <span className="text-green-700 font-medium">
+                        {formatarBRL(row.lucro_gerado_empresa ?? 0)}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Desktop: tabela completa */}
+            <div className="hidden md:block bg-card rounded-lg shadow-sm border overflow-x-auto">
               <table className="min-w-[600px] w-full text-sm">
                 <thead className="bg-muted/50 border-b">
                   <tr>
