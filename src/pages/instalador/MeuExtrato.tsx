@@ -10,6 +10,15 @@ import { subDays, format } from 'date-fns'
 import { GerarReciboModal } from '@/components/instalador/GerarReciboModal'
 import { formatarDataBR } from '@/lib/utils'
 
+interface ServicoAjudado {
+  id: string
+  codigo: string
+  data_conclusao: string | null
+  status: string
+  valor_mao_obra_ajudante: number
+  cliente_nome: string
+}
+
 interface Servico {
   id: string
   codigo: string
@@ -40,6 +49,7 @@ export default function MeuExtrato() {
   const [instaladorNome, setInstaladorNome] = useState('')
   const [dataRecibo, setDataRecibo] = useState<Date>(new Date())
   const [recibosGerados, setRecibosGerados] = useState<string[]>([])
+  const [servicosAjudados, setServicosAjudados] = useState<ServicoAjudado[]>([])
 
   // Verificar se recibo já foi gerado para data selecionada
   const dataSelecionadaStr = format(dataRecibo, 'yyyy-MM-dd')
@@ -72,7 +82,38 @@ export default function MeuExtrato() {
     carregarServicos()
     carregarNomeInstalador()
     carregarRecibosGerados()
+    carregarServicosAjudados()
   }, [filtroStatus, tipoPeriodo, dataPersonalizadaDe, dataPersonalizadaAte])
+
+  // Serviços de OUTROS instaladores em que este instalador entrou como
+  // ajudante (25% de referência). Puramente informativo — não entra em
+  // nenhum dos totais/cards acima nem no recibo: quem repassa isso é o
+  // instalador principal, direto com ele (ver migration 20260821120000).
+  async function carregarServicosAjudados() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data, error } = await supabase
+        .from('servicos')
+        .select('id, codigo, data_conclusao, status, valor_mao_obra_ajudante, cliente:clientes(nome)')
+        .eq('instalador_ajudante_id', user.id)
+        .order('data_conclusao', { ascending: false })
+
+      if (error) throw error
+
+      setServicosAjudados((data || []).map((s: any) => ({
+        id: s.id,
+        codigo: s.codigo,
+        data_conclusao: s.data_conclusao,
+        status: s.status,
+        valor_mao_obra_ajudante: s.valor_mao_obra_ajudante || 0,
+        cliente_nome: s.cliente?.nome || 'N/A',
+      })))
+    } catch (error) {
+      console.error('Erro ao carregar serviços ajudados:', error)
+    }
+  }
 
   async function carregarRecibosGerados() {
     try {
@@ -494,6 +535,45 @@ export default function MeuExtrato() {
             </>
           )}
         </div>
+
+        {/* Serviços em que ajudei outro instalador */}
+        {servicosAjudados.length > 0 && (
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="px-4 py-3 border-b bg-gray-50">
+              <h2 className="text-lg font-semibold">🤝 Serviços que você ajudou</h2>
+              <p className="text-xs text-muted-foreground mt-1">
+                Valor de referência (25% da mão de obra). Não é pago pelo sistema —
+                combine o acerto direto com o instalador principal do serviço.
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Valor de referência</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {servicosAjudados.map((s) => (
+                    <tr key={s.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm">
+                        {s.data_conclusao ? formatarDataBR(s.data_conclusao) : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium">{s.codigo}</td>
+                      <td className="px-4 py-3 text-sm">{s.cliente_nome}</td>
+                      <td className="px-4 py-3 text-sm">{getStatusBadge(s.status)}</td>
+                      <td className="px-4 py-3 text-sm text-right">R$ {s.valor_mao_obra_ajudante.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Modal de Recibo */}
         <GerarReciboModal
