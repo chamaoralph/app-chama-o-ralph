@@ -126,12 +126,37 @@ export default function AdminClientes() {
         .from('cotacoes')
         .select('*')
         .order('created_at', { ascending: false })
-      
+
       if (error) throw error
       return data as Cotacao[]
     },
     enabled: !!user
   })
+
+  // Serviços já criados a partir de cotações aprovadas — usado só pra saber,
+  // por cotacao_id, qual é o id do SERVIÇO (tabela diferente da cotação) pra
+  // onde o botão "Ver" do histórico deve apontar quando o serviço já existe.
+  const { data: servicosPorCotacaoRaw = [] } = useQuery({
+    queryKey: ['servicos-ids-por-cotacao'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('servicos')
+        .select('id, cotacao_id')
+        .not('cotacao_id', 'is', null)
+
+      if (error) throw error
+      return data as { id: string; cotacao_id: string | null }[]
+    },
+    enabled: !!user
+  })
+
+  const servicoIdPorCotacaoId = useMemo(() => {
+    const mapa = new Map<string, string>()
+    servicosPorCotacaoRaw.forEach(s => {
+      if (s.cotacao_id) mapa.set(s.cotacao_id, s.id)
+    })
+    return mapa
+  }, [servicosPorCotacaoRaw])
 
   // Calcular métricas por cliente
   const clientesComMetricas: ClienteComMetricas[] = useMemo(() => {
@@ -799,37 +824,43 @@ export default function AdminClientes() {
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {clienteSelecionado.cotacoes.map(cotacao => (
-                            <tr key={cotacao.id} className="hover:bg-gray-50">
-                              <td className="px-4 py-2 text-sm">
-                                {formatarDataBR(cotacao.created_at)}
-                              </td>
-                              <td className="px-4 py-2 text-sm">
-                                {cotacao.tipo_servico?.join(', ') || '-'}
-                              </td>
-                              <td className="px-4 py-2 text-sm">
-                                {cotacao.valor_estimado 
-                                  ? `R$ ${cotacao.valor_estimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                                  : '-'}
-                              </td>
-                              <td className="px-4 py-2">
-                                {getStatusBadge(cotacao.status)}
-                              </td>
-                              <td className="px-4 py-2 text-sm">
-                                {cotacao.data_servico_desejada 
-                                  ? formatarDataBR(cotacao.data_servico_desejada)
-                                  : '-'}
-                              </td>
-                              <td className="px-4 py-2">
-                                <Link to={`/admin/cotacoes?id=${cotacao.id}`}>
-                                  <Button size="sm" variant="ghost">
-                                    <FileText className="w-4 h-4 mr-1" />
-                                    Ver
-                                  </Button>
-                                </Link>
-                              </td>
-                            </tr>
-                          ))}
+                          {clienteSelecionado.cotacoes.map(cotacao => {
+                            const servicoId = servicoIdPorCotacaoId.get(cotacao.id)
+                            return (
+                              <tr key={cotacao.id} className="hover:bg-gray-50">
+                                <td className="px-4 py-2 text-sm">
+                                  {formatarDataBR(cotacao.created_at)}
+                                </td>
+                                <td className="px-4 py-2 text-sm">
+                                  {cotacao.tipo_servico?.join(', ') || '-'}
+                                </td>
+                                <td className="px-4 py-2 text-sm">
+                                  {cotacao.valor_estimado
+                                    ? `R$ ${cotacao.valor_estimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                                    : '-'}
+                                </td>
+                                <td className="px-4 py-2">
+                                  {getStatusBadge(cotacao.status)}
+                                </td>
+                                <td className="px-4 py-2 text-sm">
+                                  {cotacao.data_servico_desejada
+                                    ? formatarDataBR(cotacao.data_servico_desejada)
+                                    : '-'}
+                                </td>
+                                <td className="px-4 py-2">
+                                  {/* Se já virou serviço, manda pro serviço específico
+                                      (/admin/servicos/:id — id do SERVIÇO, não da cotação).
+                                      Senão, ainda é só cotação, manda pra lista de cotações. */}
+                                  <Link to={servicoId ? `/admin/servicos/${servicoId}` : `/admin/cotacoes`}>
+                                    <Button size="sm" variant="ghost">
+                                      <FileText className="w-4 h-4 mr-1" />
+                                      {servicoId ? 'Ver Serviço' : 'Ver Cotação'}
+                                    </Button>
+                                  </Link>
+                                </td>
+                              </tr>
+                            )
+                          })}
                         </tbody>
                       </table>
                     </div>
