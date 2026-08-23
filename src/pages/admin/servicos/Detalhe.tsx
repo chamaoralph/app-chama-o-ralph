@@ -84,6 +84,20 @@ export default function DetalheServico() {
     }
   }
 
+  // fotos_conclusao guarda só o PATH dentro do bucket (não a URL pública) —
+  // precisa resolver pra URL antes de usar em <img>/<a>, senão quebra.
+  // Registros bem antigos podem ter salvo a URL completa direto; mantém
+  // como está nesse caso (mesma lógica de Aprovacoes.tsx).
+  function getPhotoUrl(pathOrUrl: string) {
+    if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+      return pathOrUrl
+    }
+    const { data } = supabase.storage
+      .from('fotos-servicos')
+      .getPublicUrl(pathOrUrl)
+    return data.publicUrl
+  }
+
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { bg: string; text: string; label: string }> = {
       aguardando_distribuicao: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Aguardando Distribuição' },
@@ -293,9 +307,9 @@ export default function DetalheServico() {
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {servico.fotos_conclusao.map((foto, index) => (
-                  <a key={index} href={foto} target="_blank" rel="noopener noreferrer">
+                  <a key={index} href={getPhotoUrl(foto)} target="_blank" rel="noopener noreferrer">
                     <img
-                      src={foto}
+                      src={getPhotoUrl(foto)}
                       alt={`Foto ${index + 1}`}
                       className="w-full h-32 object-cover rounded-lg hover:opacity-80 transition-opacity"
                     />
