@@ -430,7 +430,7 @@ export default function AdminClientes() {
     <AdminLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Clientes</h1>
             <p className="text-gray-600">Gerencie sua base de clientes e acompanhe métricas</p>
@@ -558,7 +558,50 @@ export default function AdminClientes() {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <>
+                {/* Mobile: cards empilhados, sem rolagem lateral */}
+                <div className="md:hidden divide-y divide-gray-200">
+                  {clientesFiltrados.length === 0 ? (
+                    <div className="px-6 py-12 text-center text-gray-500">
+                      <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                      <p>Nenhum cliente encontrado</p>
+                    </div>
+                  ) : (
+                    clientesFiltrados.map((cliente) => (
+                      <div key={cliente.id} className="p-4">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{cliente.nome}</p>
+                            {cliente.bairro && (
+                              <p className="text-xs text-gray-500">{cliente.bairro}</p>
+                            )}
+                          </div>
+                          {getClassificacaoBadge(cliente.classificacao, cliente.observacao_alerta)}
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-gray-900 mb-2">
+                          <Phone className="w-4 h-4 text-gray-400" />
+                          {cliente.telefone}
+                        </div>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600 mb-3">
+                          <span>{cliente.totalCotacoes} cotações ({cliente.cotacoesAprovadas} aprovadas)</span>
+                          <span>💰 R$ {cliente.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                          <span>📈 {cliente.taxaConversao.toFixed(1)}% conversão</span>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => abrirDetalhe(cliente)}
+                        >
+                          <Eye className="w-4 h-4 mr-1" />
+                          Ver Detalhes
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Desktop: tabela completa com ordenação por coluna */}
+                <div className="hidden md:block overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
@@ -664,7 +707,8 @@ export default function AdminClientes() {
                     )}
                   </tbody>
                 </table>
-              </div>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -811,7 +855,43 @@ export default function AdminClientes() {
                   {clienteSelecionado.cotacoes.length === 0 ? (
                     <p className="text-gray-500 text-center py-8">Nenhuma cotação registrada</p>
                   ) : (
-                    <div className="overflow-x-auto">
+                    <>
+                      {/* Mobile: cards, sem rolagem lateral */}
+                      <div className="md:hidden space-y-3">
+                        {clienteSelecionado.cotacoes.map(cotacao => {
+                          const servicoId = servicoIdPorCotacaoId.get(cotacao.id)
+                          return (
+                            <div key={cotacao.id} className="border rounded-lg p-3">
+                              <div className="flex items-start justify-between gap-2 mb-1">
+                                <p className="text-sm font-medium">
+                                  {cotacao.tipo_servico?.join(', ') || '-'}
+                                </p>
+                                {getStatusBadge(cotacao.status)}
+                              </div>
+                              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600 mb-2">
+                                <span>📅 {formatarDataBR(cotacao.created_at)}</span>
+                                {cotacao.data_servico_desejada && (
+                                  <span>🔧 {formatarDataBR(cotacao.data_servico_desejada)}</span>
+                                )}
+                                <span>
+                                  💰 {cotacao.valor_estimado
+                                    ? `R$ ${cotacao.valor_estimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                                    : '-'}
+                                </span>
+                              </div>
+                              <Link to={servicoId ? `/admin/servicos/${servicoId}` : `/admin/cotacoes`}>
+                                <Button size="sm" variant="ghost">
+                                  <FileText className="w-4 h-4 mr-1" />
+                                  {servicoId ? 'Ver Serviço' : 'Ver Cotação'}
+                                </Button>
+                              </Link>
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      {/* Desktop: tabela */}
+                      <div className="hidden md:block overflow-x-auto">
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                           <tr>
@@ -863,7 +943,8 @@ export default function AdminClientes() {
                           })}
                         </tbody>
                       </table>
-                    </div>
+                      </div>
+                    </>
                   )}
                 </div>
               </>
