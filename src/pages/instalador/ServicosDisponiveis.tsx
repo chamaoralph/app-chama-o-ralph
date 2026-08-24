@@ -6,7 +6,15 @@ import { useAuth } from '@/lib/auth'
 import { useToast } from '@/hooks/use-toast'
 import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
-import { Lock, Calendar, MapPin as MapPinIcon, List, CalendarDays } from 'lucide-react'
+import { Lock, Calendar, MapPin as MapPinIcon, List, CalendarDays, AlertTriangle } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { MobileServicoCard } from '@/components/instalador/MobileServicoCard'
 import { AgendaSemanalDisponiveis } from '@/components/instalador/AgendaSemanalDisponiveis'
@@ -72,6 +80,14 @@ export default function ServicosDisponiveis() {
   const [solicitando, setSolicitando] = useState<string | null>(null)
   const [ordenacao, setOrdenacao] = useState<OrdenacaoTipo>('data')
   const [visualizacao, setVisualizacao] = useState<VisualizacaoTipo>('lista')
+  // Aviso de suporte indisponível: aberto quando o instalador tenta
+  // solicitar um serviço sem ter, em mãos, algum acessório necessário.
+  const [avisoSuporte, setAvisoSuporte] = useState<{
+    servico: Servico
+    itens: { catalogoId: string; quantidade: number }[]
+  } | null>(null)
+  const [carregandoAviso, setCarregandoAviso] = useState(false)
+  const [instaladoresPorItem, setInstaladoresPorItem] = useState<Record<string, string[]>>({})
   const { user } = useAuth()
   const { toast } = useToast()
   const isMobile = useIsMobile()
@@ -105,22 +121,36 @@ export default function ServicosDisponiveis() {
     return saldo
   })()
 
-  // Some acessório do serviço veio (ou vai vir) do saldo de ALGUM instalador
-  // porque o estoque central não cobria na hora da cotação — só aparece pra
-  // quem tiver, em mãos, a quantidade necessária de cada um desses itens.
-  // Serviço sem acessório "pendente" (ou com acessório coberto pelo estoque
-  // central) aparece normalmente pra todo mundo.
-  const podeAtender = (servico: Servico) => {
-    const itensPendentes = (servico.acessorios_vendidos || []).filter(
-      (item) => item.catalogo_id && (item.origem_estoque ?? item.fornecedor) === 'instalador'
-    )
-    if (itensPendentes.length === 0) return true
-    return itensPendentes.every(
-      (item) => (saldoProprioPorCatalogo[item.catalogo_id!] ?? 0) >= item.quantidade
-    )
+  // Nomes dos acessórios do catálogo — só pra exibir no aviso de suporte
+  // indisponível (ex.: "Suporte TV 55 fixo").
+  const { data: catalogoAcessorios } = useQuery({
+    queryKey: ['catalogo-acessorios-nomes'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('catalogo_servicos')
+        .select('id, nome')
+        .eq('categoria', 'acessorios')
+      if (error) throw error
+      return (data || []) as { id: string; nome: string }[]
+    },
+  })
+
+  const nomeAcessorio = (catalogoId: string) =>
+    catalogoAcessorios?.find((c) => c.id === catalogoId)?.nome ?? 'suporte'
+
+  // Serviços agora aparecem pra TODO mundo, mesmo sem o suporte em mãos. Esta
+  // função só identifica quais itens do serviço vieram (ou vão vir) do saldo
+  // de ALGUM instalador — porque o estoque central não cobria na hora da
+  // cotação — e que este instalador não tem, em mãos, na quantidade
+  // necessária. Usada pra montar o aviso ao tentar solicitar o serviço.
+  const itensFaltantes = (servico: Servico) => {
+    return (servico.acessorios_vendidos || [])
+      .filter((item) => item.catalogo_id && (item.origem_estoque ?? item.fornecedor) === 'instalador')
+      .filter((item) => (saldoProprioPorCatalogo[item.catalogo_id!] ?? 0) < item.quantidade)
+      .map((item) => ({ catalogoId: item.catalogo_id as string, quantidade: item.quantidade }))
   }
 
-  const servicosAtendiveis = servicos.filter(podeAtender)
+  const servicosAtendiveis = servicos
 
   // Ordenar serviços
   const servicosOrdenados = [...servicosAtendiveis].sort((a, b) => {
@@ -270,6 +300,56 @@ export default function ServicosDisponiveis() {
     }
   }
 
+  // Chamado ao clicar em "Solicitar Serviço". Se faltar algum suporte em
+  // mãos, mostra um aviso (toast + modal) com quem tem o suporte em
+  // estoque — mas o instalador pode confirmar e solicitar mesmo assim.
+  async function handleSolicitarClick(servicoId: string) {
+    const servico = servicos.find((s) => s.id === servicoId)
+    if (!servico) return
+
+    const faltantes = itensFaltantes(servico)
+    if (faltantes.length === 0) {
+      solicitarServico(servicoId)
+      return
+    }
+
+    toast({
+      title: "Suporte necessário indisponível",
+      description: "Você não tem o suporte necessário para este serviço. Veja os detalhes antes de solicitar.",
+    })
+
+    setAvisoSuporte({ servico, itens: faltantes })
+    setCarregandoAviso(true)
+    setInstaladoresPorItem({})
+
+    try {
+      const resultadosPorItem = await Promise.all(
+        faltantes.map(async (item) => {
+          const { data, error } = await supabase.rpc('instaladores_com_suporte_disponivel', {
+            p_catalogo_id: item.catalogoId,
+            p_quantidade: item.quantidade,
+          })
+          if (error) {
+            console.error('Erro ao buscar instaladores com suporte:', error)
+            return [item.catalogoId, [] as string[]] as const
+          }
+          const nomes = ((data || []) as { nome: string }[]).map((d) => d.nome)
+          return [item.catalogoId, nomes] as const
+        })
+      )
+      setInstaladoresPorItem(Object.fromEntries(resultadosPorItem))
+    } finally {
+      setCarregandoAviso(false)
+    }
+  }
+
+  function confirmarSolicitarMesmoAssim() {
+    if (avisoSuporte) {
+      solicitarServico(avisoSuporte.servico.id)
+    }
+    setAvisoSuporte(null)
+  }
+
   if (loading) {
     return (
       <InstaladorLayout>
@@ -366,7 +446,7 @@ export default function ServicosDisponiveis() {
           <AgendaSemanalDisponiveis
             servicos={servicosAtendiveis}
             certificacoes={certificacoes || []}
-            onSolicitar={solicitarServico}
+            onSolicitar={handleSolicitarClick}
             solicitandoId={solicitando}
           />
         ) : (
@@ -381,7 +461,7 @@ export default function ServicosDisponiveis() {
                     servico={servico}
                     variant="disponivel"
                     temCertificacao={temCertificacao}
-                    onSolicitar={solicitarServico}
+                    onSolicitar={handleSolicitarClick}
                     isLoading={solicitando === servico.id}
                   />
                 )
@@ -437,7 +517,7 @@ export default function ServicosDisponiveis() {
 
                   {temCertificacao ? (
                     <Button
-                      onClick={() => solicitarServico(servico.id)}
+                      onClick={() => handleSolicitarClick(servico.id)}
                       disabled={solicitando === servico.id}
                       className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3"
                     >
@@ -466,6 +546,58 @@ export default function ServicosDisponiveis() {
           </div>
         )}
       </div>
+
+      <Dialog open={!!avisoSuporte} onOpenChange={(open) => !open && setAvisoSuporte(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-orange-600">
+              <AlertTriangle className="w-5 h-5" />
+              Suporte necessário indisponível
+            </DialogTitle>
+            <DialogDescription>
+              Você não tem, em mãos, o suporte necessário para instalar {avisoSuporte?.servico.codigo}.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            {avisoSuporte?.itens.map((item) => {
+              const nomes = instaladoresPorItem[item.catalogoId] ?? []
+              return (
+                <div key={item.catalogoId} className="rounded-lg border border-orange-200 bg-orange-50 p-3">
+                  <p className="font-medium text-orange-800">
+                    {nomeAcessorio(item.catalogoId)} — {item.quantidade}x necessário
+                  </p>
+                  <p className="text-sm text-gray-700 mt-2">
+                    {carregandoAviso ? (
+                      'Verificando quem tem em estoque...'
+                    ) : nomes.length > 0 ? (
+                      <>
+                        Deverá pegar com {nomes.length > 1 ? 'os instaladores' : 'o instalador'}:{' '}
+                        <strong>{nomes.join(', ')}</strong>
+                      </>
+                    ) : (
+                      'Nenhum outro instalador tem esse suporte em estoque no momento — fale com o admin.'
+                    )}
+                  </p>
+                </div>
+              )
+            })}
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setAvisoSuporte(null)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={confirmarSolicitarMesmoAssim}
+              disabled={!!avisoSuporte && solicitando === avisoSuporte.servico.id}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              Solicitar mesmo assim
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </InstaladorLayout>
   )
 }
