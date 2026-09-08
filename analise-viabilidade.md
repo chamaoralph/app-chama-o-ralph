@@ -207,4 +207,160 @@ Tudo até aqui foi número real do banco. A partir daqui são **projeções com 
 
 ---
 
-*Análise completa — Blocos 1, 2 e 3.*
+## Bloco 4 — A opção econômica ("garantia parcial")
+
+### Onde a "opção econômica" mora no banco
+
+Investiguei o schema antes de rodar qualquer número. **A opção econômica é o campo `cotacoes.tv_cobertura`**, que só existe para cotações de TV e tem 2 valores: `parcial` (a econômica — no catálogo interno, `catalogo_servicos`, ela se chama "Parcial", descrição *"Cliente ajuda a encaixar; cobertura parcial"*) e `total` (a cheia — "Proteção Total", *"Equipe faz tudo, cobertura total"*). Esse campo **não existe em `servicos`**, mas todo `servicos.cotacao_id` aponta pra uma linha de `cotacoes`, então cruzei as duas tabelas por esse ID para saber a opção de cada serviço concluído.
+
+Também existe `servicos.usou_suporte_garantia_total` (boolean), que é uma coisa **diferente**: registra se o serviço *de fato* usou a garantia total no momento da execução — bate com `tv_cobertura='total'` em 28 dos 29 casos em que é `true`, mas para a maioria dos serviços com `tv_cobertura='total'` (204 de 232) o campo fica `false`. Não é a mesma informação e não usei esse campo para separar as opções — usei só `tv_cobertura`.
+
+**Quando a opção econômica passou a existir:** a primeira cotação com `tv_cobertura='parcial'` foi criada em **24/04/2026**. Antes disso, o campo `tv_cobertura` só tinha um único registro isolado (`total`, em 17/03/2026, provavelmente teste) — a virada real de dois níveis de cobertura começa em maio/2026.
+
+### Nº e % de cotações por opção (jun–set/26, só cotações de TV — `tv_cobertura` não nulo)
+
+| Mês | Parcial (econômica) | Total (cheia) | % Parcial das cotações de TV |
+|---|---|---|---|
+| Jun/26 | 25 | 66 | 27,5% |
+| Jul/26 | 33 | 59 | 35,9% |
+| Ago/26 | 57 | 56 | **50,4%** |
+| Set/26 (parcial, dados até o momento da consulta) | 6 | 9 | 40,0% |
+
+A fatia da opção econômica **quase dobrou de junho a agosto** (27,5% → 50,4% das cotações de TV) — em agosto ela já é praticamente metade do volume.
+
+### Ticket médio por opção, por mês
+
+| Mês | Ticket estimado na cotação — Parcial (R$) | Ticket estimado — Total (R$) | Ticket real do serviço — Parcial (R$) | Ticket real do serviço — Total (R$) |
+|---|---|---|---|---|
+| Jun/26 | 163,92 | 347,86 | 183,14 | 385,61 |
+| Jul/26 | 217,61 | 332,42 | 218,32 | 311,93 |
+| Ago/26 | 233,70 | 340,21 | 231,30 | 311,12 |
+| Set/26 (parcial) | 273,67 | 268,22 | 201,20 | 233,09 |
+
+A opção parcial tem ticket real ~30–50% mais baixo que a opção total em todos os meses (exceto set, com amostra pequena — 5 e 10 serviços).
+
+### Taxa de aprovação por opção, por mês (cotações de TV)
+
+| Mês | Aprovação Parcial | Aprovação Total |
+|---|---|---|
+| Jun/26 | 96,0% | 92,4% |
+| Jul/26 | 84,8% | 96,6% |
+| Ago/26 | 91,2% | 87,5% |
+| Set/26 (parcial) | 100,0% | 88,9% |
+
+Não há um padrão consistente de qual opção aprova mais — varia mês a mês, sem vencedor claro entre as duas.
+
+### Nº e % de serviços concluídos por opção, por mês
+
+| Mês | Concluídos Parcial | Concluídos Total | % Parcial dos concluídos de TV |
+|---|---|---|---|
+| Jun/26 | 22 | 59 | 27,2% |
+| Jul/26 | 30 | 57 | 34,5% |
+| Ago/26 | 53 | 50 | **51,5%** |
+| Set/26 (parcial) | 5 | 10 | 33,3% |
+
+### A pergunta central: cliente novo ou canibalização?
+
+Comparando a **taxa de aprovação TOTAL** (todas as cotações, TV ou não) antes e depois da criação da opção parcial (24/04/26):
+
+- **Antes (jan–mar/26):** 230 cotações, 185 aprovadas → **80,4% de aprovação**.
+- **Depois (abr–set/26):** 755 cotações, 517 aprovadas → **68,5% de aprovação**.
+
+**A taxa de aprovação total caiu 11,9 pontos percentuais depois que a opção econômica passou a existir, enquanto a fatia dela dentro das cotações de TV cresceu de 0% para mais de 50%. Pelo critério que você pediu, isso é canibalização, não é dizer isso.** A opção parcial não está claramente trazendo cliente que não fecharia de outro jeito — ela está, na melhor leitura dos números, substituindo uma parte do que fecharia na opção cheia (ou pior).
+
+**Ressalva importante:** esse mesmo período (abr–set) é o mesmo em que o volume de leads do Google mais que dobrou (seção 4/5) e a qualidade média dos leads pode ter caído por outros motivos (mais volume, menos triagem). O banco não permite isolar "efeito da opção econômica" de "efeito do aumento de volume/Ads" — os dois aconteceram juntos. O que dá pra afirmar com segurança é a correlação (queda de aprovação total simultânea ao crescimento da fatia econômica); a causalidade exclusiva não é confirmável só com estes dados.
+
+### Cruzamento com origem do lead
+
+| Opção | Google | Outras origens | Total | % vindo do Google |
+|---|---|---|---|---|
+| Parcial | 113 | 8 | 121 | 93,4% |
+| Total | 179 | 11 | 190 | 94,2% |
+
+**A opção econômica não é mais usada em lead de Google do que a opção cheia** — as duas vêm de Google em praticamente a mesma proporção (93,4% vs 94,2%). Não há evidência de que a econômica seja um recurso específico para "salvar" lead de Ads que não converteria — ela é escolhida na mesma proporção em qualquer origem.
+
+---
+
+## Bloco 5 — Cherry-picking já existe?
+
+Base: serviços concluídos jun–ago/26 (últimos 3 meses completos), cruzando `servicos` com `cotacoes` (via `cotacao_id`) para pegar `tv_parede` (alvenaria/drywall/painel_madeira/teto) e `tv_tamanho`. Exclui a conta de teste. Mediana geral de `valor_total` no período: **R$ 250,00** (311 serviços).
+
+### Ticket médio e % de serviços acima da mediana geral, por instalador
+
+| Instalador | Nº serviços | Ticket médio (R$) | % acima da mediana (R$250) |
+|---|---|---|---|
+| Rayana Araujo* | 19 | 475,18 | **89,5%** |
+| João Victor | 130 | 295,83 | 53,1% |
+| Pedro Henrique | 72 | 276,36 | 44,4% |
+| Daniel Levy | 59 | 246,32 | 37,3% |
+| Bryan Rodrigues | 31 | 243,47 | 35,5% |
+
+*Rayana é sócia (ver ressalva 5) — ela pega muito menos volume, mas o que pega tem ticket bem mais alto que a média dos outros 4. Sem ser paga por %, o padrão dela sozinho já sugere que ela escolhe o que atende — mas com só 19 serviços em 3 meses, a amostra é pequena.
+
+### Quem pega drywall/painel/TV grande e quem não pega (dos 4 instaladores contratados)
+
+| Instalador | % parede difícil (drywall+painel) | % TV grande (70"+) |
+|---|---|---|
+| Daniel Levy | 45,5% (25 de 55) | 16,4% (9 de 55) |
+| Pedro Henrique | 41,0% (25 de 61) | 18,0% (11 de 61) |
+| João Victor | 39,8% (45 de 113) | 16,8% (19 de 113) |
+| Bryan Rodrigues | 28,6% (8 de 28) | 10,7% (3 de 28) |
+
+(Base: só serviços com `tv_parede`/`tv_tamanho` preenchido, ou seja, serviços de TV.)
+
+**Há uma correlação real entre ticket médio, % acima da mediana e % de serviço difícil**, na mesma ordem em 3 das 4 métricas: João e Pedro pegam proporcionalmente mais drywall/painel/TV grande e têm ticket mais alto; Bryan pega proporcionalmente menos de tudo isso e tem o ticket mais baixo dos 4. A variação entre eles não é extrema (28,6% a 45,5% de serviço difícil) — não é uma segregação completa, mas o padrão está lá.
+
+**Não é possível confirmar se isso é escolha do instalador (cherry-picking) ou só o jeito que os serviços são distribuídos hoje** — o banco não tem histórico de quem recusou o quê ou de mudança de `instalador_id` num mesmo serviço (ver abaixo). O que dá para afirmar com números reais é que a variação de dificuldade/ticket entre os 4 já existe — se é por escolha ativa ou por como a agenda é montada, os dados não respondem.
+
+### Recusas ou reatribuições de instalador
+
+**Esse dado não existe no banco.** Procurei por: tabela de histórico/auditoria (não há nenhuma com nome de histórico, log de mudança, ou auditoria além de `importacao_clientes_log`, que é sobre importação de clientes, não sobre serviços); status de recusa/rejeição em `servicos.status` (os únicos valores são `aguardando_aprovacao`, `atribuido`, `cancelado`, `concluido`, `em_andamento`, `solicitado` — nenhum é "recusado"); e campo de instalador anterior (não existe — só há `instalador_id` atual e `instalador_ajudante_id`, sem histórico de troca). Reportando isso como está: **sem estimar** quantas recusas ou reatribuições aconteceram.
+
+---
+
+## Bloco 6 — Tabela de comissão fixa por tipo de serviço
+
+Base: mesma categorização por `tv_parede`/`tv_tamanho` da seção 7, agora em jun–ago/26 (todos os serviços da empresa, para ver os tipos mais frequentes) e calibrada especificamente sobre **agosto/26, só os 4 instaladores contratados** (João, Pedro, Daniel, Bryan — excluí Rayana porque ela não recebe os 50% atuais, então não faz sentido incluí-la numa tabela que redistribui esses 50%).
+
+### Tipos de serviço mais frequentes (jun–ago/26, toda a empresa) e o que se paga hoje (50% do valor real)
+
+| Categoria | Nº ocorrências | Ticket médio (R$) | Pago hoje ao instalador em média (50%, R$) |
+|---|---|---|---|
+| TV pequena/média em alvenaria (fácil) | 129 | 255,01 | 116,16 |
+| TV em painel de madeira | 73 | 314,35 | 146,05 |
+| Não-TV (fechadura/quadros/outros) | 40 | 263,52 | 99,99 |
+| TV em drywall | 34 | 287,69 | 138,05 |
+| TV grande em alvenaria (70"+) | 30 | 398,39 | 147,75 |
+| TV em teto | 5 | 269,60 | 134,80 |
+
+### Proposta de tabela de valor fixo por categoria
+
+Calibrada sobre agosto/26 (só os 4 instaladores): custo total pago hoje = **R$ 14.738,92** (100 serviços de TV nas 4 categorias abaixo + 12 não-TV + 1 teto). "Não-TV" e "TV em teto" ficam **sem alteração** (não fazem parte do pedido de recalibragem e têm volume baixo — 12 e 1 ocorrência — para justificar um valor fixo confiável).
+
+| Categoria | Pago hoje (média, 50%) | **Valor fixo proposto** | Variação |
+|---|---|---|---|
+| TV pequena/média em alvenaria (fácil) | R$ 124,20 | **R$ 104,00** | **-16,3%** |
+| TV em drywall | R$ 131,43 | **R$ 160,00** | **+21,7%** |
+| TV em painel de madeira | R$ 131,02 | **R$ 150,00** | **+14,5%** |
+| TV grande em alvenaria (70"+) | R$ 166,21 | **R$ 190,00** | **+14,3%** |
+| Não-TV (sem alteração) | R$ 113,04 | R$ 113,04 | 0% |
+| TV em teto (sem alteração) | R$ 179,50 | R$ 179,50 | 0% |
+
+Aplicando esses valores fixos ao mix real de agosto (100 serviços de TV nas 4 categorias + 12 não-TV + 1 teto), o custo total fica em **R$ 14.737,96** — R$ 0,96 abaixo do custo real de agosto (R$ 14.738,92). **Neutro no agregado, a menos de um arredondamento de R$ 1.**
+
+### Impacto por instalador (mix real de cada um em agosto/26)
+
+| Instalador | Pago hoje (ago, R$) | Pago com tabela fixa (R$) | Diferença/mês | Por quê |
+|---|---|---|---|---|
+| Daniel Levy | 4.329,43 | 4.629,50 | **+R$ 300,07** | Mix pesado em painel de madeira (10 de 35 serviços, 28,6%) |
+| Pedro Henrique | 1.860,22 | 2.076,96 | **+R$ 216,74** | Proporção alta de TV grande (3 de 16, 18,8%) |
+| Bryan Rodrigues | 2.674,26 | 2.608,00 | -R$ 66,26 | Mix quase neutro, leve maioria de alvenaria fácil |
+| João Victor | 5.875,01 | 5.423,50 | **-R$ 451,51** | Metade do seu volume (21 de 42 serviços) é TV pequena/média em alvenaria — o mais fácil da tabela |
+
+**Achado central: João Victor — o instalador que mais produz — é quem mais perderia com uma tabela calibrada por dificuldade, porque metade dos serviços dele em agosto foram o tipo mais fácil (TV pequena/média em alvenaria).** Isso não significa que ele "escolhe" o fácil (seção 7 não confirma isso) — mas significa que o modelo de 50% linear hoje paga ele bem mesmo com um mix fácil, e uma tabela por dificuldade tiraria parte dessa vantagem. Pedro e Daniel, que têm proporcionalmente mais serviço difícil, ganhariam.
+
+**Ressalva:** os números de "n" por categoria e por instalador em um único mês são pequenos (de 1 a 21) — o mix de agosto pode não se repetir em setembro. Antes de aplicar essa tabela, valeria simular com pelo menos 2-3 meses de mix por instalador, não só agosto.
+
+---
+
+*Análise completa — Blocos 1 a 6.*
