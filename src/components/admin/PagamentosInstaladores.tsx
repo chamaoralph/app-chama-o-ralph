@@ -238,7 +238,7 @@ export function PagamentosInstaladores() {
           .order('data_referencia', { ascending: false }),
         supabase
           .from('servicos')
-          .select('id, instalador_id, data_conclusao, valor_mao_obra_instalador, valor_reembolso_despesas, valor_recebido_cliente')
+          .select('id, instalador_id, data_conclusao, valor_mao_obra_instalador, valor_reembolso_despesas, ganho_acessorios_instalador, valor_recebido_cliente')
           .eq('empresa_id', userData.empresa_id)
           .eq('status', 'concluido')
           .not('data_conclusao', 'is', null)
@@ -357,9 +357,14 @@ export function PagamentosInstaladores() {
         
         const grupo = grupos.get(chave)!
         const maoObra = Number(s.valor_mao_obra_instalador || 0)
-        const reembolso = Number(s.valor_reembolso_despesas || 0)
+        // Fatia que é DELE: reembolso de despesas + ganho no lucro de acessórios vendidos —
+        // mesma composição que GerarReciboModal.tsx persiste como valor_reembolso (totalInst
+        // - totalMaoObra). Sem o ganho de acessórios aqui, o recibo gerado por este fluxo
+        // (admin) ficava menor que o recibo que o próprio instalador gera e envia, fazendo o
+        // saldo "a pagar/receber" divergir entre os dois.
+        const reembolso = Number(s.valor_reembolso_despesas || 0) + Number(s.ganho_acessorios_instalador || 0)
         const recebidoCliente = Number(s.valor_recebido_cliente || 0)
-        
+
         grupo.servicos.push({
           id: s.id,
           valor_mao_obra_instalador: maoObra,
