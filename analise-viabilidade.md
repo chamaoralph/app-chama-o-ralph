@@ -139,4 +139,72 @@ O orçamento de Ads subiu ~10,8× entre fev e ago (R$ 464,91 → R$ 5.033,39). O
 
 ---
 
-*Bloco 2 de 3 — Margem real e Dependência de Ads. Próximo bloco: Gargalo de atendimento + os 3 cenários finais.*
+## 5. Gargalo de atendimento
+
+### Cotações criadas por mês e taxa de aprovação
+
+| Mês | Cotações criadas | Aprovadas | Taxa de aprovação |
+|---|---|---|---|
+| Jan/26 | 91 | 75 | 82,4% |
+| Fev/26 | 45 | 41 | 91,1% |
+| Mar/26 | 94 | 69 | 73,4% |
+| Abr/26 | 100 | 69 | 69,0% |
+| Mai/26 | 135 | 105 | 77,8% |
+| Jun/26 | 141 | 96 | 68,1% |
+| Jul/26 | 162 | 105 | 64,8% |
+| Ago/26 | 184 | 122 | 66,3% |
+| Set/26 (parcial) | 30 | 20 | 66,7% |
+
+O volume de cotações mais que dobrou de jan (91) para ago (184), mas a **taxa de aprovação caiu de ~82% para ~66%** no mesmo período — mais gente pedindo orçamento, proporcionalmente menos gente fechando. Isso é consistente com o achado da seção 4 (mais volume vindo de Google, que converte pior que outras origens).
+
+### Tempo médio entre criação da cotação e aprovação
+
+- **Média: 63,6 horas**
+- **Mediana: 23,9 horas**
+- Base: 702 cotações aprovadas com `updated_at` posterior a `created_at`.
+
+### Distribuição de cotações por hora do dia
+
+⚠️ **Anomalia de dados encontrada:** 655 das 982 cotações (66,7%) têm `created_at` registrado exatamente à hora 0 (meia-noite). Isso não é um padrão real de atendimento — é muito provável que seja um processo de importação/sincronização em lote (ex.: sync com N8N/Google Ads) gravando `created_at` com timestamp fixo em vez do horário real de contato do cliente. Reportando como está no banco, sem inventar o horário real desses 655 registros.
+
+Excluindo esse pico, os 327 registros restantes (33,3% do total) com horário real se distribuem assim:
+
+| Período | Cotações | % das 327 com horário real |
+|---|---|---|
+| Madrugada (1h–5h) | 59 | 18,0% |
+| Manhã (7h–11h) | 22 | 6,7% |
+| Tarde (12h–17h) | 117 | 35,8% |
+| Noite (18h–23h) | 129 | **39,4%** |
+
+Entre os horários confiáveis, **75% do atendimento real acontece entre 12h e meia-noite** — o pico é à noite (18h–23h), fora do horário comercial. Isso ajuda a explicar por que responder cliente consome o dia inteiro: a demanda não para no fim do expediente.
+
+---
+
+## Cenários de projeção de margem líquida mensal
+
+Tudo até aqui foi número real do banco. A partir daqui são **projeções com premissas explícitas** — como você pediu na seção final do pedido. Baseline: agosto/26 (mês mais recente completo): 115 serviços concluídos, faturamento R$ 30.527,87, ticket médio R$ 265,46, pago a instaladores R$ 14.738,92, gasto em Ads R$ 5.033,39, custo por venda de Ads R$ 47,04.
+
+| Cenário | Faturamento/mês | Mão de obra | Ads | Atendimento | **Margem líquida/mês** | **Margem %** |
+|---|---|---|---|---|---|---|
+| **A** — Você sozinho, sem instaladores | R$ 13.273,00 | R$ 0,00 | R$ 2.352,00 | R$ 0,00 | **R$ 10.921,00** | 82,3% |
+| **B** — 4/5 instaladores, ticket +15%, atendente R$2.000/mês | R$ 35.107,05 | R$ 16.949,76 | R$ 5.033,39 | R$ 2.000,00 | **R$ 11.123,90** | 31,7% |
+| **C** — 2 melhores instaladores, ticket +15%, Ads reduzido proporcionalmente | R$ 23.470,20 | R$ 11.735,11 | R$ 3.370,18 | R$ 0,00 | **R$ 8.364,91** | 35,6% |
+
+### Premissas de cada cenário (explícitas, não é dado real)
+
+- **A:** capacidade = 50 serviços/mês, o **melhor mês individual já registrado no banco** (João Victor, julho/26) — usado como teto realista de uma pessoa. Ticket mantido no valor atual (R$ 265,46, sem +15%, pois o cenário não pede aumento). Ads calculado pelo custo-por-venda real de agosto (R$ 47,04) × 50. Não existe no banco nenhum período em que você operou sozinho — este número assume que reproduzir a capacidade do seu melhor instalador é possível, o que não está confirmado, especialmente considerando que você também acumularia o atendimento.
+- **B:** mantém o volume atual (115 serviços/mês) e a estrutura de comissão atual, com ticket médio +15% (R$ 265,46 → R$ 305,28) e mão de obra/Ads escalados na mesma proporção do faturamento. Soma um atendente fixo em R$ 2.000/mês. **Premissa não testada:** que subir o ticket 15% não reduz o volume de vendas.
+- **C:** usa João Victor + Daniel Levy — os 2 melhores do ranking da seção 2 (maior produção e menor ociosidade) — como base (77 serviços/R$ 20.408,87 em agosto), com ticket +15% e Ads reduzido na mesma proporção da queda de volume (77/115 = 67% do budget atual). Sem atendente — o cenário original não previa esse custo aqui, então o problema de tempo de atendimento **não é resolvido** neste cenário.
+
+### Qual paga mais, qual escala melhor
+
+- **Quem paga mais em R$: B (R$ 11.123,90/mês)**, mas por uma margem mínima sobre A (R$ 10.921,00) — uma diferença de ~R$ 203/mês (1,9%), praticamente empate em reais.
+- **O que separa A de B não é quanto sobra no fim do mês — é o que cada um custa do seu tempo.** Em A, você volta a instalar o dia inteiro, sozinho, com um teto físico rígido (~50 serviços/mês, o melhor mês individual já visto no banco) e ainda acumula o atendimento que hoje consome seu dia. Em B, você contrata alguém por R$ 2.000/mês exatamente para a tarefa que está sobrecarregando você — e mantém capacidade de crescer (mais leads, mais agenda), coisa que A não permite.
+- **C paga menos que A e B em R$ absoluto (R$ 8.364,91)**, apesar de ter a margem percentual mais alta das três (35,6%) — cortar para 2 instaladores corta ~33% do faturamento, e o cenário nem resolve o problema de atendimento (não inclui atendente).
+- **Quem escala melhor: B.** É o único cenário que mantém volume de operação e tira você do atendimento ao mesmo tempo — A tem teto físico de uma pessoa, C reduz a capacidade de atendimento da própria operação.
+
+**Mas atenção:** o +15% de ticket é a premissa central de B e C, e **nenhum mês do histórico real (seção 1) chegou a esse ticket médio** — o mês com ticket mais alto foi abril/26, com R$ 367,42. Se o aumento de 15% não for sustentável, a margem de B cai proporcionalmente e A passa a pagar mais que B. Antes de decidir com base neste cenário, valeria testar o aumento de ticket em um grupo pequeno de clientes e confirmar que a conversão (seção 4/5) não cai.
+
+---
+
+*Análise completa — Blocos 1, 2 e 3.*
