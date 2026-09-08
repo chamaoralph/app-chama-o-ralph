@@ -320,7 +320,7 @@ Base: serviços concluídos jun–ago/26 (últimos 3 meses completos), cruzando 
 
 ## Bloco 6 — Tabela de comissão fixa por tipo de serviço
 
-Base: mesma categorização por `tv_parede`/`tv_tamanho` da seção 7, agora em jun–ago/26 (todos os serviços da empresa, para ver os tipos mais frequentes) e calibrada especificamente sobre **agosto/26, só os 4 instaladores contratados** (João, Pedro, Daniel, Bryan — excluí Rayana porque ela não recebe os 50% atuais, então não faz sentido incluí-la numa tabela que redistribui esses 50%).
+Base: mesma categorização por `tv_parede`/`tv_tamanho` do Bloco 5, agora em jun–ago/26 (todos os serviços da empresa, para ver os tipos mais frequentes) e calibrada especificamente sobre **agosto/26, só os 4 instaladores contratados** (João, Pedro, Daniel, Bryan — excluí Rayana porque ela não recebe os 50% atuais, então não faz sentido incluí-la numa tabela que redistribui esses 50%).
 
 ### Tipos de serviço mais frequentes (jun–ago/26, toda a empresa) e o que se paga hoje (50% do valor real)
 
@@ -357,7 +357,7 @@ Aplicando esses valores fixos ao mix real de agosto (100 serviços de TV nas 4 c
 | Bryan Rodrigues | 2.674,26 | 2.608,00 | -R$ 66,26 | Mix quase neutro, leve maioria de alvenaria fácil |
 | João Victor | 5.875,01 | 5.423,50 | **-R$ 451,51** | Metade do seu volume (21 de 42 serviços) é TV pequena/média em alvenaria — o mais fácil da tabela |
 
-**Achado central: João Victor — o instalador que mais produz — é quem mais perderia com uma tabela calibrada por dificuldade, porque metade dos serviços dele em agosto foram o tipo mais fácil (TV pequena/média em alvenaria).** Isso não significa que ele "escolhe" o fácil (seção 7 não confirma isso) — mas significa que o modelo de 50% linear hoje paga ele bem mesmo com um mix fácil, e uma tabela por dificuldade tiraria parte dessa vantagem. Pedro e Daniel, que têm proporcionalmente mais serviço difícil, ganhariam.
+**Achado central: João Victor — o instalador que mais produz — é quem mais perderia com uma tabela calibrada por dificuldade, porque metade dos serviços dele em agosto foram o tipo mais fácil (TV pequena/média em alvenaria).** Isso não significa que ele "escolhe" o fácil (Bloco 5 não confirma isso) — mas significa que o modelo de 50% linear hoje paga ele bem mesmo com um mix fácil, e uma tabela por dificuldade tiraria parte dessa vantagem. Pedro e Daniel, que têm proporcionalmente mais serviço difícil, ganhariam.
 
 **Ressalva:** os números de "n" por categoria e por instalador em um único mês são pequenos (de 1 a 21) — o mix de agosto pode não se repetir em setembro. Antes de aplicar essa tabela, valeria simular com pelo menos 2-3 meses de mix por instalador, não só agosto.
 
