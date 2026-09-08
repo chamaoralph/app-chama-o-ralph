@@ -9,7 +9,7 @@
 2. **O histórico real tem ~8 meses, não 12.** A tabela `servicos` só tem registros a partir de **06/01/2026**. "Últimos 12 meses" foi substituído por "todo o histórico disponível" (jan/2026 a set/2026, com set/2026 parcial — só até o dia 07).
 3. **Não existe nenhum serviço sem instalador atribuído** (`instalador_id` nunca é nulo, nem em janeiro/2026). Portanto **não há, nos dados, um período em que você operava sozinho** — o item "melhor mês sozinho" foi removido da análise, por decisão sua.
 4. **O banco tem 5 instaladores reais com histórico de serviço**, não 4: João Victor, Rayana Araujo, Pedro Henrique, Daniel Levy e Bryan Rodrigues (excluída a conta "Claude Teste (instalador)", que tem 0 serviços). Por decisão sua, os 5 foram mantidos na análise.
-5. **Anomalia de cadastro encontrada:** Rayana Araujo está com `percentual_mao_obra = 0%` no cadastro (todos os outros 4 estão em 50%). Isso faz o valor "pago ao instalador" dela aparecer como **R$ 0,00 em 100% dos serviços concluídos**, mesmo tendo faturado R$ 57.934,11 em serviços no total. Isso é o que está registrado no banco — se na prática ela recebe comissão, o cadastro está desatualizado. Reportado como está, sem corrigir ou estimar o valor real pago a ela.
+5. **Rayana Araujo está com `percentual_mao_obra = 0%` no cadastro** (os outros 4 estão em 50%) — por decisão sua, isso é porque ela é sócia e fica com 100% do que fatura, sem passar pela divisão de comissão dos 4 instaladores contratados. Por isso, na tabela de "pago ao instalador" ela aparece com **R$ 0,00 em 100% dos serviços concluídos**, mesmo tendo faturado R$ 57.934,11 em serviços no total — é esperado, não é erro de cadastro. Ela segue nas seções abaixo ao lado dos outros 4 (por decisão sua), mas o critério de comissão dela é diferente e não é comparável ponto a ponto.
 
 ---
 
@@ -48,7 +48,7 @@ Base: serviços com `status = 'concluido'`, agrupados por mês de `data_conclusa
 | Pedro Henrique dos Santos Silva | 40 / 10.559,00 | 16 / 5.618,50 | 16 / 3.720,46 | 72 / 19.897,96 | 9.667,97 |
 | Daniel Levy Souza dos Santos* | — | 24 / 5.874,10 | 35 / 8.658,89 | 59 / 14.532,99 | 7.286,48 |
 | Bryan Rodrigues do Rosario* | — | 11 / 2.199,10 | 20 / 5.348,54 | 31 / 7.547,64 | 3.773,81 |
-| Rayana Araujo | 12 / 6.058,50 | 5 / 1.920,00 | 2 / 1.050,00 | 19 / 9.028,50 | **0,00 ⚠️** |
+| Rayana Araujo* | 12 / 6.058,50 | 5 / 1.920,00 | 2 / 1.050,00 | 19 / 9.028,50 | **0,00 (sócia, fica com 100%)** |
 
 *Daniel e Bryan só começaram a atender em julho/26 — não têm serviço concluído em junho.
 
@@ -70,7 +70,7 @@ Base: serviços com `status = 'concluido'`, agrupados por mês de `data_conclusa
 2. **Daniel Levy** — melhor eficiência entre os "novatos" (chegou em julho): 1,40 serviços/dia útil, só 33% de dias vazios.
 3. **Pedro Henrique** — volume médio, mas **51% dos dias úteis sem nenhum serviço** — a agenda dele está ociosa a maior parte do tempo.
 4. **Bryan Rodrigues** — entrada mais recente (jul/26), ainda em rampa, 51% de dias vazios.
-5. **Rayana Araujo** — menor produção absoluta (19 concluídos em 3 meses), **77% dos dias úteis sem nenhum serviço agendado** — é quem mais "só ocupa agenda" no grupo. Some ainda a anomalia de comissão zerada (ressalva 5).
+5. **Rayana Araujo** — menor produção absoluta (19 concluídos em 3 meses), **77% dos dias úteis sem nenhum serviço agendado** — é quem mais "só ocupa agenda" no grupo. Ela é sócia (fica com 100% do que fatura, ver ressalva 5) — não é uma das 4 instaladoras com quem você divide comissão, então essa ociosidade não pesa no seu caixa da mesma forma que a dos outros 4, mas ainda representa capacidade de atendimento não usada.
 
 ---
 
