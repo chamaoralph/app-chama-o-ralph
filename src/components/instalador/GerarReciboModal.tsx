@@ -114,7 +114,15 @@ export function GerarReciboModal({
     }
   }
 
-  async function salvarRecibo() {
+  /**
+   * Salva/atualiza o registro em recibos_diarios. Retorna se salvou de verdade —
+   * antes esse erro era só logado no console e o download/compartilhamento seguia
+   * normal, então o instalador via "Recibo gerado com sucesso!" mesmo quando o
+   * registro não existia no banco (ex: RLS bloqueando update de recibo já 'pago',
+   * ou qualquer outra falha de rede/permissão). Isso fazia o admin não achar o
+   * recibo em /admin/instaladores mesmo já tendo recebido a imagem por WhatsApp.
+   */
+  async function salvarRecibo(): Promise<boolean> {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Usuário não autenticado')
@@ -170,9 +178,12 @@ export function GerarReciboModal({
 
         if (error) throw error
       }
+      return true
     } catch (error) {
       console.error('Erro ao salvar recibo:', error)
-      // Não bloquear o download se falhar o salvamento
+      // Não bloqueia o download/compartilhamento se falhar o salvamento — mas quem
+      // chama precisa avisar o instalador, ver comentário acima.
+      return false
     }
   }
 
@@ -186,7 +197,7 @@ export function GerarReciboModal({
       }
 
       // Salvar registro no banco
-      await salvarRecibo()
+      const salvou = await salvarRecibo()
 
       // Download do arquivo
       const url = URL.createObjectURL(imageBlob)
@@ -198,7 +209,11 @@ export function GerarReciboModal({
       document.body.removeChild(link)
       URL.revokeObjectURL(url)
 
-      toast.success('Recibo gerado com sucesso!')
+      if (salvou) {
+        toast.success('Recibo gerado com sucesso!')
+      } else {
+        toast.error('Imagem baixada, mas não foi possível registrar no sistema. Avise o admin e tente gerar de novo mais tarde.')
+      }
       onReciboGerado?.()
       onOpenChange(false)
     } catch (error) {
@@ -219,7 +234,7 @@ export function GerarReciboModal({
       }
 
       // Salvar registro no banco
-      await salvarRecibo()
+      const salvou = await salvarRecibo()
 
       const file = new File([imageBlob], `recibo_${format(dataReferencia, 'dd-MM-yyyy')}.png`, {
         type: 'image/png'
@@ -231,7 +246,11 @@ export function GerarReciboModal({
           title: 'Recibo de Serviços',
           text: `Recibo dos serviços do dia ${format(dataReferencia, 'dd/MM/yyyy')} - Total: R$ ${totalGeral.toFixed(2)}`
         })
-        toast.success('Recibo compartilhado!')
+        if (salvou) {
+          toast.success('Recibo compartilhado!')
+        } else {
+          toast.error('Recibo compartilhado, mas não foi possível registrar no sistema. Avise o admin e tente gerar de novo mais tarde.')
+        }
         onReciboGerado?.()
         onOpenChange(false)
       } else {
@@ -337,6 +356,10 @@ export function GerarReciboModal({
             servicos={servicos}
           />
         </div>
+
+        <p className="text-xs text-muted-foreground text-center sm:text-left">
+          ⚠️ Só clicar em <strong>Compartilhar</strong> ou <strong>Baixar Imagem</strong> registra o recibo no sistema — um print da tela não salva nada.
+        </p>
 
         <DialogFooter className="flex-col sm:flex-row gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
