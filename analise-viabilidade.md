@@ -74,4 +74,69 @@ Base: serviços com `status = 'concluido'`, agrupados por mês de `data_conclusa
 
 ---
 
-*Bloco 1 de 3 — Faturamento e Produtividade. Próximo bloco: Margem real e Dependência de Ads.*
+## 3. Margem real (últimos 6 meses: abr–set/26)
+
+Base: `valor_total` (faturamento), `valor_mao_obra_instalador` (pago a instaladores) e `google_ads_metrics.cost_micros` (gasto em Ads), todos em serviços/meses concluídos.
+
+| Mês | Faturamento (R$) | Pago a instaladores (R$) | Gasto em Ads (R$) | Margem (R$) | Margem (%) |
+|---|---|---|---|---|---|
+| Abr/26 | 22.780,08 | 5.130,49 | 2.894,88 | 14.754,71 | **64,8%** |
+| Mai/26 | 32.225,82 | 11.958,35 | 3.036,45 | 17.231,02 | 53,5% |
+| Jun/26 | 30.849,20 | 11.670,35 | 3.721,43 | 15.457,42 | 50,1% |
+| Jul/26 | 28.088,50 | 13.037,25 | 4.912,62 | 10.138,63 | 36,1% |
+| Ago/26 | 30.527,87 | 14.738,92 | 5.033,39 | 10.755,56 | **35,2%** |
+| Set/26 (parcial, dias 1–7) | 3.706,90 | 1.853,45 | 581,46 | 1.271,99 | 34,3% |
+
+### Margem líquida por serviço (R$)
+
+| Abr | Mai | Jun | Jul | Ago | Set (parcial) |
+|---|---|---|---|---|---|
+| 237,98 | 161,13 | 171,75 | 95,65 | 93,53 | 70,67 |
+
+**A margem % caiu de 64,8% (abr) para 35,2% (ago) — quase pela metade em 4 meses.** Dois efeitos somados: o pagamento a instaladores subiu de 22,5% do faturamento (abr) para 48,3% (ago), e o gasto em Ads subiu de 12,7% para 16,5% do faturamento no mesmo intervalo (ver abaixo). Isso não é ilustrativo — é o que os números mostram mês a mês, na direção contrária à que você quer.
+
+### Quanto do faturamento é consumido por Ads (custo por venda ÷ ticket médio)
+
+| Mês | Gasto Ads ÷ nº serviços concluídos (R$/serviço) | Ticket médio (R$) | % do ticket consumido por Ads |
+|---|---|---|---|
+| Abr/26 | 46,69 | 367,42 | 12,7% |
+| Mai/26 | 28,38 | 301,18 | 9,4% |
+| Jun/26 | 41,35 | 342,77 | 12,1% |
+| Jul/26 | 46,35 | 264,99 | 17,5% |
+| Ago/26 | 43,77 | 265,46 | 16,5% |
+| Set/26 (parcial) | 32,30 | 205,94 | 15,7% |
+
+---
+
+## 4. Dependência de Ads
+
+Base: `cotacoes.origem_lead` (982 cotações no total, 0 com origem em branco).
+
+### Origem das cotações (histórico completo)
+
+| Origem | Nº cotações | % do total | Aprovadas | Taxa de aprovação |
+|---|---|---|---|---|
+| **Google** | 822 | **83,7%** | 561 | 68,2% |
+| Não-Google (Indicação, Já era cliente, WhatsApp, Instagram, Orçamento na hora) | 160 | 16,3% | 141 | **88,1%** |
+| **Total** | 982 | 100% | 702 | 71,5% |
+
+**Achado importante: leads que não vêm do Google aprovam 88,1% das vezes, contra 68,2% dos leads de Google — mas o Google já é 83,7% de todo o volume de cotações.** A operação está estruturalmente dependente de Ads para ter volume, mesmo sendo a origem menos eficiente em conversão.
+
+### Evolução do custo por venda de Google Ads (todo o período com dado de Ads: fev–set/26)
+
+| Mês | Gasto Ads (R$) | Cotações aprovadas (Google) | Custo por venda (R$) |
+|---|---|---|---|
+| Fev/26 | 464,91 | 25 | 18,60 |
+| Mar/26 | 1.746,33 | 50 | 34,93 |
+| Abr/26 | 2.894,88 | 46 | 62,93 |
+| Mai/26 | 3.036,45 | 93 | 32,65 |
+| Jun/26 | 3.721,43 | 85 | 43,78 |
+| Jul/26 | 4.912,62 | 89 | 55,20 |
+| Ago/26 | 5.033,39 | 107 | 47,04 |
+| Set/26 (parcial) | 581,46 | 16 | 36,34 |
+
+O orçamento de Ads subiu ~10,8× entre fev e ago (R$ 464,91 → R$ 5.033,39). O custo por venda subiu só ~2,5× no mesmo período (R$ 18,60 → R$ 47,04) — o budget maior trouxe mais vendas absolutas (25 → 107/mês), mas cada venda ficou proporcionalmente mais cara, com pico em julho (R$ 55,20).
+
+---
+
+*Bloco 2 de 3 — Margem real e Dependência de Ads. Próximo bloco: Gargalo de atendimento + os 3 cenários finais.*
