@@ -33,16 +33,18 @@ interface AgendaSemanalProps {
   indisponibilidades: Indisponibilidade[];
   onIniciar: (id: string) => void;
   onFinalizar: (id: string) => void;
+  onTransferido?: () => void;
   onMarcarIndisponibilidade: () => void;
   onEditarIndisponibilidade: (indisponibilidade: Indisponibilidade) => void;
   onExcluirIndisponibilidade: (id: string) => void;
 }
 
-export function AgendaSemanal({ 
-  servicos, 
+export function AgendaSemanal({
+  servicos,
   indisponibilidades,
-  onIniciar, 
+  onIniciar,
   onFinalizar,
+  onTransferido,
   onMarcarIndisponibilidade,
   onEditarIndisponibilidade,
   onExcluirIndisponibilidade,
@@ -212,6 +214,7 @@ export function AgendaSemanal({
                     servico={servico}
                     onIniciar={onIniciar}
                     onFinalizar={onFinalizar}
+                    onTransferido={onTransferido}
                   />
                 ))}
               {/* Mensagem se não houver nada */}
@@ -250,6 +253,7 @@ export function AgendaSemanal({
                       servico={servico}
                       onIniciar={onIniciar}
                       onFinalizar={onFinalizar}
+                      onTransferido={onTransferido}
                     />
                   ))}
                 </div>
@@ -355,6 +359,7 @@ export function AgendaSemanal({
                   servico={servico}
                   onIniciar={onIniciar}
                   onFinalizar={onFinalizar}
+                  onTransferido={onTransferido}
                 />
               ))}
               

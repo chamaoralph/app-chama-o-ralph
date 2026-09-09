@@ -155,13 +155,32 @@ export default function ListaServicos() {
     }
 
     try {
-      const idsParaAtribuir = servicoParaAtribuir 
-        ? [servicoParaAtribuir] 
+      const idsSelecionados = servicoParaAtribuir
+        ? [servicoParaAtribuir]
         : Array.from(servicosSelecionados)
+
+      // "Definir Instalador" só vale pra atribuição inicial (serviço sem
+      // instalador). Serviço que já tem alguém responsável precisa passar
+      // pela transferência (mantém o histórico de auditoria) — o próprio
+      // banco bloqueia essa troca direta, mas filtramos aqui pra dar um
+      // aviso claro em vez de um erro genérico do Postgres.
+      const jaAtribuidos = new Set(
+        servicos.filter(s => idsSelecionados.includes(s.id) && s.instalador_id).map(s => s.id)
+      )
+      const idsParaAtribuir = idsSelecionados.filter(id => !jaAtribuidos.has(id))
+
+      if (idsParaAtribuir.length === 0) {
+        toast({
+          title: "Nenhum serviço elegível",
+          description: "O(s) serviço(s) selecionado(s) já têm instalador. Use \"Transferir\" no detalhe do serviço para trocar o responsável.",
+          variant: "destructive",
+        })
+        return
+      }
 
       const { error } = await supabase
         .from('servicos')
-        .update({ 
+        .update({
           instalador_id: instaladorSelecionado,
           status: 'atribuido'
         })
@@ -171,7 +190,9 @@ export default function ListaServicos() {
 
       toast({
         title: "Instalador atribuído",
-        description: `${idsParaAtribuir.length} serviço(s) atribuído(s) com sucesso`,
+        description: jaAtribuidos.size > 0
+          ? `${idsParaAtribuir.length} serviço(s) atribuído(s). ${jaAtribuidos.size} já tinham instalador e foram ignorados — use "Transferir" para esses.`
+          : `${idsParaAtribuir.length} serviço(s) atribuído(s) com sucesso`,
       })
 
       setModalAberto(false)

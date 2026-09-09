@@ -3,11 +3,18 @@ import { AdminLayout } from '@/components/layout/AdminLayout'
 import { supabase } from '@/integrations/supabase/client'
 import { useEffect, useState } from 'react'
 import { useToast } from '@/hooks/use-toast'
+import { useAuth } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, User, MapPin, Calendar, Phone, DollarSign, FileText } from 'lucide-react'
+import { ArrowLeft, User, MapPin, Calendar, Phone, DollarSign, FileText, ArrowLeftRight } from 'lucide-react'
 import { formatarDataBR, formatarDataHoraBR } from '@/lib/utils'
+import { TransferirServicoModal } from '@/components/servicos/TransferirServicoModal'
+import { HistoricoTransferenciasServico } from '@/components/servicos/HistoricoTransferenciasServico'
+
+// Status a partir dos quais a transferência de serviço não é mais permitida
+// (mesma regra aplicada em transferir_servico() no banco).
+const STATUS_SEM_TRANSFERENCIA = ['concluido', 'cancelado']
 
 interface Servico {
   id: string
@@ -42,8 +49,11 @@ export default function DetalheServico() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { toast } = useToast()
+  const { user, userType } = useAuth()
   const [servico, setServico] = useState<Servico | null>(null)
   const [loading, setLoading] = useState(true)
+  const [modalTransferirAberto, setModalTransferirAberto] = useState(false)
+  const [historicoRefreshKey, setHistoricoRefreshKey] = useState(0)
 
   useEffect(() => {
     if (id) fetchServico()
@@ -97,6 +107,17 @@ export default function DetalheServico() {
       .getPublicUrl(pathOrUrl)
     return data.publicUrl
   }
+
+  function handleTransferenciaConcluida() {
+    fetchServico()
+    setHistoricoRefreshKey((k) => k + 1)
+  }
+
+  const podeTransferir =
+    !!servico &&
+    !!servico.instalador_id &&
+    !STATUS_SEM_TRANSFERENCIA.includes(servico.status) &&
+    (userType === 'admin' || user?.id === servico.instalador_id)
 
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { bg: string; text: string; label: string }> = {
@@ -253,8 +274,14 @@ export default function DetalheServico() {
 
           {/* Instalador */}
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle>Instalador</CardTitle>
+              {podeTransferir && (
+                <Button size="sm" variant="outline" onClick={() => setModalTransferirAberto(true)} className="gap-2">
+                  <ArrowLeftRight className="w-4 h-4" />
+                  Transferir
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               {servico.instalador ? (
@@ -319,7 +346,20 @@ export default function DetalheServico() {
             </CardContent>
           </Card>
         )}
+
+        {/* Histórico de Transferências */}
+        <HistoricoTransferenciasServico servicoId={servico.id} refreshKey={historicoRefreshKey} />
       </div>
+
+      {servico.instalador_id && (
+        <TransferirServicoModal
+          open={modalTransferirAberto}
+          onOpenChange={setModalTransferirAberto}
+          servicoId={servico.id}
+          instaladorAtualId={servico.instalador_id}
+          onSuccess={handleTransferenciaConcluida}
+        />
+      )}
     </AdminLayout>
   )
 }

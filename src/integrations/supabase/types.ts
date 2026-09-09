@@ -572,6 +572,7 @@ export type Database = {
           ocasiao: string | null
           origem_lead: string | null
           origem_suporte: string | null
+          servico_origem_id: string | null
           servicos_extras: Json | null
           status: string
           tipo_servico: string[] | null
@@ -598,6 +599,7 @@ export type Database = {
           ocasiao?: string | null
           origem_lead?: string | null
           origem_suporte?: string | null
+          servico_origem_id?: string | null
           servicos_extras?: Json | null
           status?: string
           tipo_servico?: string[] | null
@@ -624,6 +626,7 @@ export type Database = {
           ocasiao?: string | null
           origem_lead?: string | null
           origem_suporte?: string | null
+          servico_origem_id?: string | null
           servicos_extras?: Json | null
           status?: string
           tipo_servico?: string[] | null
@@ -648,6 +651,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotacoes_servico_origem_id_fkey"
+            columns: ["servico_origem_id"]
+            isOneToOne: false
+            referencedRelation: "servicos"
             referencedColumns: ["id"]
           },
         ]
@@ -1175,6 +1185,7 @@ export type Database = {
       }
       movimentacoes_suportes: {
         Row: {
+          catalogo_id: string | null
           created_at: string | null
           data_movimento: string
           empresa_id: string
@@ -1187,6 +1198,7 @@ export type Database = {
           valor_unitario: number | null
         }
         Insert: {
+          catalogo_id?: string | null
           created_at?: string | null
           data_movimento?: string
           empresa_id: string
@@ -1199,6 +1211,7 @@ export type Database = {
           valor_unitario?: number | null
         }
         Update: {
+          catalogo_id?: string | null
           created_at?: string | null
           data_movimento?: string
           empresa_id?: string
@@ -1211,6 +1224,13 @@ export type Database = {
           valor_unitario?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "movimentacoes_suportes_catalogo_id_fkey"
+            columns: ["catalogo_id"]
+            isOneToOne: false
+            referencedRelation: "catalogo_servicos"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "movimentacoes_suportes_empresa_id_fkey"
             columns: ["empresa_id"]
@@ -1536,6 +1556,9 @@ export type Database = {
           descricao: string | null
           empresa_id: string
           endereco_completo: string
+          estoque_extras_instalador_baixado: boolean
+          estoque_suporte_garantia_baixado: boolean
+          estoque_suporte_instalador_baixado: boolean
           fotos_conclusao: string[] | null
           ganho_acessorios_empresa: number
           ganho_acessorios_instalador: number
@@ -1553,6 +1576,7 @@ export type Database = {
           status: string | null
           tipo_servico: string[]
           updated_at: string | null
+          usou_suporte_garantia_total: boolean
           valor_mao_obra_ajudante: number | null
           valor_mao_obra_instalador: number | null
           valor_recebido_cliente: number | null
@@ -1573,6 +1597,9 @@ export type Database = {
           descricao?: string | null
           empresa_id: string
           endereco_completo: string
+          estoque_extras_instalador_baixado?: boolean
+          estoque_suporte_garantia_baixado?: boolean
+          estoque_suporte_instalador_baixado?: boolean
           fotos_conclusao?: string[] | null
           ganho_acessorios_empresa?: number
           ganho_acessorios_instalador?: number
@@ -1590,6 +1617,7 @@ export type Database = {
           status?: string | null
           tipo_servico: string[]
           updated_at?: string | null
+          usou_suporte_garantia_total?: boolean
           valor_mao_obra_ajudante?: number | null
           valor_mao_obra_instalador?: number | null
           valor_recebido_cliente?: number | null
@@ -1610,6 +1638,9 @@ export type Database = {
           descricao?: string | null
           empresa_id?: string
           endereco_completo?: string
+          estoque_extras_instalador_baixado?: boolean
+          estoque_suporte_garantia_baixado?: boolean
+          estoque_suporte_instalador_baixado?: boolean
           fotos_conclusao?: string[] | null
           ganho_acessorios_empresa?: number
           ganho_acessorios_instalador?: number
@@ -1627,6 +1658,7 @@ export type Database = {
           status?: string | null
           tipo_servico?: string[]
           updated_at?: string | null
+          usou_suporte_garantia_total?: boolean
           valor_mao_obra_ajudante?: number | null
           valor_mao_obra_instalador?: number | null
           valor_recebido_cliente?: number | null
@@ -1667,6 +1699,75 @@ export type Database = {
             columns: ["instalador_id"]
             isOneToOne: false
             referencedRelation: "instaladores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      servicos_transferencias: {
+        Row: {
+          created_at: string
+          de_instalador_id: string
+          empresa_id: string
+          id: string
+          motivo: string | null
+          para_instalador_id: string
+          servico_id: string
+          transferido_por: string
+        }
+        Insert: {
+          created_at?: string
+          de_instalador_id: string
+          empresa_id: string
+          id?: string
+          motivo?: string | null
+          para_instalador_id: string
+          servico_id: string
+          transferido_por: string
+        }
+        Update: {
+          created_at?: string
+          de_instalador_id?: string
+          empresa_id?: string
+          id?: string
+          motivo?: string | null
+          para_instalador_id?: string
+          servico_id?: string
+          transferido_por?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "servicos_transferencias_de_instalador_id_fkey"
+            columns: ["de_instalador_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "servicos_transferencias_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "servicos_transferencias_para_instalador_id_fkey"
+            columns: ["para_instalador_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "servicos_transferencias_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: false
+            referencedRelation: "servicos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "servicos_transferencias_transferido_por_fkey"
+            columns: ["transferido_por"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
             referencedColumns: ["id"]
           },
         ]
@@ -2111,11 +2212,7 @@ export type Database = {
     }
     Functions: {
       ajustar_estoque_manual: {
-        Args: {
-          p_catalogo_id: string
-          p_motivo: string
-          p_quantidade: number
-        }
+        Args: { p_catalogo_id: string; p_motivo: string; p_quantidade: number }
         Returns: {
           custo_total: number
           qtd_atendida: number
@@ -2205,6 +2302,20 @@ export type Database = {
         }
         Returns: boolean
       }
+      historico_transferencias_servico: {
+        Args: { p_servico_id: string }
+        Returns: {
+          created_at: string
+          de_instalador_id: string
+          de_instalador_nome: string
+          id: string
+          motivo: string
+          para_instalador_id: string
+          para_instalador_nome: string
+          transferido_por: string
+          transferido_por_nome: string
+        }[]
+      }
       import_clientes_csv:
         | { Args: { p_arquivo_nome?: string; p_dados: Json }; Returns: Json }
         | {
@@ -2218,6 +2329,19 @@ export type Database = {
       instalador_certificado_para_tipo: {
         Args: { _instalador_id: string; _tipos_servico: string[] }
         Returns: boolean
+      }
+      instaladores_com_suporte_disponivel: {
+        Args: { p_catalogo_id: string; p_quantidade: number }
+        Returns: {
+          nome: string
+        }[]
+      }
+      listar_instaladores_para_transferencia: {
+        Args: { p_excluir_instalador_id?: string }
+        Returns: {
+          id: string
+          nome: string
+        }[]
       }
       metricas_acessorios: {
         Args: {
@@ -2265,6 +2389,14 @@ export type Database = {
         Args: { p_cotacao_id: string }
         Returns: undefined
       }
+      transferir_servico: {
+        Args: {
+          p_motivo: string
+          p_para_instalador_id: string
+          p_servico_id: string
+        }
+        Returns: undefined
+      }
       validate_signup_invitation: {
         Args: { p_email: string; p_token: string }
         Returns: {
@@ -2290,12 +2422,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2319,11 +2451,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2344,11 +2476,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2369,11 +2501,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2386,11 +2518,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

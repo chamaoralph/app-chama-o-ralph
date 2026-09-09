@@ -158,6 +158,7 @@ export default function MinhaAgenda() {
           indisponibilidades={indisponibilidades}
           onIniciar={iniciarServico}
           onFinalizar={finalizarServico}
+          onTransferido={carregarMeusServicos}
           onMarcarIndisponibilidade={handleMarcarIndisponibilidade}
           onEditarIndisponibilidade={handleEditarIndisponibilidade}
           onExcluirIndisponibilidade={handleExcluirIndisponibilidade}

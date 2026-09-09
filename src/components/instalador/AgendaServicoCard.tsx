@@ -1,10 +1,18 @@
-import { Phone, MapPin, Play, CheckCircle, Clock, User, Zap } from "lucide-react";
+import { useState } from "react";
+import { Phone, MapPin, Play, CheckCircle, Clock, User, Zap, ArrowLeftRight } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/lib/auth";
 import { decomporExtra, formatarBRL, type ExtraServicoItem } from "@/lib/orcamento";
+import { TransferirServicoModal } from "@/components/servicos/TransferirServicoModal";
+import { HistoricoTransferenciasServico } from "@/components/servicos/HistoricoTransferenciasServico";
+
+// Status a partir dos quais a transferência de serviço não é mais permitida
+// (mesma regra aplicada em transferir_servico() no banco).
+const STATUS_SEM_TRANSFERENCIA = ["concluido", "cancelado"];
 
 interface Cliente {
   nome: string;
@@ -31,6 +39,7 @@ interface AgendaServicoCardProps {
   servico: Servico;
   onIniciar: (id: string) => void;
   onFinalizar: (id: string) => void;
+  onTransferido?: () => void;
 }
 
 // Extrai horário diretamente da string para evitar conversão de timezone
@@ -47,9 +56,18 @@ function formatarDataServico(dataString: string): string {
   return `${dia}/${mes}/${ano} às ${horario}`;
 }
 
-export function AgendaServicoCard({ servico, onIniciar, onFinalizar }: AgendaServicoCardProps) {
+export function AgendaServicoCard({ servico, onIniciar, onFinalizar, onTransferido }: AgendaServicoCardProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [modalTransferirAberto, setModalTransferirAberto] = useState(false);
+  const [historicoRefreshKey, setHistoricoRefreshKey] = useState(0);
   const horario = formatarHorario(servico.data_servico_agendada);
+  const podeTransferir = !STATUS_SEM_TRANSFERENCIA.includes(servico.status);
+
+  function handleTransferenciaConcluida() {
+    setHistoricoRefreshKey((k) => k + 1);
+    onTransferido?.();
+  }
 
   const getStatusConfig = (status: string) => {
     switch (status) {
@@ -266,6 +284,19 @@ export function AgendaServicoCard({ servico, onIniciar, onFinalizar }: AgendaSer
             Orçamento na hora
           </Button>
 
+          {podeTransferir && (
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={() => setModalTransferirAberto(true)}
+            >
+              <ArrowLeftRight className="h-4 w-4" />
+              Transferir Serviço
+            </Button>
+          )}
+
+          <HistoricoTransferenciasServico servicoId={servico.id} refreshKey={historicoRefreshKey} />
+
           {/* Botões de Status */}
           {servico.status === "solicitado" && (
             <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-3 py-2 rounded text-sm text-center">
@@ -310,6 +341,16 @@ export function AgendaServicoCard({ servico, onIniciar, onFinalizar }: AgendaSer
           )}
         </div>
       </SheetContent>
+
+      {user?.id && (
+        <TransferirServicoModal
+          open={modalTransferirAberto}
+          onOpenChange={setModalTransferirAberto}
+          servicoId={servico.id}
+          instaladorAtualId={user.id}
+          onSuccess={handleTransferenciaConcluida}
+        />
+      )}
     </Sheet>
   );
 }
