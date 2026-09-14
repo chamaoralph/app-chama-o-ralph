@@ -12,7 +12,7 @@ async function hmacSign(secret: string, message: string): Promise<string> {
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-webhook-signature",
+    "authorization, x-client-info, apikey, content-type, x-webhook-signature, x-webhook-token",
 };
 
 Deno.serve(async (req) => {
@@ -21,7 +21,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Validar HMAC
     const secret = Deno.env.get("WEBHOOK_SECRET");
     if (!secret) {
       return new Response(
@@ -31,20 +30,27 @@ Deno.serve(async (req) => {
     }
 
     const rawBody = await req.text();
-    const receivedSignature = req.headers.get("x-webhook-signature");
 
-    if (!receivedSignature) {
-      return new Response(
-        JSON.stringify({ error: "Missing signature" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // Aceita dois jeitos de autenticar: token simples (x-webhook-token, é como o N8N chama
+    // essa e todas as outras Edge Functions — ver skill n8n-railway) OU assinatura HMAC
+    // (x-webhook-signature, mais forte, pra outros chamadores). Bug real encontrado em
+    // produção: antes só aceitava HMAC, mas o node "Registrar Avaliação" do N8N manda
+    // x-webhook-token — toda tentativa de registrar a nota do cliente falhava com 401
+    // "Missing signature", mesmo depois da avaliação já estar sendo encontrada certo.
+    const tokenHeader = req.headers.get("x-webhook-token");
+    const signatureHeader = req.headers.get("x-webhook-signature");
+
+    let autenticado = false;
+    if (tokenHeader) {
+      autenticado = tokenHeader === secret;
+    } else if (signatureHeader) {
+      const expectedSignature = await hmacSign(secret, rawBody);
+      autenticado = signatureHeader === expectedSignature;
     }
 
-    const expectedSignature = await hmacSign(secret, rawBody);
-
-    if (receivedSignature !== expectedSignature) {
+    if (!autenticado) {
       return new Response(
-        JSON.stringify({ error: "Invalid signature" }),
+        JSON.stringify({ error: "Missing or invalid authentication (x-webhook-token or x-webhook-signature)" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
