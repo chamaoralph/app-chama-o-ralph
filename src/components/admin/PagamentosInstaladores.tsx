@@ -238,7 +238,7 @@ export function PagamentosInstaladores() {
           .order('data_referencia', { ascending: false }),
         supabase
           .from('servicos')
-          .select('id, instalador_id, data_conclusao, valor_mao_obra_instalador, valor_reembolso_despesas, ganho_acessorios_instalador, valor_recebido_cliente')
+          .select('id, instalador_id, data_conclusao, valor_mao_obra_instalador, valor_reembolso_despesas, ganho_acessorios_instalador, valor_recebido_cliente, recebimento_cliente')
           .eq('empresa_id', userData.empresa_id)
           .eq('status', 'concluido')
           .not('data_conclusao', 'is', null)
@@ -363,7 +363,13 @@ export function PagamentosInstaladores() {
         // (admin) ficava menor que o recibo que o próprio instalador gera e envia, fazendo o
         // saldo "a pagar/receber" divergir entre os dois.
         const reembolso = Number(s.valor_reembolso_despesas || 0) + Number(s.ganho_acessorios_instalador || 0)
-        const recebidoCliente = Number(s.valor_recebido_cliente || 0)
+        // Só conta como "dinheiro na mão do instalador" quando foi ELE quem recebeu do
+        // cliente. Quando recebimento_cliente = 'empresa', valor_recebido_cliente guarda
+        // o total que a EMPRESA recebeu (não o instalador) — somar isso aqui fazia o saldo
+        // do recibo "a pagar/receber" sair invertido sempre que um dia misturava serviços
+        // pagos à empresa com serviços pagos ao instalador. Mesmo filtro que
+        // GerarReciboModal.tsx (totalRecebidoPeloInstalador) já aplica.
+        const recebidoCliente = s.recebimento_cliente === 'instalador' ? Number(s.valor_recebido_cliente || 0) : 0
 
         grupo.servicos.push({
           id: s.id,
