@@ -57,7 +57,8 @@ export async function processarExtratoOFX(
   const creditosNovos = creditos.filter(t => !fitidsJaProcessados.has(t.fitid))
 
   const recibosPendentes = await buscarRecibosPendentes(empresaId)
-  const resultados = conciliarExtrato(creditosNovos, recibosPendentes)
+  const { candidatos: candidatosFaltantes, detalhesPorId: faltantesPorId } = await buscarRecibosFaltantes(empresaId)
+  const resultados = conciliarExtrato(creditosNovos, [...recibosPendentes, ...candidatosFaltantes])
 
   let automaticos = 0
   let revisao = 0
@@ -67,7 +68,16 @@ export async function processarExtratoOFX(
   for (const resultado of resultados) {
     try {
       if (resultado.tipo === 'automatico') {
-        if (!dryRun) await aplicarBaixaAutomatica(empresaId, resultado)
+        if (!dryRun) {
+          if (resultado.recibo.id.startsWith('faltante:')) {
+            const faltante = faltantesPorId.get(resultado.recibo.id)
+            if (!faltante) throw new Error('Esse recibo ainda não existia na hora de casar, mas sumiu da lista de faltantes — provavelmente já foi gerado por outro caminho nesse meio tempo')
+            const reciboId = await criarReciboJaPago(empresaId, resultado.transacao, faltante)
+            await registrarConciliacao(empresaId, resultado.transacao, 'automatico', { recibo_id: reciboId })
+          } else {
+            await aplicarBaixaAutomatica(empresaId, resultado)
+          }
+        }
         automaticos++
       } else if (resultado.tipo === 'revisao') {
         if (!dryRun) {
@@ -126,6 +136,152 @@ async function buscarRecibosPendentes(empresaId: string): Promise<ReciboPendente
       }
     })
     .filter((r: ReciboPendente) => r.valor_a_pagar > 0)
+}
+
+export interface ReciboFaltanteCandidato {
+  /** faltante:<instalador_id>:<data_referencia> */
+  id: string
+  instalador_id: string
+  instalador_nome: string
+  data_referencia: string
+  servicos_ids: string[]
+  valor_mao_obra: number
+  valor_reembolso: number
+  valor_recebido_cliente: number
+  quantidade_servicos: number
+}
+
+/**
+ * Serviços concluídos há até 90 dias, de um dia+instalador que ainda não tem recibo_diario
+ * nenhum (mesma detecção que a caixa "Recibos Não Gerados" em PagamentosInstaladores.tsx).
+ * Servem como candidato de conciliação: se um crédito do extrato bater com um desses, o
+ * recibo é criado JÁ como pago (ver criarReciboJaPago), sem passar por 'pendente'.
+ */
+async function buscarRecibosFaltantes(empresaId: string): Promise<{
+  candidatos: ReciboPendente[]
+  detalhesPorId: Map<string, ReciboFaltanteCandidato>
+}> {
+  const noventaDiasAtras = new Date()
+  noventaDiasAtras.setDate(noventaDiasAtras.getDate() - 90)
+  const dataLimite = format(noventaDiasAtras, "yyyy-MM-dd'T'HH:mm:ss")
+
+  const [recibosRes, servicosRes] = await Promise.all([
+    supabase.from('recibos_diarios').select('instalador_id, data_referencia').eq('empresa_id', empresaId),
+    supabase
+      .from('servicos')
+      .select('id, instalador_id, data_conclusao, valor_mao_obra_instalador, valor_reembolso_despesas, ganho_acessorios_instalador, valor_recebido_cliente')
+      .eq('empresa_id', empresaId)
+      .eq('status', 'concluido')
+      .not('data_conclusao', 'is', null)
+      .not('instalador_id', 'is', null)
+      .gte('data_conclusao', dataLimite)
+  ])
+  if (recibosRes.error) throw recibosRes.error
+  if (servicosRes.error) throw servicosRes.error
+
+  // Dia+instalador que já tem QUALQUER recibo (pendente, pago...) não é "faltante".
+  const recibosExistentesSet = new Set(
+    (recibosRes.data || []).map((r: any) => `${r.instalador_id}|${r.data_referencia}`)
+  )
+
+  const grupos = new Map<string, ReciboFaltanteCandidato>()
+  for (const s of servicosRes.data || []) {
+    if (!s.instalador_id || !s.data_conclusao) continue
+
+    // Fuso Brasília (-3h), mesma conversão que PagamentosInstaladores.tsx usa.
+    const dtBrasilia = new Date(new Date(s.data_conclusao).getTime() - 3 * 60 * 60 * 1000)
+    const dataRef = dtBrasilia.toISOString().slice(0, 10)
+
+    if (recibosExistentesSet.has(`${s.instalador_id}|${dataRef}`)) continue
+
+    const id = `faltante:${s.instalador_id}:${dataRef}`
+    if (!grupos.has(id)) {
+      grupos.set(id, {
+        id,
+        instalador_id: s.instalador_id,
+        instalador_nome: '',
+        data_referencia: dataRef,
+        servicos_ids: [],
+        valor_mao_obra: 0,
+        valor_reembolso: 0,
+        valor_recebido_cliente: 0,
+        quantidade_servicos: 0
+      })
+    }
+    const grupo = grupos.get(id)!
+    grupo.servicos_ids.push(s.id)
+    grupo.valor_mao_obra += Number(s.valor_mao_obra_instalador || 0)
+    // Fatia do instalador: reembolso de despesas + ganho em acessórios vendidos.
+    grupo.valor_reembolso += Number(s.valor_reembolso_despesas || 0) + Number(s.ganho_acessorios_instalador || 0)
+    grupo.valor_recebido_cliente += Number(s.valor_recebido_cliente || 0)
+    grupo.quantidade_servicos++
+  }
+
+  const instaladorIds = Array.from(new Set(Array.from(grupos.values()).map(g => g.instalador_id)))
+  const { data: instaladores } = instaladorIds.length > 0
+    ? await supabase.from('usuarios').select('id, nome').in('id', instaladorIds)
+    : { data: [] as { id: string; nome: string }[] }
+  const nomesPorId = new Map<string, string>((instaladores || []).map((i: any) => [i.id, i.nome] as [string, string]))
+  for (const g of grupos.values()) g.instalador_nome = nomesPorId.get(g.instalador_id) || ''
+
+  const candidatos: ReciboPendente[] = Array.from(grupos.values())
+    .map(g => {
+      const saldo = g.valor_mao_obra + g.valor_reembolso - g.valor_recebido_cliente
+      return {
+        id: g.id,
+        instalador_id: g.instalador_id,
+        instalador_nome: g.instalador_nome,
+        data_referencia: g.data_referencia,
+        valor_a_pagar: saldo < 0 ? Math.abs(saldo) : 0
+      }
+    })
+    .filter(c => c.valor_a_pagar > 0)
+
+  return { candidatos, detalhesPorId: grupos }
+}
+
+/** Cria o recibo_diario JÁ como pago (pula o estado 'pendente') e lança a receita no caixa. Retorna o id criado. */
+async function criarReciboJaPago(
+  empresaId: string,
+  transacao: { fitid: string; data: string; valor: number },
+  faltante: ReciboFaltanteCandidato
+): Promise<string> {
+  const valorTotal = faltante.valor_mao_obra + faltante.valor_reembolso
+
+  const { data: novoRecibo, error: erroInsert } = await supabase
+    .from('recibos_diarios')
+    .insert({
+      empresa_id: empresaId,
+      instalador_id: faltante.instalador_id,
+      data_referencia: faltante.data_referencia,
+      valor_mao_obra: faltante.valor_mao_obra,
+      valor_reembolso: faltante.valor_reembolso,
+      valor_total: valorTotal,
+      quantidade_servicos: faltante.quantidade_servicos,
+      servicos_ids: faltante.servicos_ids,
+      valor_recebido_cliente: faltante.valor_recebido_cliente,
+      status_pagamento: 'pago',
+      data_pagamento: transacao.data,
+      extrato_fitid: transacao.fitid
+    })
+    .select('id')
+    .single()
+  if (erroInsert) throw erroInsert
+
+  const dataReferenciaFormatada = format(new Date(faltante.data_referencia + 'T12:00:00'), 'dd/MM/yyyy')
+
+  const { error: erroCaixa } = await supabase.from('lancamentos_caixa').insert({
+    empresa_id: empresaId,
+    tipo: 'receita',
+    categoria: 'Recebimento Instalador',
+    descricao: `Recebimento de ${faltante.instalador_nome} - ${dataReferenciaFormatada} (extrato bancário — recibo gerado automaticamente)`,
+    valor: transacao.valor,
+    data_lancamento: transacao.data,
+    forma_pagamento: 'PIX'
+  })
+  if (erroCaixa) throw erroCaixa
+
+  return novoRecibo.id
 }
 
 /** Efeito colateral em si da baixa: atualiza o recibo e lança a receita no caixa. Não mexe em extrato_conciliacao. */
@@ -188,7 +344,14 @@ export interface ItemFilaRevisao {
   data_transacao: string
   valor: number
   nome_remetente: string
-  candidatos: { id: string; instalador_nome: string; data_referencia: string; valor_a_pagar: number }[]
+  candidatos: {
+    id: string
+    instalador_nome: string
+    data_referencia: string
+    valor_a_pagar: number
+    /** true = recibo ainda não existe; confirmar essa opção cria e já marca como pago. */
+    seraGerado: boolean
+  }[]
 }
 
 /** Busca os itens pendentes de revisão (resultado='revisao' e status_revisao='pendente') com os dados dos recibos candidatos. */
@@ -203,12 +366,15 @@ export async function buscarFilaRevisao(empresaId: string): Promise<ItemFilaRevi
   if (error) throw error
   if (!itens || itens.length === 0) return []
 
-  const todosCandidatoIds = Array.from(new Set(itens.flatMap((i: any) => i.candidatos_recibo_ids || [])))
-  const { data: recibos } = todosCandidatoIds.length > 0
+  const todosCandidatoIds = Array.from(new Set(itens.flatMap((i: any) => i.candidatos_recibo_ids || []))) as string[]
+  const idsReais = todosCandidatoIds.filter(id => !id.startsWith('faltante:'))
+  const temCandidatoFaltante = todosCandidatoIds.some(id => id.startsWith('faltante:'))
+
+  const { data: recibos } = idsReais.length > 0
     ? await supabase
         .from('recibos_diarios')
         .select('id, instalador_id, data_referencia, valor_mao_obra, valor_reembolso, valor_recebido_cliente')
-        .in('id', todosCandidatoIds)
+        .in('id', idsReais)
     : { data: [] as any[] }
 
   const instaladorIds = Array.from(new Set((recibos || []).map((r: any) => r.instalador_id)))
@@ -226,11 +392,34 @@ export async function buscarFilaRevisao(empresaId: string): Promise<ItemFilaRevi
           id: r.id,
           instalador_nome: nomesPorId.get(r.instalador_id) || '',
           data_referencia: r.data_referencia,
-          valor_a_pagar: saldo < 0 ? Math.abs(saldo) : 0
+          valor_a_pagar: saldo < 0 ? Math.abs(saldo) : 0,
+          seraGerado: false
         }
       ]
     })
   )
+
+  // Recibos faltantes são recalculados na hora (não existe registro fixo pra guardar) — se um
+  // candidato já foi gerado por outro caminho nesse meio tempo, ele simplesmente não aparece mais.
+  const { detalhesPorId: faltantesPorId } = temCandidatoFaltante
+    ? await buscarRecibosFaltantes(empresaId)
+    : { detalhesPorId: new Map<string, ReciboFaltanteCandidato>() }
+
+  const candidatoPorId = (id: string) => {
+    if (id.startsWith('faltante:')) {
+      const f = faltantesPorId.get(id)
+      if (!f) return null
+      const saldo = f.valor_mao_obra + f.valor_reembolso - f.valor_recebido_cliente
+      return {
+        id: f.id,
+        instalador_nome: f.instalador_nome,
+        data_referencia: f.data_referencia,
+        valor_a_pagar: saldo < 0 ? Math.abs(saldo) : 0,
+        seraGerado: true
+      }
+    }
+    return recibosPorId.get(id) || null
+  }
 
   return itens.map((item: any) => ({
     id: item.id,
@@ -238,12 +427,12 @@ export async function buscarFilaRevisao(empresaId: string): Promise<ItemFilaRevi
     data_transacao: item.data_transacao,
     valor: Number(item.valor),
     nome_remetente: item.nome_remetente,
-    candidatos: (item.candidatos_recibo_ids || []).map((id: string) => recibosPorId.get(id)).filter(Boolean)
+    candidatos: (item.candidatos_recibo_ids || []).map((id: string) => candidatoPorId(id)).filter(Boolean)
   }))
 }
 
 /** Admin escolheu, entre os candidatos, qual recibo essa transação da fila de revisão paga. */
-export async function confirmarRevisao(empresaId: string, itemConciliacaoId: string, reciboId: string): Promise<void> {
+export async function confirmarRevisao(empresaId: string, itemConciliacaoId: string, candidatoId: string): Promise<void> {
   const { data: item, error: erroItem } = await supabase
     .from('extrato_conciliacao')
     .select('fitid, data_transacao, valor')
@@ -252,20 +441,33 @@ export async function confirmarRevisao(empresaId: string, itemConciliacaoId: str
   if (erroItem) throw erroItem
   if (!item) throw new Error('Item de conciliação não encontrado')
 
-  const { data: recibo, error: erroRecibo } = await supabase
-    .from('recibos_diarios')
-    .select('id, instalador_id, data_referencia')
-    .eq('id', reciboId)
-    .single()
-  if (erroRecibo) throw erroRecibo
+  const transacao = { fitid: item.fitid, data: item.data_transacao, valor: Number(item.valor) }
+  let reciboId: string
 
-  const { data: instalador } = await supabase.from('usuarios').select('nome').eq('id', recibo.instalador_id).single()
+  if (candidatoId.startsWith('faltante:')) {
+    const { detalhesPorId } = await buscarRecibosFaltantes(empresaId)
+    const faltante = detalhesPorId.get(candidatoId)
+    if (!faltante) {
+      throw new Error('Esse recibo não existe mais pra gerar (provavelmente já foi criado por outro caminho) — atualize a página')
+    }
+    reciboId = await criarReciboJaPago(empresaId, transacao, faltante)
+  } else {
+    const { data: recibo, error: erroRecibo } = await supabase
+      .from('recibos_diarios')
+      .select('id, instalador_id, data_referencia')
+      .eq('id', candidatoId)
+      .single()
+    if (erroRecibo) throw erroRecibo
 
-  await darBaixaNoRecibo(
-    empresaId,
-    { fitid: item.fitid, data: item.data_transacao, valor: Number(item.valor) },
-    { id: recibo.id, instalador_nome: instalador?.nome || '', data_referencia: recibo.data_referencia }
-  )
+    const { data: instalador } = await supabase.from('usuarios').select('nome').eq('id', recibo.instalador_id).single()
+
+    await darBaixaNoRecibo(
+      empresaId,
+      transacao,
+      { id: recibo.id, instalador_nome: instalador?.nome || '', data_referencia: recibo.data_referencia }
+    )
+    reciboId = recibo.id
+  }
 
   const { error: erroUpdate } = await supabase
     .from('extrato_conciliacao')

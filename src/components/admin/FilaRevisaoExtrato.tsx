@@ -118,6 +118,7 @@ export function FilaRevisaoExtrato({ empresaId, refreshKey }: FilaRevisaoExtrato
                       {item.candidatos.map(c => (
                         <option key={c.id} value={c.id}>
                           {c.instalador_nome} — {format(new Date(c.data_referencia + 'T12:00:00'), 'dd/MM')} — R$ {c.valor_a_pagar.toFixed(2)}
+                          {c.seraGerado ? ' (recibo será criado)' : ''}
                         </option>
                       ))}
                     </select>
