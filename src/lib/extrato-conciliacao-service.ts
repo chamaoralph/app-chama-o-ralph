@@ -45,13 +45,17 @@ export async function processarExtratoOFX(
     }
   }
 
-  // Não reprocessa transação que já apareceu num extrato importado antes.
+  // Não reprocessa transação que já virou baixa ou já está esperando revisão. "Sem
+  // correspondência" fica de fora dessa trava de propósito: nada aconteceu da vez passada,
+  // então vale tentar de novo (um recibo pode ter sido gerado/pago nesse meio tempo, ou a
+  // própria lógica de conciliação pode ter evoluído desde a última importação).
   const fitidsDoArquivo = creditos.map(t => t.fitid)
   const { data: jaProcessadas } = await supabase
     .from('extrato_conciliacao')
-    .select('fitid')
+    .select('fitid, resultado')
     .eq('empresa_id', empresaId)
     .in('fitid', fitidsDoArquivo)
+    .in('resultado', ['automatico', 'revisao'])
 
   const fitidsJaProcessados = new Set((jaProcessadas || []).map((r: { fitid: string }) => r.fitid))
   const creditosNovos = creditos.filter(t => !fitidsJaProcessados.has(t.fitid))
@@ -326,15 +330,22 @@ async function registrarConciliacao(
   resultado: 'automatico' | 'revisao' | 'sem_correspondencia',
   extra: Record<string, unknown> = {}
 ) {
-  const { error } = await supabase.from('extrato_conciliacao').insert({
-    empresa_id: empresaId,
-    fitid: transacao.fitid,
-    data_transacao: transacao.data,
-    valor: transacao.valor,
-    nome_remetente: transacao.nome,
-    resultado,
-    ...extra
-  })
+  // upsert em vez de insert: uma transação "sem_correspondencia" pode ter sido registrada
+  // numa importação anterior e agora virar automático/revisão (ver comentário em
+  // processarExtratoOFX sobre por que sem_correspondencia é reprocessável) — precisa
+  // sobrescrever a linha antiga, não falhar por violar o unique (empresa_id, fitid).
+  const { error } = await supabase.from('extrato_conciliacao').upsert(
+    {
+      empresa_id: empresaId,
+      fitid: transacao.fitid,
+      data_transacao: transacao.data,
+      valor: transacao.valor,
+      nome_remetente: transacao.nome,
+      resultado,
+      ...extra
+    },
+    { onConflict: 'empresa_id,fitid' }
+  )
   if (error) throw error
 }
 
