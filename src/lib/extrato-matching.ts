@@ -38,8 +38,15 @@ export interface TransacaoSemCorrespondencia {
 
 export type ResultadoMatch = MatchAutomatico | MatchRevisao | TransacaoSemCorrespondencia
 
-/** Tolerância de centavos pra cobrir arredondamento. */
-const TOLERANCIA_VALOR = 0.01
+/** Valor bateu exato (cobre só arredondamento de centavo) — combinado com nome, pode virar baixa automática. */
+const TOLERANCIA_VALOR_EXATA = 0.01
+/**
+ * Valor "parecido" mas não exato (ex: instalador pagou R$407,00 de um saldo de R$407,50) —
+ * achado testando com extrato real: essa diferença pequena acontece na prática. Nesse caso
+ * o recibo sempre vai pra revisão, nunca pra baixa automática, mesmo com nome perfeito —
+ * quem decide se aceita a diferença é o admin.
+ */
+const TOLERANCIA_VALOR_PROXIMA = 5
 /** PIX pode cair alguns dias depois da data do recibo (atraso do instalador) — nunca antes. */
 const JANELA_DIAS = 5
 /** Nome tem que estar bem parecido (~1-2 letras de diferença num nome médio) pra baixa automática. */
@@ -129,44 +136,61 @@ export function conciliarExtrato(
   const resultados: ResultadoMatch[] = []
 
   for (const transacao of transacoesCredito) {
-    const candidatosPorValor = recibosPendentes.filter(
+    const dentroDoPeriodo = (r: ReciboPendente) => dentroDaJanela(r.data_referencia, transacao.data, JANELA_DIAS)
+
+    const candidatosValorExato = recibosPendentes.filter(
+      r => Math.abs(r.valor_a_pagar - transacao.valor) <= TOLERANCIA_VALOR_EXATA && dentroDoPeriodo(r)
+    )
+    const candidatosValorProximo = recibosPendentes.filter(
       r =>
-        Math.abs(r.valor_a_pagar - transacao.valor) <= TOLERANCIA_VALOR &&
-        dentroDaJanela(r.data_referencia, transacao.data, JANELA_DIAS)
+        Math.abs(r.valor_a_pagar - transacao.valor) > TOLERANCIA_VALOR_EXATA &&
+        Math.abs(r.valor_a_pagar - transacao.valor) <= TOLERANCIA_VALOR_PROXIMA &&
+        dentroDoPeriodo(r)
     )
 
-    if (candidatosPorValor.length === 0) {
-      resultados.push({ tipo: 'sem_correspondencia', transacao })
+    const comSimilaridade = (candidatos: ReciboPendente[]) =>
+      candidatos
+        .map(recibo => ({ recibo, similaridade: similaridade(recibo.instalador_nome, transacao.nome) }))
+        .filter(c => c.similaridade >= SIMILARIDADE_MINIMA_REVISAO)
+        .sort((a, b) => b.similaridade - a.similaridade)
+
+    const candidatosExatosComNome = comSimilaridade(candidatosValorExato)
+
+    if (candidatosExatosComNome.length > 0) {
+      const melhor = candidatosExatosComNome[0]
+      const empateComOSegundo =
+        candidatosExatosComNome.length > 1 &&
+        candidatosExatosComNome[1].similaridade >= melhor.similaridade - 0.05
+
+      if (melhor.similaridade >= SIMILARIDADE_MINIMA_AUTOMATICA && !empateComOSegundo) {
+        resultados.push({ tipo: 'automatico', transacao, recibo: melhor.recibo })
+      } else {
+        resultados.push({
+          tipo: 'revisao',
+          transacao,
+          candidatos: candidatosExatosComNome.map(c => c.recibo),
+          motivo: empateComOSegundo
+            ? 'Mais de um recibo pendente com nome parecido para esse valor'
+            : 'Nome do remetente não bate com confiança suficiente'
+        })
+      }
       continue
     }
 
-    const candidatosComSimilaridade = candidatosPorValor
-      .map(recibo => ({ recibo, similaridade: similaridade(recibo.instalador_nome, transacao.nome) }))
-      .filter(c => c.similaridade >= SIMILARIDADE_MINIMA_REVISAO)
-      .sort((a, b) => b.similaridade - a.similaridade)
-
-    if (candidatosComSimilaridade.length === 0) {
-      resultados.push({ tipo: 'sem_correspondencia', transacao })
-      continue
-    }
-
-    const melhor = candidatosComSimilaridade[0]
-    const empateComOSegundo =
-      candidatosComSimilaridade.length > 1 &&
-      candidatosComSimilaridade[1].similaridade >= melhor.similaridade - 0.05
-
-    if (melhor.similaridade >= SIMILARIDADE_MINIMA_AUTOMATICA && !empateComOSegundo) {
-      resultados.push({ tipo: 'automatico', transacao, recibo: melhor.recibo })
-    } else {
+    // Valor não bateu exato — só entra em revisão se o nome também for compatível
+    // (evita sugerir, por exemplo, um estorno ou reembolso de terceiro só porque o valor é próximo).
+    const candidatosProximosComNome = comSimilaridade(candidatosValorProximo)
+    if (candidatosProximosComNome.length > 0) {
       resultados.push({
         tipo: 'revisao',
         transacao,
-        candidatos: candidatosComSimilaridade.map(c => c.recibo),
-        motivo: empateComOSegundo
-          ? 'Mais de um recibo pendente com nome parecido para esse valor'
-          : 'Nome do remetente não bate com confiança suficiente'
+        candidatos: candidatosProximosComNome.map(c => c.recibo),
+        motivo: 'Valor não bate exatamente com o saldo do recibo (possível arredondamento/desconto)'
       })
+      continue
     }
+
+    resultados.push({ tipo: 'sem_correspondencia', transacao })
   }
 
   return resultados
