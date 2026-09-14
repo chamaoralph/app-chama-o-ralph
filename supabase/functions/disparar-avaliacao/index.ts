@@ -15,6 +15,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-webhook-token",
 };
 
+const N8N_WEBHOOK_URL = "https://primary-production-4e58.up.railway.app/webhook/feedback-disparo";
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -100,22 +102,36 @@ Deno.serve(async (req) => {
     const payloadStr = JSON.stringify(payload);
     const signature = await hmacSign(secret, payloadStr);
 
-    // Marcar enviado_em na avaliação
+    // Marcar enviado_em + status='enviada' na avaliação. O workflow "Feedback WhatsApp -
+    // Captura" no N8N só encontra a avaliação certa buscando por status='enviada' quando o
+    // cliente responde — sem isso a resposta do cliente chega no WhatsApp mas nunca é
+    // vinculada a nenhuma avaliação (bug real encontrado em produção: status ficava
+    // 'pendente' pra sempre, mesmo com a mensagem já enviada).
     if (avaliacao?.id) {
       await supabase
         .from("avaliacoes")
-        .update({ enviado_em: new Date().toISOString() })
+        .update({ enviado_em: new Date().toISOString(), status: "enviada" })
         .eq("id", avaliacao.id);
     }
 
-    // Retornar payload para que pg_net ou chamada direta envie pro n8n
-    // O admin configurará a URL do webhook do n8n externamente
+    // Chamar N8N
+    const n8nResponse = await fetch(N8N_WEBHOOK_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-webhook-token": secret,
+        "x-signature": signature,
+      },
+      body: payloadStr,
+    });
+
+    const n8nStatus = n8nResponse.status;
+
     return new Response(
       JSON.stringify({
         success: true,
+        n8n_status: n8nStatus,
         payload,
-        signature,
-        message: "Dados prontos para envio ao n8n. Configure o webhook URL no n8n.",
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
