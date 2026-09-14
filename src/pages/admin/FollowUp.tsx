@@ -273,6 +273,14 @@ export default function FollowUp() {
         if (c.contatos.length === 0) return true;
         return differenceInDays(new Date(), new Date(c.contatos[0].created_at)) > 7;
       });
+    } else if (filtroContato === "10_dias") {
+      // Mesmo critério que a automação de follow-up usava (10 dias sem
+      // contato) — agora é o filtro pra você mandar manualmente pelo
+      // botão de WhatsApp, sem risco de banimento por envio automático.
+      result = result.filter((c) => {
+        const base = c.contatos.length === 0 ? c.created_at : c.contatos[0].created_at;
+        return differenceInDays(new Date(), new Date(base)) >= 10;
+      });
     } else if (filtroContato === "15_dias") {
       result = result.filter((c) => {
         if (c.contatos.length === 0) return true;
@@ -396,6 +404,7 @@ export default function FollowUp() {
               <SelectItem value="todos">Todos</SelectItem>
               <SelectItem value="sem_contato">Sem contato</SelectItem>
               <SelectItem value="7_dias">&gt; 7 dias sem contato</SelectItem>
+              <SelectItem value="10_dias">10+ dias — precisa recontatar</SelectItem>
               <SelectItem value="15_dias">&gt; 15 dias sem contato</SelectItem>
               <SelectItem value="30_dias">&gt; 30 dias sem contato</SelectItem>
             </SelectContent>
