@@ -1,11 +1,17 @@
 // =====================================================================
 // Edge Function: followup-automatico
 //
-// Roda 1x/dia (via pg_cron + pg_net, ver migration
-// 20260914190000_agendar_followup_automatico.sql) e manda uma mensagem
-// de WhatsApp pra clientes com cotação pendente há 10+ dias — e repete
-// a cada 10 dias enquanto a cotação continuar pendente (sem fechar nem
-// ser marcada como "Não Gerou"/perdida/etc).
+// Roda 1x/hora, em horário comercial (via pg_cron + pg_net, ver migration
+// 20260915000000_ajustar_followup_para_1_por_hora.sql), mandando NO MÁXIMO
+// 1 mensagem de WhatsApp por execução (LOTE_MAXIMO) pra clientes com
+// cotação pendente há 10+ dias — repete a cada 10 dias enquanto a cotação
+// continuar pendente (sem fechar nem ser marcada como "Não Gerou"/perdida).
+//
+// IMPORTANTE — histórico: a primeira versão mandava até 25 de uma vez,
+// espaçadas em 4s. Isso gerou 30 envios em ~2min30 e o WhatsApp restringiu
+// a conta por 24h (detecção de mensagem automática/em massa) em
+// 2026-09-14. Daí o LOTE_MAXIMO=1 e a cadência de 1/hora — bem mais perto
+// de comportamento humano.
 //
 // Mesmo texto do botão manual de WhatsApp da tela /admin/follow-up
 // (src/pages/admin/FollowUp.tsx -> abrirWhatsApp).
@@ -23,13 +29,12 @@ const MEGA_INSTANCE_KEY = Deno.env.get("MEGAAPI_INSTANCE_KEY") ?? "megacode-MoTN
 const MEGA_TOKEN = Deno.env.get("MEGAAPI_TOKEN") ?? "MoTNZMNvYUQ";
 
 const DIAS_LIMITE = 10;
-// Pausa entre envios pra não levar bloqueio da megaAPI/WhatsApp (mesma
-// prática recomendada usada no workflow de Confirmação de Agendamento no N8N).
-const PAUSA_ENTRE_ENVIOS_MS = 4000;
-// Máximo de mensagens por execução — a megaAPI recomenda não passar de ~50
-// contatos sem pausas longas. Quem não for atendido hoje (backlog grande)
-// continua elegível e é pego na execução de amanhã, sem repetir os já enviados.
-const LOTE_MAXIMO = 25;
+// Máximo de mensagens por execução. O cron roda 1x/hora em horário
+// comercial, então isso equivale a ~1 mensagem por hora — bem abaixo de
+// qualquer limiar de detecção de mensagem automática/em massa do WhatsApp
+// (ver histórico no comentário do topo do arquivo). Quem não for atendido
+// nesta hora continua elegível e é pego na próxima execução.
+const LOTE_MAXIMO = 1;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -58,10 +63,6 @@ async function enviarWhatsapp(jid: string, texto: string): Promise<void> {
   if (!resp.ok) {
     throw new Error(`megaAPI respondeu ${resp.status}: ${await resp.text()}`);
   }
-}
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // Faz o trabalho pesado (busca + envios + registro) em background — chamado
@@ -150,7 +151,7 @@ async function processarFollowupAutomatico(supabase: ReturnType<typeof createCli
         if (erroInsert) throw erroInsert;
 
         resultado.enviados++;
-        await sleep(PAUSA_ENTRE_ENVIOS_MS);
+        break; // LOTE_MAXIMO=1 — não precisa continuar o loop
       } catch (e) {
         resultado.erros.push({ cotacao_id: cotacao.id, erro: e instanceof Error ? e.message : String(e) });
       }
