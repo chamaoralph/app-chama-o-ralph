@@ -67,10 +67,7 @@ export default function NovaCotacao() {
     tipo_servico_outro: '',
     descricao: '',
     valor_mao_obra: '',
-    valor_material: '',
     observacoes: '',
-    origem_suporte: '',
-    custo_suporte: ''
   })
 
   const totalItensExtras = itensExtras.reduce((s, i) => s + (parseFloat(i.valor) || 0), 0)
@@ -152,9 +149,6 @@ export default function NovaCotacao() {
     setFormData(prev => ({
       ...prev,
       valor_mao_obra: totais.totalMaoObra ? totais.totalMaoObra.toString() : '',
-      valor_material: totais.origemSuporte === 'empresa' ? '' : (totais.totalMaterial ? totais.totalMaterial.toString() : ''),
-      origem_suporte: totais.origemSuporte,
-      custo_suporte: totais.totalCustoSuporte ? totais.totalCustoSuporte.toString() : '',
     }))
   }
 
@@ -383,12 +377,9 @@ export default function NovaCotacao() {
                 repasse_empresa: repasse.repasse_empresa,
               }
             }) as any,
-          valor_material: formData.origem_suporte === 'empresa' ? 0 : (formData.valor_material ? parseFloat(formData.valor_material) : 0),
           origem_lead: formData.origem_lead,
           ocasiao: formData.ocasiao,
           observacoes: formData.observacoes,
-          origem_suporte: formData.origem_suporte || null,
-          custo_suporte: formData.custo_suporte ? parseFloat(formData.custo_suporte) : 0,
           tv_tamanho: tvItens[0]?.tamanho || null,
           tv_parede: tvItens[0]?.parede || null,
           tv_cobertura: tvItens[0]?.cobertura || null,

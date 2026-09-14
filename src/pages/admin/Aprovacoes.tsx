@@ -851,11 +851,11 @@ export default function Aprovacoes() {
                     </div>
                   </div>
 
-                  {/* Garantia Total: suporte fixo universal usado na finalização */}
+                  {/* Suporte fixo universal usado na finalização */}
                   {servico.usou_suporte_garantia_total && (
                     <div className="border-t pt-4">
                       <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg text-sm text-blue-900">
-                        🛡️ <span className="font-medium">Garantia Total:</span> instalador marcou que usou o suporte fixo universal da empresa.{' '}
+                        🛡️ <span className="font-medium">Suporte fixo:</span> instalador marcou que usou o suporte fixo universal da empresa.{' '}
                         {servico.estoque_suporte_garantia_baixado
                           ? 'Custo já processado e baixado do estoque.'
                           : 'O custo real (FIFO) será somado ao Reembolso empresa e a baixa de estoque ocorrerá ao confirmar a aprovação.'}
@@ -1145,7 +1145,7 @@ export default function Aprovacoes() {
                     if (modalServico.estoque_suporte_garantia_baixado) return null
                     return (
                       <p className="text-xs text-blue-700 mt-1">
-                        Já inclui o custo estimado do suporte fixo universal (Garantia Total). A baixa real do estoque acontece ao confirmar.
+                        Já inclui o custo estimado do suporte fixo universal. A baixa real do estoque acontece ao confirmar.
                       </p>
                     )
                   }
@@ -1161,7 +1161,7 @@ export default function Aprovacoes() {
                         onCheckedChange={(checked) => alternarSuporteGarantiaManual(checked === true)}
                       />
                       <Label htmlFor="ap-usou-suporte-garantia" className="text-xs font-normal leading-tight cursor-pointer">
-                        Instalador usou o suporte fixo universal (Garantia Total) da empresa, mas esqueceu de marcar
+                        Instalador usou o suporte fixo universal da empresa, mas esqueceu de marcar
                         {carregandoCustoGarantia && ' — calculando custo...'}
                       </Label>
                     </div>

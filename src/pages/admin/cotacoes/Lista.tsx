@@ -35,7 +35,6 @@ interface Cotacao {
   horario_inicio: string | null
   horario_fim: string | null
   valor_estimado: number | null
-  valor_material: number | null
   ocasiao: string | null
   origem_lead: string | null
   descricao_servico: string | null
@@ -73,11 +72,8 @@ interface EditForm {
   tipo_servico: string
   tipo_servico_outro: string
   valor_estimado: string
-  valor_material: string
   descricao_servico: string
   observacoes: string
-  origem_suporte: string
-  custo_suporte: string
 }
 
 interface TipoServico {
@@ -234,11 +230,8 @@ export default function ListaCotacoes() {
     tipo_servico: '',
     tipo_servico_outro: '',
     valor_estimado: '',
-    valor_material: '',
     descricao_servico: '',
     observacoes: '',
-    origem_suporte: '',
-    custo_suporte: ''
   })
   const [editLoading, setEditLoading] = useState(false)
   const [cepErroEdit, setCepErroEdit] = useState(false)
@@ -470,11 +463,8 @@ export default function ListaCotacoes() {
       tipo_servico: ehTipoCadastrado ? tipoAtual : (tipoAtual ? 'Outros' : ''),
       tipo_servico_outro: ehTipoCadastrado ? '' : tipoAtual,
       valor_estimado: cotacao.valor_estimado?.toString() || '',
-      valor_material: cotacao.valor_material?.toString() || '',
       descricao_servico: cotacao.descricao_servico || '',
       observacoes: cotacao.observacoes || '',
-      origem_suporte: (cotacao as any).origem_suporte || '',
-      custo_suporte: (cotacao as any).custo_suporte?.toString() || ''
     })
     setShowOutroInput(!ehTipoCadastrado && !!tipoAtual)
     // Carregar tvs_itens existente, ou construir a partir das colunas legadas
@@ -548,9 +538,6 @@ export default function ListaCotacoes() {
     setEditForm(prev => ({
       ...prev,
       valor_estimado: totais.totalMaoObra ? totais.totalMaoObra.toString() : '',
-      valor_material: totais.origemSuporte === 'empresa' ? '' : (totais.totalMaterial ? totais.totalMaterial.toString() : ''),
-      origem_suporte: totais.origemSuporte,
-      custo_suporte: totais.totalCustoSuporte ? totais.totalCustoSuporte.toString() : '',
     }))
   }
 
@@ -626,13 +613,10 @@ export default function ListaCotacoes() {
                 repasse_empresa: repasse.repasse_empresa,
               }
             }) as any,
-          valor_material: editForm.origem_suporte === 'empresa' ? 0 : (editForm.valor_material ? parseFloat(editForm.valor_material) : null),
           origem_lead: editForm.origem_lead || null,
           ocasiao: editForm.ocasiao || null,
           descricao_servico: editForm.descricao_servico || null,
           observacoes: editForm.observacoes || null,
-          origem_suporte: editForm.origem_suporte || null,
-          custo_suporte: editForm.custo_suporte ? parseFloat(editForm.custo_suporte) : 0,
           tv_tamanho: tvItensEdit[0]?.tamanho || null,
           tv_parede: tvItensEdit[0]?.parede || null,
           tv_cobertura: tvItensEdit[0]?.cobertura || null,
@@ -1755,22 +1739,6 @@ export default function ListaCotacoes() {
                   />
                   {ehInstalacaoTV(editForm.tipo_servico) && editForm.valor_estimado && (
                     <p className="text-xs text-muted-foreground">💡 Calculado pela calculadora. Edite se necessário.</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label>Valor do Material (R$)</Label>
-                  <Input 
-                    type="number"
-                    step="0.01"
-                    value={editForm.origem_suporte === 'empresa' ? '' : editForm.valor_material}
-                    onChange={(e) => setEditForm({...editForm, valor_material: e.target.value})}
-                    placeholder="0,00"
-                    disabled={editForm.origem_suporte === 'empresa'}
-                  />
-                  {editForm.origem_suporte === 'empresa' && (
-                    <p className="text-xs text-muted-foreground">
-                      💡 Sem reembolso quando a empresa fornece o suporte
-                    </p>
                   )}
                 </div>
                 <div className="space-y-2">

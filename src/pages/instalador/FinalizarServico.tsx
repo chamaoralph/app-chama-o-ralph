@@ -16,6 +16,7 @@ import {
   somarDecomposicaoExtras,
   formatarBRL,
 } from "@/lib/orcamento";
+import { ehInstalacaoTV } from "@/lib/precosTV";
 
 interface ItemEstoqueDevolver {
   servico_id: string;
@@ -208,12 +209,16 @@ export default function FinalizarServico() {
     return { saldoInstaladorPorId: saldo, custoMedioInstaladorPorId: custoMedio };
   }, [movimentacoesProprias]);
 
-  // --- Garantia Total: suporte fixo universal usado na instalação ---
-  const isGarantiaTotal = servico?.cotacoes?.tv_cobertura === "total";
+  // --- Suporte fixo universal usado na instalação de TV ---
+  // Antes só perguntava pra clientes do plano "Garantia Total"
+  // (cotacoes.tv_cobertura === 'total'); agora pergunta em qualquer
+  // instalação de TV, já que o preço de suporte saiu da tabela de preços
+  // e passou a ser lançado pelo instalador na finalização.
+  const isInstalacaoTV = (servico?.tipo_servico ?? []).some(ehInstalacaoTV);
 
   const { data: catalogoSuporteGarantia } = useQuery({
     queryKey: ["catalogo-suporte-garantia-total"],
-    enabled: isGarantiaTotal,
+    enabled: isInstalacaoTV,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("catalogo_servicos")
@@ -242,7 +247,7 @@ export default function FinalizarServico() {
   });
 
   const suporteGarantiaComProblema =
-    isGarantiaTotal && (usouSuporteGarantia === null || (usouSuporteGarantia === true && (!catalogoSuporteGarantia || saldoSuporteGarantia <= 0)));
+    isInstalacaoTV && (usouSuporteGarantia === null || (usouSuporteGarantia === true && (!catalogoSuporteGarantia || saldoSuporteGarantia <= 0)));
 
   // Antes só buscava o custo de referência do central pra linha "restante
   // vem do central" (fornecedorRestante==='empresa'). Ampliado pra QUALQUER
@@ -442,7 +447,7 @@ export default function FinalizarServico() {
       
       const { data, error } = await supabase
         .from("servicos")
-        .select("*, clientes!servicos_cliente_id_fkey(*), cotacoes!servicos_cotacao_id_fkey(tv_cobertura)")
+        .select("*, clientes!servicos_cliente_id_fkey(*)")
         .eq("id", servicoId)
         .maybeSingle();
 
@@ -630,7 +635,7 @@ export default function FinalizarServico() {
             ? parseFloat(valorRecebidoCliente || '0')
             : valorEmpresaRecebeu,
           acessorios_vendidos: [...acessoriosCotacao, ...extrasNovos],
-          usou_suporte_garantia_total: isGarantiaTotal ? (usouSuporteGarantia ?? false) : false,
+          usou_suporte_garantia_total: isInstalacaoTV ? (usouSuporteGarantia ?? false) : false,
           // Ajudante: só um valor de referência (25% = metade da mão de obra
           // do principal), congelado agora. Não altera valor_mao_obra_instalador
           // nem o repasse real — ver comentário na migration 20260821120000.
@@ -900,11 +905,11 @@ export default function FinalizarServico() {
           </div>
         )}
 
-        {isGarantiaTotal && (
+        {isInstalacaoTV && (
           <div className="bg-white rounded-lg shadow p-6 mb-6">
-            <h2 className="text-lg font-semibold mb-1">🛡️ Garantia Total — Suporte Fixo</h2>
+            <h2 className="text-lg font-semibold mb-1">🛡️ Suporte Fixo</h2>
             <p className="text-sm text-muted-foreground mb-4">
-              Este cliente está no plano Garantia Total. Você usou um suporte fixo universal da empresa nesta instalação?
+              Você usou um suporte fixo universal da empresa nesta instalação?
             </p>
             <div className="flex gap-4">
               <label className="flex items-center">

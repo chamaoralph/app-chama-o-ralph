@@ -3,21 +3,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tv } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   TAMANHOS_TV,
   TIPOS_PAREDE,
   COBERTURAS,
-  TIPOS_SUPORTE,
   type PrecoTV,
 } from "@/lib/precosTV";
 
@@ -114,9 +105,6 @@ export function TabelaPrecosTVCard() {
                         <th className="text-left p-2 font-medium">Parede / Cobertura</th>
                         <th className="text-left p-2 font-medium w-24">Disponível</th>
                         <th className="text-left p-2 font-medium w-32">Mão de obra (R$)</th>
-                        <th className="text-left p-2 font-medium w-28">Parafusos (R$)</th>
-                        <th className="text-left p-2 font-medium w-40">Suporte</th>
-                        <th className="text-left p-2 font-medium w-28">Valor Suporte (R$)</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -150,52 +138,6 @@ export function TabelaPrecosTVCard() {
                                     const v = e.target.value === "" ? null : parseFloat(e.target.value);
                                     if (v !== preco.valor_mao_obra)
                                       salvarCelula(preco, { valor_mao_obra: v });
-                                  }}
-                                  className="h-9"
-                                />
-                              </td>
-                              <td className="p-2">
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  defaultValue={preco.valor_parafusos ?? 0}
-                                  disabled={saving}
-                                  onBlur={(e) => {
-                                    const v = e.target.value === "" ? 0 : parseFloat(e.target.value);
-                                    if (v !== preco.valor_parafusos)
-                                      salvarCelula(preco, { valor_parafusos: v });
-                                  }}
-                                  className="h-9"
-                                />
-                              </td>
-                              <td className="p-2">
-                                <Select
-                                  value={preco.tipo_suporte}
-                                  disabled={saving}
-                                  onValueChange={(v) => salvarCelula(preco, { tipo_suporte: v })}
-                                >
-                                  <SelectTrigger className="h-9">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {TIPOS_SUPORTE.map((t) => (
-                                      <SelectItem key={t.value} value={t.value}>
-                                        {t.label}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </td>
-                              <td className="p-2">
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  defaultValue={preco.valor_suporte ?? 0}
-                                  disabled={saving || preco.tipo_suporte !== "valor"}
-                                  onBlur={(e) => {
-                                    const v = e.target.value === "" ? 0 : parseFloat(e.target.value);
-                                    if (v !== preco.valor_suporte)
-                                      salvarCelula(preco, { valor_suporte: v });
                                   }}
                                   className="h-9"
                                 />
