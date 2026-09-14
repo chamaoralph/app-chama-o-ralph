@@ -128,9 +128,12 @@ async function buscarRecibosPendentes(empresaId: string): Promise<ReciboPendente
     .filter((r: ReciboPendente) => r.valor_a_pagar > 0)
 }
 
-async function aplicarBaixaAutomatica(empresaId: string, match: Extract<ResultadoMatch, { tipo: 'automatico' }>) {
-  const { transacao, recibo } = match
-
+/** Efeito colateral em si da baixa: atualiza o recibo e lança a receita no caixa. Não mexe em extrato_conciliacao. */
+async function darBaixaNoRecibo(
+  empresaId: string,
+  transacao: { fitid: string; data: string; valor: number },
+  recibo: { id: string; instalador_nome: string; data_referencia: string }
+) {
   const { error: erroUpdate } = await supabase
     .from('recibos_diarios')
     .update({
@@ -153,7 +156,11 @@ async function aplicarBaixaAutomatica(empresaId: string, match: Extract<Resultad
     forma_pagamento: 'PIX'
   })
   if (erroCaixa) throw erroCaixa
+}
 
+async function aplicarBaixaAutomatica(empresaId: string, match: Extract<ResultadoMatch, { tipo: 'automatico' }>) {
+  const { transacao, recibo } = match
+  await darBaixaNoRecibo(empresaId, transacao, recibo)
   await registrarConciliacao(empresaId, transacao, 'automatico', { recibo_id: recibo.id })
 }
 
@@ -172,5 +179,106 @@ async function registrarConciliacao(
     resultado,
     ...extra
   })
+  if (error) throw error
+}
+
+export interface ItemFilaRevisao {
+  id: string
+  fitid: string
+  data_transacao: string
+  valor: number
+  nome_remetente: string
+  candidatos: { id: string; instalador_nome: string; data_referencia: string; valor_a_pagar: number }[]
+}
+
+/** Busca os itens pendentes de revisão (resultado='revisao' e status_revisao='pendente') com os dados dos recibos candidatos. */
+export async function buscarFilaRevisao(empresaId: string): Promise<ItemFilaRevisao[]> {
+  const { data: itens, error } = await supabase
+    .from('extrato_conciliacao')
+    .select('id, fitid, data_transacao, valor, nome_remetente, candidatos_recibo_ids')
+    .eq('empresa_id', empresaId)
+    .eq('resultado', 'revisao')
+    .eq('status_revisao', 'pendente')
+    .order('data_transacao', { ascending: false })
+  if (error) throw error
+  if (!itens || itens.length === 0) return []
+
+  const todosCandidatoIds = Array.from(new Set(itens.flatMap((i: any) => i.candidatos_recibo_ids || [])))
+  const { data: recibos } = todosCandidatoIds.length > 0
+    ? await supabase
+        .from('recibos_diarios')
+        .select('id, instalador_id, data_referencia, valor_mao_obra, valor_reembolso, valor_recebido_cliente')
+        .in('id', todosCandidatoIds)
+    : { data: [] as any[] }
+
+  const instaladorIds = Array.from(new Set((recibos || []).map((r: any) => r.instalador_id)))
+  const { data: instaladores } = instaladorIds.length > 0
+    ? await supabase.from('usuarios').select('id, nome').in('id', instaladorIds)
+    : { data: [] as { id: string; nome: string }[] }
+  const nomesPorId = new Map((instaladores || []).map((i: any) => [i.id, i.nome]))
+
+  const recibosPorId = new Map(
+    (recibos || []).map((r: any) => {
+      const saldo = Number(r.valor_mao_obra) + Number(r.valor_reembolso) - Number(r.valor_recebido_cliente || 0)
+      return [
+        r.id,
+        {
+          id: r.id,
+          instalador_nome: nomesPorId.get(r.instalador_id) || '',
+          data_referencia: r.data_referencia,
+          valor_a_pagar: saldo < 0 ? Math.abs(saldo) : 0
+        }
+      ]
+    })
+  )
+
+  return itens.map((item: any) => ({
+    id: item.id,
+    fitid: item.fitid,
+    data_transacao: item.data_transacao,
+    valor: Number(item.valor),
+    nome_remetente: item.nome_remetente,
+    candidatos: (item.candidatos_recibo_ids || []).map((id: string) => recibosPorId.get(id)).filter(Boolean)
+  }))
+}
+
+/** Admin escolheu, entre os candidatos, qual recibo essa transação da fila de revisão paga. */
+export async function confirmarRevisao(empresaId: string, itemConciliacaoId: string, reciboId: string): Promise<void> {
+  const { data: item, error: erroItem } = await supabase
+    .from('extrato_conciliacao')
+    .select('fitid, data_transacao, valor')
+    .eq('id', itemConciliacaoId)
+    .single()
+  if (erroItem) throw erroItem
+  if (!item) throw new Error('Item de conciliação não encontrado')
+
+  const { data: recibo, error: erroRecibo } = await supabase
+    .from('recibos_diarios')
+    .select('id, instalador_id, data_referencia')
+    .eq('id', reciboId)
+    .single()
+  if (erroRecibo) throw erroRecibo
+
+  const { data: instalador } = await supabase.from('usuarios').select('nome').eq('id', recibo.instalador_id).single()
+
+  await darBaixaNoRecibo(
+    empresaId,
+    { fitid: item.fitid, data: item.data_transacao, valor: Number(item.valor) },
+    { id: recibo.id, instalador_nome: instalador?.nome || '', data_referencia: recibo.data_referencia }
+  )
+
+  const { error: erroUpdate } = await supabase
+    .from('extrato_conciliacao')
+    .update({ status_revisao: 'confirmado', recibo_id: reciboId })
+    .eq('id', itemConciliacaoId)
+  if (erroUpdate) throw erroUpdate
+}
+
+/** Admin decidiu que nenhum candidato é o certo — não faz baixa nenhuma, só tira da fila. */
+export async function ignorarRevisao(itemConciliacaoId: string): Promise<void> {
+  const { error } = await supabase
+    .from('extrato_conciliacao')
+    .update({ status_revisao: 'ignorado' })
+    .eq('id', itemConciliacaoId)
   if (error) throw error
 }

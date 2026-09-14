@@ -33,7 +33,9 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { toast } from '@/hooks/use-toast'
-import { Check, Upload, Eye, Clock, DollarSign, FileText, Pencil, Plus, Trash2, AlertTriangle, Loader2 } from 'lucide-react'
+import { Check, Upload, Eye, Clock, DollarSign, FileText, Pencil, Plus, Trash2, AlertTriangle, Loader2, FileUp } from 'lucide-react'
+import { ImportarExtratoModal } from './ImportarExtratoModal'
+import { FilaRevisaoExtrato } from './FilaRevisaoExtrato'
 import {
   Select,
   SelectContent,
@@ -127,6 +129,10 @@ export function PagamentosInstaladores() {
   const [alertApagar, setAlertApagar] = useState(false)
   const [reciboApagar, setReciboApagar] = useState<ReciboComInstalador | null>(null)
   const [apagando, setApagando] = useState(false)
+
+  // Modal de importação de extrato bancário (OFX) + fila de revisão
+  const [modalImportarExtrato, setModalImportarExtrato] = useState(false)
+  const [refreshExtrato, setRefreshExtrato] = useState(0)
 
   // Modal de lançamento manual
   const [modalManual, setModalManual] = useState(false)
@@ -959,13 +965,20 @@ export function PagamentosInstaladores() {
             <option value="a_receber">Instalador deve pagar</option>
           </select>
         </div>
-        <div className="ml-auto">
+        <div className="ml-auto flex gap-2">
+          <Button variant="outline" onClick={() => setModalImportarExtrato(true)}>
+            <FileUp className="h-4 w-4 mr-1" />
+            Importar Extrato
+          </Button>
           <Button onClick={abrirModalManual}>
             <Plus className="h-4 w-4 mr-1" />
             Lançar Recibo Manual
           </Button>
         </div>
       </div>
+
+      {/* Fila de Revisão do Extrato Bancário — some sozinha quando não há nada pendente */}
+      <FilaRevisaoExtrato empresaId={empresaId} refreshKey={refreshExtrato} />
 
       {/* Alerta de Recibos Faltantes */}
       {!loading && recibosFaltantes.length > 0 && (
@@ -1712,6 +1725,17 @@ export function PagamentosInstaladores() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de Importação de Extrato Bancário */}
+      <ImportarExtratoModal
+        open={modalImportarExtrato}
+        onOpenChange={setModalImportarExtrato}
+        empresaId={empresaId}
+        onConcluido={() => {
+          carregarRecibos()
+          setRefreshExtrato(k => k + 1)
+        }}
+      />
 
       {/* AlertDialog de Confirmação de Exclusão */}
       <AlertDialog open={alertApagar} onOpenChange={setAlertApagar}>
