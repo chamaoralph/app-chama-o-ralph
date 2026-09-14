@@ -20,7 +20,16 @@ export interface ResumoConciliacao {
   resultados: ResultadoMatch[]
 }
 
-export async function processarExtratoOFX(empresaId: string, conteudoOFX: string): Promise<ResumoConciliacao> {
+/**
+ * @param dryRun Quando true, faz todo o matching mas não grava nada no banco (nem baixa,
+ * nem lançamento no caixa, nem registro na fila de revisão) — só retorna o resumo pra
+ * conferência. Útil pra validar um extrato antes de aplicar de verdade.
+ */
+export async function processarExtratoOFX(
+  empresaId: string,
+  conteudoOFX: string,
+  dryRun: boolean = false
+): Promise<ResumoConciliacao> {
   const transacoes = parseOFX(conteudoOFX)
   const creditos = filtrarCreditos(transacoes)
 
@@ -58,16 +67,18 @@ export async function processarExtratoOFX(empresaId: string, conteudoOFX: string
   for (const resultado of resultados) {
     try {
       if (resultado.tipo === 'automatico') {
-        await aplicarBaixaAutomatica(empresaId, resultado)
+        if (!dryRun) await aplicarBaixaAutomatica(empresaId, resultado)
         automaticos++
       } else if (resultado.tipo === 'revisao') {
-        await registrarConciliacao(empresaId, resultado.transacao, 'revisao', {
-          candidatos_recibo_ids: resultado.candidatos.map(c => c.id),
-          status_revisao: 'pendente'
-        })
+        if (!dryRun) {
+          await registrarConciliacao(empresaId, resultado.transacao, 'revisao', {
+            candidatos_recibo_ids: resultado.candidatos.map(c => c.id),
+            status_revisao: 'pendente'
+          })
+        }
         revisao++
       } else {
-        await registrarConciliacao(empresaId, resultado.transacao, 'sem_correspondencia')
+        if (!dryRun) await registrarConciliacao(empresaId, resultado.transacao, 'sem_correspondencia')
         semCorrespondencia++
       }
     } catch (error) {
