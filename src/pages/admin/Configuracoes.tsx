@@ -469,15 +469,6 @@ export default function Configuracoes() {
               <BackupStorageCard />
             </div>
 
-            {/* Espaço para futuras configurações */}
-            <Card className="mt-6 opacity-50">
-              <CardHeader>
-                <CardTitle className="text-muted-foreground">Outras Configurações</CardTitle>
-                <CardDescription>
-                  Em breve: Origens de Lead, Ocasiões e mais opções de personalização
-                </CardDescription>
-              </CardHeader>
-            </Card>
         </div>
       </div>
 

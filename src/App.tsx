@@ -20,7 +20,6 @@ import AdminServicoDetalhe from "@/pages/admin/servicos/Detalhe";
 import AdminAprovacoes from "@/pages/admin/Aprovacoes";
 import Caixa from "@/pages/admin/Caixa";
 import AdminInstaladores from "@/pages/admin/Instaladores";
-import AdminRelatorios from "@/pages/admin/Relatorios";
 import AdminDespesas from "@/pages/admin/Despesas";
 import AdminMarketing from "@/pages/admin/Marketing";
 import AdminClientes from "@/pages/admin/Clientes";
@@ -82,7 +81,8 @@ function App() {
               <Route path="despesas" element={<AdminDespesas />} />
               <Route path="instaladores" element={<AdminInstaladores />} />
               <Route path="clientes" element={<AdminClientes />} />
-              <Route path="relatorios" element={<AdminRelatorios />} />
+              {/* Consolidado no Dashboard (Serviços por Status) e em Caixa/Instaladores>Desempenho (resumo financeiro e ranking). */}
+              <Route path="relatorios" element={<Navigate to="/admin/dashboard" replace />} />
               <Route path="marketing" element={<AdminMarketing />} />
               <Route path="follow-up" element={<AdminFollowUp />} />
               <Route path="conteudo" element={<AdminGerenciarConteudo />} />

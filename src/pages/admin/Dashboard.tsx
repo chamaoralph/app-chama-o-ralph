@@ -15,6 +15,15 @@ interface Metricas {
   cotacoesPendentes: number
 }
 
+interface ServicosPorStatus {
+  aguardando_distribuicao: number
+  disponivel: number
+  atribuido: number
+  em_andamento: number
+  aguardando_aprovacao: number
+  concluido: number
+}
+
 interface UltimoServico {
   codigo: string
   cliente_nome: string
@@ -55,6 +64,16 @@ export default function AdminDashboard() {
     cotacoesPendentes: 0
   })
   const [ultimosServicos, setUltimosServicos] = useState<UltimoServico[]>([])
+  // Ex-tela /admin/relatorios: consolidado aqui pra não recalcular receita/repasse
+  // pela 3ª vez no sistema (já existiam versões em Caixa.tsx e Instaladores > Desempenho).
+  const [servicosPorStatus, setServicosPorStatus] = useState<ServicosPorStatus>({
+    aguardando_distribuicao: 0,
+    disponivel: 0,
+    atribuido: 0,
+    em_andamento: 0,
+    aguardando_aprovacao: 0,
+    concluido: 0
+  })
   const [loading, setLoading] = useState(true)
   const [loadingSemana, setLoadingSemana] = useState(false)
   const [servicosDisponiveis, setServicosDisponiveis] = useState(0)
@@ -297,6 +316,27 @@ export default function AdminDashboard() {
 
       setServicosDisponiveis(servicosDisp?.length || 0)
 
+      // Serviços por status (todos, sem filtro de período — visão operacional do momento).
+      const { data: todosServicos } = await supabase
+        .from('servicos')
+        .select('status')
+        .eq('empresa_id', userData.empresa_id)
+
+      const statusCounts: ServicosPorStatus = {
+        aguardando_distribuicao: 0,
+        disponivel: 0,
+        atribuido: 0,
+        em_andamento: 0,
+        aguardando_aprovacao: 0,
+        concluido: 0
+      }
+      todosServicos?.forEach(s => {
+        if (s.status in statusCounts) {
+          statusCounts[s.status as keyof ServicosPorStatus]++
+        }
+      })
+      setServicosPorStatus(statusCounts)
+
       setMetricas({
         receitaMes,
         servicosConcluidosMes,
@@ -445,6 +485,26 @@ export default function AdminDashboard() {
             </div>
           </div>
 
+          {/* Serviços por Status */}
+          <div>
+            <h2 className="text-sm font-bold mb-2 text-gray-700">Serviços por Status</h2>
+            <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
+              {([
+                { key: 'aguardando_distribuicao', label: 'Aguard. Distrib.' },
+                { key: 'disponivel', label: 'Disponível' },
+                { key: 'atribuido', label: 'Atribuído' },
+                { key: 'em_andamento', label: 'Em Andamento' },
+                { key: 'aguardando_aprovacao', label: 'Aguard. Aprov.' },
+                { key: 'concluido', label: 'Concluído' }
+              ] as const).map(({ key, label }) => (
+                <div key={key} className="bg-gray-100 rounded-lg p-3 min-w-[90px] flex-shrink-0 text-center">
+                  <div className="text-lg font-bold">{servicosPorStatus[key]}</div>
+                  <div className="text-[10px] text-gray-500">{label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Ações Rápidas */}
           <div className="grid grid-cols-2 gap-3">
             <Link to="/admin/cotacoes/nova">
@@ -574,13 +634,13 @@ export default function AdminDashboard() {
                 <ChevronRight className="h-5 w-5 text-gray-400" />
               </div>
             </Link>
-            <Link to="/admin/relatorios">
+            <Link to="/admin/caixa">
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="bg-gray-100 p-2 rounded-lg">
                     <BarChart3 className="h-5 w-5 text-gray-600" />
                   </div>
-                  <span className="font-medium text-gray-900">Relatórios</span>
+                  <span className="font-medium text-gray-900">Ver Caixa</span>
                 </div>
                 <ChevronRight className="h-5 w-5 text-gray-400" />
               </div>
@@ -664,6 +724,29 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {/* Serviços por Status */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-blue-600" />
+            Serviços por Status
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {([
+              { key: 'aguardando_distribuicao', label: 'Aguard. Distribuição' },
+              { key: 'disponivel', label: 'Disponível' },
+              { key: 'atribuido', label: 'Atribuído' },
+              { key: 'em_andamento', label: 'Em Andamento' },
+              { key: 'aguardando_aprovacao', label: 'Aguard. Aprovação' },
+              { key: 'concluido', label: 'Concluído' }
+            ] as const).map(({ key, label }) => (
+              <div key={key} className="text-center p-3 rounded-lg bg-gray-50">
+                <div className="text-2xl font-bold">{servicosPorStatus[key]}</div>
+                <div className="text-xs text-gray-500">{label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Ações Rápidas */}
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
@@ -686,9 +769,9 @@ export default function AdminDashboard() {
                 )}
               </Button>
             </Link>
-            <Link to="/admin/relatorios">
+            <Link to="/admin/caixa">
               <Button className="w-full h-20 text-lg bg-green-600 hover:bg-green-700">
-                📊 Ver Relatórios
+                📊 Ver Caixa
               </Button>
             </Link>
           </div>

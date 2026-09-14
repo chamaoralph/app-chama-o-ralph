@@ -122,9 +122,6 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               </Link>
             </CollapsibleContent>
           </Collapsible>
-          <Link to="/admin/relatorios" className="block px-4 py-2 rounded hover:bg-gray-800 transition-colors">
-            📊 Relatórios
-          </Link>
           <Link to="/admin/marketing" className="block px-4 py-2 rounded hover:bg-gray-800 transition-colors">
             📈 Marketing
           </Link>
