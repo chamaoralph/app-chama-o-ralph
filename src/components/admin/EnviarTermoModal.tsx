@@ -27,7 +27,7 @@ interface Props {
 }
 
 const TAMANHO_PARA_POLEGADAS: Record<string, string> = {
-  ate_39: "39",
+  ate_39: "43",
   "40_55": "55",
   "58_65": "65",
   "70_75": "75",

@@ -2,8 +2,8 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export const TAMANHOS_TV = [
-  { value: "ate_39", label: 'até 39"' },
-  { value: "40_55", label: '40" – 55"' },
+  { value: "ate_39", label: 'até 43"' },
+  { value: "40_55", label: '50" – 55"' },
   { value: "58_65", label: '58" – 65"' },
   { value: "70_75", label: '70" – 75"' },
   { value: "85", label: '85"' },
