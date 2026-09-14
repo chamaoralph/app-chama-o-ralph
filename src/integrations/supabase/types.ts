@@ -897,6 +897,63 @@ export type Database = {
           },
         ]
       }
+      extrato_conciliacao: {
+        Row: {
+          candidatos_recibo_ids: string[] | null
+          created_at: string
+          data_transacao: string
+          empresa_id: string
+          fitid: string
+          id: string
+          nome_remetente: string
+          recibo_id: string | null
+          resultado: string
+          status_revisao: string | null
+          valor: number
+        }
+        Insert: {
+          candidatos_recibo_ids?: string[] | null
+          created_at?: string
+          data_transacao: string
+          empresa_id: string
+          fitid: string
+          id?: string
+          nome_remetente: string
+          recibo_id?: string | null
+          resultado: string
+          status_revisao?: string | null
+          valor: number
+        }
+        Update: {
+          candidatos_recibo_ids?: string[] | null
+          created_at?: string
+          data_transacao?: string
+          empresa_id?: string
+          fitid?: string
+          id?: string
+          nome_remetente?: string
+          recibo_id?: string | null
+          resultado?: string
+          status_revisao?: string | null
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extrato_conciliacao_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extrato_conciliacao_recibo_id_fkey"
+            columns: ["recibo_id"]
+            isOneToOne: false
+            referencedRelation: "recibos_diarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       followup_contatos: {
         Row: {
           cotacao_id: string
@@ -1447,6 +1504,7 @@ export type Database = {
           data_referencia: string
           desatualizado_em: string | null
           empresa_id: string
+          extrato_fitid: string | null
           id: string
           instalador_id: string
           pdf_url: string | null
@@ -1466,6 +1524,7 @@ export type Database = {
           data_referencia: string
           desatualizado_em?: string | null
           empresa_id: string
+          extrato_fitid?: string | null
           id?: string
           instalador_id: string
           pdf_url?: string | null
@@ -1485,6 +1544,7 @@ export type Database = {
           data_referencia?: string
           desatualizado_em?: string | null
           empresa_id?: string
+          extrato_fitid?: string | null
           id?: string
           instalador_id?: string
           pdf_url?: string | null
