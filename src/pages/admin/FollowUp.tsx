@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
-import { Phone, MessageCircle, Clock, AlertTriangle, Users, PhoneCall, Search, Eye, CheckCircle2, XCircle, Trash2 } from "lucide-react";
+import { Phone, MessageCircle, Clock, AlertTriangle, Users, PhoneCall, Search, Eye, CheckCircle2, XCircle, Trash2, Reply } from "lucide-react";
 import { formatDistanceToNow, differenceInDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -291,6 +291,8 @@ export default function FollowUp() {
         if (c.contatos.length === 0) return true;
         return differenceInDays(new Date(), new Date(c.contatos[0].created_at)) > 30;
       });
+    } else if (filtroContato === "respondeu") {
+      result = result.filter((c) => respondeu(c));
     }
 
     // Sort
@@ -319,6 +321,27 @@ export default function FollowUp() {
             totalPendentes
         )
       : 0;
+
+  function abrirRegistrarContato(cotacao: CotacaoPendente, tipoPadrao: string) {
+    setCotacaoSelecionada(cotacao);
+    setTipoContato(tipoPadrao);
+    setModalOpen(true);
+  }
+
+  function respondeu(cotacao: CotacaoPendente) {
+    return cotacao.contatos.some((c) => c.tipo_contato === "resposta_cliente");
+  }
+
+  const LABELS_TIPO_CONTATO: Record<string, string> = {
+    whatsapp: "WhatsApp",
+    whatsapp_auto: "WhatsApp (automático)",
+    telefone: "Telefone",
+    email: "E-mail",
+    resposta_cliente: "Cliente respondeu",
+  };
+  function labelTipoContato(tipo: string): string {
+    return LABELS_TIPO_CONTATO[tipo] ?? tipo;
+  }
 
   function abrirWhatsApp(telefone: string, nome: string) {
     const tel = telefone.replace(/\D/g, "");
@@ -405,6 +428,7 @@ export default function FollowUp() {
               <SelectItem value="sem_contato">Sem contato</SelectItem>
               <SelectItem value="7_dias">&gt; 7 dias sem contato</SelectItem>
               <SelectItem value="10_dias">10+ dias — precisa recontatar</SelectItem>
+              <SelectItem value="respondeu">Cliente respondeu</SelectItem>
               <SelectItem value="15_dias">&gt; 15 dias sem contato</SelectItem>
               <SelectItem value="30_dias">&gt; 30 dias sem contato</SelectItem>
             </SelectContent>
@@ -452,7 +476,14 @@ export default function FollowUp() {
                         <TableRow key={cotacao.id}>
                           <TableCell>
                             <div>
-                              <p className="font-medium">{cotacao.cliente?.nome}</p>
+                              <div className="flex items-center gap-1.5">
+                                <p className="font-medium">{cotacao.cliente?.nome}</p>
+                                {respondeu(cotacao) && (
+                                  <Badge className="bg-green-100 text-green-700 hover:bg-green-100 text-xs">
+                                    Respondeu
+                                  </Badge>
+                                )}
+                              </div>
                               <p className="text-xs text-muted-foreground">{cotacao.cliente?.telefone}</p>
                             </div>
                           </TableCell>
@@ -501,13 +532,19 @@ export default function FollowUp() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => {
-                                  setCotacaoSelecionada(cotacao);
-                                  setModalOpen(true);
-                                }}
-                                title="Registrar contato"
+                                onClick={() => abrirRegistrarContato(cotacao, "whatsapp")}
+                                title="Registrar contato que eu fiz"
                               >
                                 <PhoneCall className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-blue-600 hover:text-blue-700"
+                                onClick={() => abrirRegistrarContato(cotacao, "resposta_cliente")}
+                                title="Marcar que o cliente respondeu"
+                              >
+                                <Reply className="h-4 w-4" />
                               </Button>
                               <Button
                                 size="sm"
@@ -584,9 +621,10 @@ export default function FollowUp() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                    <SelectItem value="telefone">Telefone</SelectItem>
-                    <SelectItem value="email">E-mail</SelectItem>
+                    <SelectItem value="whatsapp">WhatsApp (eu mandei)</SelectItem>
+                    <SelectItem value="telefone">Telefone (eu liguei)</SelectItem>
+                    <SelectItem value="email">E-mail (eu mandei)</SelectItem>
+                    <SelectItem value="resposta_cliente">Cliente respondeu</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -610,7 +648,7 @@ export default function FollowUp() {
                       <div key={c.id} className="text-sm border-l-2 border-muted pl-3 py-1">
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className="text-xs">
-                            {c.tipo_contato}
+                            {labelTipoContato(c.tipo_contato)}
                           </Badge>
                           <span className="text-xs text-muted-foreground">
                             {formatDistanceToNow(new Date(c.created_at), { addSuffix: true, locale: ptBR })}
@@ -678,7 +716,7 @@ export default function FollowUp() {
                     {cotacaoDetalhes.contatos.map((c) => (
                       <div key={c.id} className="border-l-2 border-primary/30 pl-3 py-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant="outline" className="text-xs">{c.tipo_contato}</Badge>
+                          <Badge variant="outline" className="text-xs">{labelTipoContato(c.tipo_contato)}</Badge>
                           <span className="text-xs text-muted-foreground">
                             {format(new Date(c.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                           </span>
