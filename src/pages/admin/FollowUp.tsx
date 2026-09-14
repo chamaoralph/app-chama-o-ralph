@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
-import { Phone, MessageCircle, Clock, AlertTriangle, Users, PhoneCall, Search, Eye, CheckCircle2, XCircle } from "lucide-react";
+import { Phone, MessageCircle, Clock, AlertTriangle, Users, PhoneCall, Search, Eye, CheckCircle2, XCircle, Trash2 } from "lucide-react";
 import { formatDistanceToNow, differenceInDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -195,6 +195,36 @@ export default function FollowUp() {
       toast({ title: "Erro", description: "Não foi possível atualizar a cotação.", variant: "destructive" });
     },
   });
+
+  // Excluir cliente (ex: cadastrado por engano — fornecedor, teste, etc.)
+  // Cascateia pra cotacoes/clientes_rfm_cache. Se o cliente já tiver
+  // serviço ou avaliação registrada, o banco bloqueia (FK sem cascade) —
+  // nesse caso não é um cadastro por engano, é cliente de verdade.
+  const excluirCliente = useMutation({
+    mutationFn: async (clienteId: string) => {
+      const { error } = await supabase.from("clientes").delete().eq("id", clienteId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["followup-cotacoes"] });
+      toast({ title: "Cliente excluído" });
+    },
+    onError: (error: any) => {
+      const bloqueadoPorHistorico = error?.code === "23503";
+      toast({
+        title: "Erro ao excluir",
+        description: bloqueadoPorHistorico
+          ? "Esse cliente já tem serviço ou avaliação registrada — não pode ser excluído."
+          : "Não foi possível excluir o cliente.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  function handleExcluirCliente(cotacao: CotacaoPendente) {
+    if (!confirm(`Excluir "${cotacao.cliente?.nome}" da lista de clientes? Isso remove também todas as cotações dele. Essa ação não pode ser desfeita.`)) return;
+    excluirCliente.mutate(cotacao.cliente.id);
+  }
 
   // Register contact mutation
   const registrarContato = useMutation({
@@ -501,6 +531,16 @@ export default function FollowUp() {
                               >
                                 <XCircle className="h-4 w-4 mr-1" />
                                 Não Gerou
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-destructive hover:text-destructive"
+                                disabled={excluirCliente.isPending}
+                                onClick={() => handleExcluirCliente(cotacao)}
+                                title="Excluir cliente (ex: não é cliente de verdade — fornecedor, teste, etc.)"
+                              >
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
                           </TableCell>
