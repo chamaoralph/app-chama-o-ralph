@@ -9,10 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
-import { Phone, MessageCircle, Clock, AlertTriangle, Users, PhoneCall, Search, Eye } from "lucide-react";
+import { Phone, MessageCircle, Clock, AlertTriangle, Users, PhoneCall, Search, Eye, CheckCircle2, XCircle } from "lucide-react";
 import { formatDistanceToNow, differenceInDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -48,6 +48,9 @@ export default function FollowUp() {
   const [observacoes, setObservacoes] = useState("");
   const [detalhesOpen, setDetalhesOpen] = useState(false);
   const [cotacaoDetalhes, setCotacaoDetalhes] = useState<CotacaoPendente | null>(null);
+  const [cotacaoParaNaoGerou, setCotacaoParaNaoGerou] = useState<string | null>(null);
+  const [motivoNaoGerou, setMotivoNaoGerou] = useState("");
+  const [observacaoNaoGerou, setObservacaoNaoGerou] = useState("");
 
   // Fetch empresa_id
   const { data: empresaId } = useQuery({
@@ -109,6 +112,88 @@ export default function FollowUp() {
       })) as CotacaoPendente[];
     },
     enabled: !!empresaId,
+  });
+
+  // Tipos de serviço que exigem termo de aceite — mesma regra de Cotações/Lista.tsx
+  // (Set com nomes em minúsculo pra comparar direto com cotacao.tipo_servico).
+  const { data: tiposExigemTermo = new Set<string>() } = useQuery({
+    queryKey: ["tipos-servico-exige-termo"],
+    queryFn: async () => {
+      const { data } = await supabase.from("tipos_servico").select("id, nome, exige_termo, ativo");
+      return new Set(
+        (data || [])
+          .filter((t: any) => t.exige_termo)
+          .map((t: any) => String(t.nome || "").trim().toLowerCase())
+      );
+    },
+  });
+
+  function cotacaoExigeTermo(tiposCotacao: string[] | null | undefined): boolean {
+    if (!tiposCotacao || tiposCotacao.length === 0) return false;
+    return tiposCotacao.some((t) => tiposExigemTermo.has(String(t || "").trim().toLowerCase()));
+  }
+
+  // Aprovar cotação (fecha o follow-up: sai de "pendente" e some da lista)
+  const aprovarCotacao = useMutation({
+    mutationFn: async (cotacao: CotacaoPendente) => {
+      const novoStatus = cotacaoExigeTermo(cotacao.tipo_servico) ? "termo_pendente" : "aprovada";
+      const { error } = await supabase.from("cotacoes").update({ status: novoStatus }).eq("id", cotacao.id);
+      if (error) throw error;
+      return novoStatus;
+    },
+    onSuccess: (novoStatus) => {
+      queryClient.invalidateQueries({ queryKey: ["followup-cotacoes"] });
+      toast({
+        title: "Cotação aprovada!",
+        description:
+          novoStatus === "termo_pendente"
+            ? "Abra a cotação em Cotações para enviar o termo de aceite ao cliente."
+            : "Serviço liberado para os instaladores (este tipo não exige termo).",
+      });
+    },
+    onError: () => {
+      toast({ title: "Erro ao aprovar cotação", variant: "destructive" });
+    },
+  });
+
+  function handleAprovar(cotacao: CotacaoPendente) {
+    if (!((cotacao.valor_estimado ?? 0) > 0)) {
+      toast({
+        title: "Valor não preenchido",
+        description: "Vá em Cotações e preencha o valor (tamanho/parede da TV ou valor manual) antes de aprovar.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (cotacaoExigeTermo(cotacao.tipo_servico)) {
+      if (!confirm("Aprovar esta cotação? O cliente precisará assinar o termo digital antes do serviço ser liberado para os instaladores.")) return;
+    }
+    aprovarCotacao.mutate(cotacao);
+  }
+
+  // Marcar como "Não Gerou" (mesmos motivos usados em Cotações/Lista.tsx)
+  const marcarNaoGerou = useMutation({
+    mutationFn: async () => {
+      if (!cotacaoParaNaoGerou || !motivoNaoGerou) return;
+      const { error } = await supabase
+        .from("cotacoes")
+        .update({
+          status: "nao_gerou",
+          observacoes: `${motivoNaoGerou}${observacaoNaoGerou ? ": " + observacaoNaoGerou : ""}`,
+        })
+        .eq("id", cotacaoParaNaoGerou);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["followup-cotacoes"] });
+      toast({ title: "Status atualizado", description: "A cotação foi marcada como não gerou serviço." });
+      setCotacaoParaNaoGerou(null);
+      setMotivoNaoGerou("");
+      setObservacaoNaoGerou("");
+    },
+    onError: () => {
+      toast({ title: "Erro", description: "Não foi possível atualizar a cotação.", variant: "destructive" });
+    },
   });
 
   // Register contact mutation
@@ -362,7 +447,7 @@ export default function FollowUp() {
                               : "Nenhum"}
                           </TableCell>
                           <TableCell>
-                            <div className="flex gap-1">
+                            <div className="flex gap-1 flex-wrap">
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -381,6 +466,7 @@ export default function FollowUp() {
                                   setCotacaoSelecionada(cotacao);
                                   setModalOpen(true);
                                 }}
+                                title="Registrar contato"
                               >
                                 <PhoneCall className="h-4 w-4" />
                               </Button>
@@ -391,8 +477,30 @@ export default function FollowUp() {
                                 onClick={() =>
                                   abrirWhatsApp(cotacao.cliente?.telefone || "", cotacao.cliente?.nome || "")
                                 }
+                                title="Abrir WhatsApp"
                               >
                                 <MessageCircle className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="default"
+                                className="bg-green-600 hover:bg-green-700"
+                                disabled={aprovarCotacao.isPending}
+                                onClick={() => handleAprovar(cotacao)}
+                                title="Fechou! Aprovar cotação"
+                              >
+                                <CheckCircle2 className="h-4 w-4 mr-1" />
+                                Fechou
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-orange-600 hover:text-orange-700"
+                                onClick={() => setCotacaoParaNaoGerou(cotacao.id)}
+                                title="Não gerou serviço"
+                              >
+                                <XCircle className="h-4 w-4 mr-1" />
+                                Não Gerou
                               </Button>
                             </div>
                           </TableCell>
@@ -539,6 +647,66 @@ export default function FollowUp() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Não Gerou Serviço */}
+      <Dialog open={!!cotacaoParaNaoGerou} onOpenChange={() => setCotacaoParaNaoGerou(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Marcar como Não Gerou Serviço</DialogTitle>
+            <DialogDescription>
+              Selecione o motivo pelo qual esta cotação não gerou um serviço.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Motivo</label>
+              <Select value={motivoNaoGerou} onValueChange={setMotivoNaoGerou}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um motivo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="nao_gerou_longe">Local muito longe</SelectItem>
+                  <SelectItem value="nao_gerou_caro">Cliente achou caro</SelectItem>
+                  <SelectItem value="nao_gerou_cliente_sumiu">Cliente sumiu/não respondeu</SelectItem>
+                  <SelectItem value="nao_gerou_instalador_atrasou">Instalador atrasou</SelectItem>
+                  <SelectItem value="nao_gerou_chamou_outra">Chamou outra pessoa</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Observações (opcional)</label>
+              <Textarea
+                value={observacaoNaoGerou}
+                onChange={(e) => setObservacaoNaoGerou(e.target.value)}
+                placeholder="Adicione observações adicionais sobre esta cotação..."
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCotacaoParaNaoGerou(null);
+                setMotivoNaoGerou("");
+                setObservacaoNaoGerou("");
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => marcarNaoGerou.mutate()}
+              disabled={!motivoNaoGerou || marcarNaoGerou.isPending}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              Confirmar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </AdminLayout>
