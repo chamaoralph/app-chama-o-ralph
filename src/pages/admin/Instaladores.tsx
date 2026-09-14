@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { AdminLayout } from '@/components/layout/AdminLayout'
 import { supabase } from '@/integrations/supabase/client'
-import { Users, UserCheck, UserX, Mail, Copy, Trash2, Plus, Clock, CheckCircle, XCircle, ChevronLeft, ChevronRight, TrendingUp, Wrench, DollarSign } from 'lucide-react'
+import { Users, UserCheck, UserX, Mail, Copy, Trash2, Plus, Clock, CheckCircle, XCircle, ChevronLeft, ChevronRight, TrendingUp, Wrench, DollarSign, Percent, AlertTriangle } from 'lucide-react'
 import { startOfMonth, endOfMonth, format, subMonths, addMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Badge } from '@/components/ui/badge'
@@ -57,7 +57,17 @@ export default function Instaladores() {
 
   // Estado para Desempenho
   const [mesDesempenho, setMesDesempenho] = useState(new Date())
-  const [desempenhoData, setDesempenhoData] = useState<{ instalador_id: string; nome: string; total_servicos: number; receita: number; mao_obra: number; lucro_acessorios: number }[]>([])
+  const [desempenhoData, setDesempenhoData] = useState<{
+    instalador_id: string
+    nome: string
+    total_servicos: number
+    receita: number
+    mao_obra: number
+    lucro_acessorios: number
+    lucroEmpresa: number
+    margem: number
+    retrabalhosAbertos: number
+  }[]>([])
   const [loadingDesempenho, setLoadingDesempenho] = useState(false)
 
   // Estado para Convites
@@ -163,13 +173,25 @@ export default function Instaladores() {
       const inicio = format(startOfMonth(mesDesempenho), 'yyyy-MM-dd')
       const fim = format(endOfMonth(mesDesempenho), 'yyyy-MM-dd')
 
-      const { data: servicos, error } = await supabase
-        .from('servicos')
-        .select('instalador_id, valor_total, valor_mao_obra_instalador, ganho_acessorios_instalador')
-        .eq('empresa_id', userData.empresa_id)
-        .eq('status', 'concluido')
-        .gte('data_conclusao', `${inicio}T00:00:00`)
-        .lte('data_conclusao', `${fim}T23:59:59`)
+      const [{ data: servicos, error }, { data: correcoes }] = await Promise.all([
+        supabase
+          .from('servicos')
+          .select('instalador_id, valor_total, valor_mao_obra_instalador, ganho_acessorios_instalador')
+          .eq('empresa_id', userData.empresa_id)
+          .eq('status', 'concluido')
+          .gte('data_conclusao', `${inicio}T00:00:00`)
+          .lte('data_conclusao', `${fim}T23:59:59`),
+        // Retrabalho é um proxy, não um histórico real: conta só serviços ATUALMENTE em
+        // 'correcao_solicitada' agendados no mês — o schema não guarda transições de status,
+        // então correções já resolvidas (voltaram a concluído) não entram aqui.
+        supabase
+          .from('servicos')
+          .select('instalador_id')
+          .eq('empresa_id', userData.empresa_id)
+          .eq('status', 'correcao_solicitada')
+          .gte('data_servico_agendada', inicio)
+          .lte('data_servico_agendada', fim)
+      ])
 
       if (error) throw error
 
@@ -181,6 +203,12 @@ export default function Instaladores() {
         .eq('empresa_id', userData.empresa_id)
 
       const nomesMap = new Map((instaladoresData || []).map(i => [i.id, i.nome]))
+
+      const correcoesPorInstalador = new Map<string, number>()
+      for (const c of correcoes || []) {
+        if (!c.instalador_id) continue
+        correcoesPorInstalador.set(c.instalador_id, (correcoesPorInstalador.get(c.instalador_id) || 0) + 1)
+      }
 
       // Agrupar por instalador
       const agrupado = new Map<string, { total_servicos: number; receita: number; mao_obra: number; lucro_acessorios: number }>()
@@ -196,11 +224,20 @@ export default function Instaladores() {
         agrupado.set(s.instalador_id, atual)
       }
 
-      const resultado = Array.from(agrupado.entries()).map(([id, dados]) => ({
-        instalador_id: id,
-        nome: nomesMap.get(id) || 'Desconhecido',
-        ...dados
-      })).sort((a, b) => b.receita - a.receita)
+      const resultado = Array.from(agrupado.entries()).map(([id, dados]) => {
+        // Mesma fórmula que a antiga tela Rentabilidade por Instalador usava: lucro da
+        // empresa é só receita menos mão de obra (não desconta lucro de acessórios, que é
+        // rastreado separadamente na coluna ao lado).
+        const lucroEmpresa = dados.receita - dados.mao_obra
+        return {
+          instalador_id: id,
+          nome: nomesMap.get(id) || 'Desconhecido',
+          ...dados,
+          lucroEmpresa,
+          margem: dados.receita > 0 ? (lucroEmpresa / dados.receita) * 100 : 0,
+          retrabalhosAbertos: correcoesPorInstalador.get(id) || 0
+        }
+      }).sort((a, b) => b.receita - a.receita)
 
       setDesempenhoData(resultado)
     } catch (error) {
@@ -561,9 +598,11 @@ export default function Instaladores() {
             {(() => {
               const totalServicos = desempenhoData.reduce((s, d) => s + d.total_servicos, 0)
               const totalReceita = desempenhoData.reduce((s, d) => s + d.receita, 0)
+              const totalLucroEmpresa = desempenhoData.reduce((s, d) => s + d.lucroEmpresa, 0)
+              const margemGeral = totalReceita > 0 ? (totalLucroEmpresa / totalReceita) * 100 : 0
               const mediaPorInstalador = desempenhoData.length > 0 ? totalReceita / desempenhoData.length : 0
               return (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
                   <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg shadow-lg p-6">
                     <div className="flex items-center justify-between mb-2">
                       <Wrench className="h-8 w-8" />
@@ -590,9 +629,37 @@ export default function Instaladores() {
                     <div className="text-2xl font-bold">R$ {mediaPorInstalador.toFixed(2)}</div>
                     <div className="text-sm opacity-90">Média por Instalador</div>
                   </div>
+
+                  <div className="bg-gradient-to-br from-teal-500 to-teal-600 text-white rounded-lg shadow-lg p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <TrendingUp className="h-8 w-8" />
+                      <span className="text-3xl opacity-30">🏦</span>
+                    </div>
+                    <div className="text-2xl font-bold">R$ {totalLucroEmpresa.toFixed(2)}</div>
+                    <div className="text-sm opacity-90">Lucro Empresa</div>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-lg shadow-lg p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <Percent className="h-8 w-8" />
+                      <span className="text-3xl opacity-30">%</span>
+                    </div>
+                    <div className="text-2xl font-bold">{margemGeral.toFixed(1)}%</div>
+                    <div className="text-sm opacity-90">Margem Geral</div>
+                  </div>
                 </div>
               )
             })()}
+
+            {/* Aviso sobre retrabalho */}
+            <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                <strong>Retrabalho:</strong> mostra serviços <em>atualmente</em> em "correção solicitada"
+                agendados no mês — o schema não guarda histórico de transições de status, então serviços
+                que já passaram por correção e voltaram a concluído não aparecem aqui.
+              </span>
+            </div>
 
             {/* Tabela de Desempenho */}
             <div className="bg-card rounded-lg shadow overflow-hidden">
@@ -615,6 +682,9 @@ export default function Instaladores() {
                         <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Receita Gerada</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Mão de Obra</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Lucro Acessórios</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Lucro Empresa</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Margem %</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase" title="Serviços atualmente em 'correção solicitada'">Retrabalho ⚠</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -625,6 +695,21 @@ export default function Instaladores() {
                           <td className="px-4 py-3 text-sm text-right font-bold text-green-600">R$ {item.receita.toFixed(2)}</td>
                           <td className="px-4 py-3 text-sm text-right">R$ {item.mao_obra.toFixed(2)}</td>
                           <td className="px-4 py-3 text-sm text-right">R$ {item.lucro_acessorios.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-sm text-right font-semibold">
+                            <span className={item.lucroEmpresa >= 0 ? 'text-green-700' : 'text-red-600'}>
+                              R$ {item.lucroEmpresa.toFixed(2)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right">
+                            <MargemBadge pct={item.margem} />
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right">
+                            {item.retrabalhosAbertos > 0 ? (
+                              <Badge variant="destructive" className="text-xs">{item.retrabalhosAbertos}</Badge>
+                            ) : (
+                              <span className="text-muted-foreground">0</span>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -635,6 +720,9 @@ export default function Instaladores() {
                         <td className="px-4 py-3 text-sm text-right font-bold text-green-600">R$ {desempenhoData.reduce((s, d) => s + d.receita, 0).toFixed(2)}</td>
                         <td className="px-4 py-3 text-sm text-right font-bold">R$ {desempenhoData.reduce((s, d) => s + d.mao_obra, 0).toFixed(2)}</td>
                         <td className="px-4 py-3 text-sm text-right font-bold">R$ {desempenhoData.reduce((s, d) => s + d.lucro_acessorios, 0).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-sm text-right font-bold">R$ {desempenhoData.reduce((s, d) => s + d.lucroEmpresa, 0).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-sm text-right font-bold" />
+                        <td className="px-4 py-3 text-sm text-right font-bold" />
                       </tr>
                     </tfoot>
                   </table>
@@ -873,5 +961,19 @@ export default function Instaladores() {
         </Dialog>
       </div>
     </AdminLayout>
+  )
+}
+
+// Badge colorido de margem — mesmo critério que a antiga tela Rentabilidade por Instalador usava.
+function MargemBadge({ pct }: { pct: number }) {
+  const cls =
+    pct >= 50 ? 'bg-green-100 text-green-800'
+    : pct >= 30 ? 'bg-yellow-100 text-yellow-800'
+    : pct >= 0 ? 'bg-orange-100 text-orange-800'
+    : 'bg-red-100 text-red-800'
+  return (
+    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>
+      {pct.toFixed(1)}%
+    </span>
   )
 }
