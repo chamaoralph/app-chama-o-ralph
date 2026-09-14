@@ -26,12 +26,11 @@ export interface TVItem {
   cobertura: string;
   // snapshot de preços calculados
   valor_mao_obra: number;
-  valor_material: number;
-  origem_suporte: "" | "empresa" | "instalador";
-  custo_suporte: number;
-  // tipo de suporte da tabela (para o modal do termo)
-  tipo_suporte?: string;
-  valor_suporte?: number;
+  // Campo legado: a calculadora não lê/grava mais isso (suporte saiu da
+  // tabela de preços — ver precosTV.ts), mas cotações antigas ainda podem
+  // ter esse valor salvo em tvs_itens, e a aprovação de serviço ainda lê
+  // pra dar baixa de estoque retroativa (ver Aprovacoes.tsx).
+  origem_suporte?: "" | "empresa" | "instalador";
   // dados informados no EnviarTermoModal
   marca_modelo?: string;
   polegadas?: string;
@@ -40,9 +39,6 @@ export interface TVItem {
 
 export interface TotaisTV {
   totalMaoObra: number;
-  totalMaterial: number;
-  totalCustoSuporte: number;
-  origemSuporte: "" | "empresa" | "instalador";
 }
 
 // Compatibilidade com callsites antigos
@@ -53,9 +49,6 @@ export interface SelectorTVValues {
 }
 export interface PrecoTVResult {
   valorMaoObra: number;
-  valorMaterial: number;
-  origemSuporte: "" | "empresa" | "instalador";
-  custoSuporte: number;
 }
 
 export function novoItemTV(): TVItem {
@@ -64,9 +57,6 @@ export function novoItemTV(): TVItem {
     parede: "",
     cobertura: "",
     valor_mao_obra: 0,
-    valor_material: 0,
-    origem_suporte: "",
-    custo_suporte: 0,
   };
 }
 
@@ -119,7 +109,7 @@ export function SelectorPrecoTV({ empresaId, items, onItemsChange, onTotaisChang
       setNdPorItem(nds);
 
       // Na primeira montagem com items já carregados, preservar os valores salvos
-      // (não sobrescrever valor_mao_obra/custo_suporte/origem_suporte vindos do banco).
+      // (não sobrescrever valor_mao_obra vindo do banco).
       // Novas buscas já populam precosPorItem/ndPorItem acima, então o bloco de
       // exibição (incluindo o input de mão de obra) continua aparecendo.
       if (!didMountRef.current) {
@@ -131,45 +121,20 @@ export function SelectorPrecoTV({ empresaId, items, onItemsChange, onTotaisChang
         const p = precos[idx];
         const configCompleta = !!(it.tamanho && it.parede && it.cobertura);
         if (!configCompleta) {
-          return { ...it, valor_mao_obra: 0, valor_material: 0, origem_suporte: "" as const, custo_suporte: 0 };
+          return { ...it, valor_mao_obra: 0 };
         }
         const isND = nds[idx];
         if (isND) {
-          return { ...it, valor_mao_obra: 0, valor_material: 0, origem_suporte: "" as const, custo_suporte: 0 };
-        }
-        let origem: "empresa" | "instalador" = "instalador";
-        let custo = 0;
-        if (p!.tipo_suporte === "incluso") {
-          origem = "empresa";
-          custo = 0;
-        } else if (p!.tipo_suporte === "valor") {
-          origem = "empresa";
-          custo = Number(p!.valor_suporte ?? 0);
-        } else {
-          origem = "instalador";
-          custo = 0;
+          return { ...it, valor_mao_obra: 0 };
         }
         return {
           ...it,
           valor_mao_obra: Number(p!.valor_mao_obra ?? 0),
-          valor_material: Number(p!.valor_parafusos ?? 0),
-          origem_suporte: origem,
-          custo_suporte: custo,
-          tipo_suporte: p!.tipo_suporte,
-          valor_suporte: Number(p!.valor_suporte ?? 0),
         };
       });
 
       // Só atualizar se algo mudou nos snapshots
-      const mudou = novosItems.some((ni, i) => {
-        const old = items[i];
-        return (
-          ni.valor_mao_obra !== old.valor_mao_obra ||
-          ni.valor_material !== old.valor_material ||
-          ni.origem_suporte !== old.origem_suporte ||
-          ni.custo_suporte !== old.custo_suporte
-        );
-      });
+      const mudou = novosItems.some((ni, i) => ni.valor_mao_obra !== items[i].valor_mao_obra);
       if (mudou) onItemsChange(novosItems);
     })();
     return () => {
@@ -185,10 +150,7 @@ export function SelectorPrecoTV({ empresaId, items, onItemsChange, onTotaisChang
   // Calcular e notificar totais
   const totais = useMemo<TotaisTV>(() => {
     const totalMaoObra = items.reduce((s, i) => s + (Number(i.valor_mao_obra) || 0), 0);
-    const totalMaterial = items.reduce((s, i) => s + (Number(i.valor_material) || 0), 0);
-    const totalCustoSuporte = items.reduce((s, i) => s + (Number(i.custo_suporte) || 0), 0);
-    const origemSuporte = (items[0]?.origem_suporte ?? "") as "" | "empresa" | "instalador";
-    return { totalMaoObra, totalMaterial, totalCustoSuporte, origemSuporte };
+    return { totalMaoObra };
   }, [items]);
 
   const algumND = ndPorItem.some(Boolean);
@@ -196,7 +158,7 @@ export function SelectorPrecoTV({ empresaId, items, onItemsChange, onTotaisChang
   useEffect(() => {
     onTotaisChange(totais, algumND);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [totais.totalMaoObra, totais.totalMaterial, totais.totalCustoSuporte, totais.origemSuporte, algumND]);
+  }, [totais.totalMaoObra, algumND]);
 
   function atualizarItem(idx: number, patch: Partial<TVItem>) {
     const novos = items.map((it, i) => (i === idx ? { ...it, ...patch } : it));
@@ -227,16 +189,6 @@ export function SelectorPrecoTV({ empresaId, items, onItemsChange, onTotaisChang
             <div className="flex items-center justify-between">
               <div className="text-sm font-medium">TV {idx + 1}</div>
               <div className="flex items-center gap-3">
-                {preco && !isND && (
-                  <span className="text-xs text-muted-foreground">
-                    Suporte:{" "}
-                    {preco.tipo_suporte === "incluso"
-                      ? "Incluso"
-                      : preco.tipo_suporte === "valor"
-                      ? `R$ ${Number(preco.valor_suporte).toFixed(2)}`
-                      : "Não fornecemos"}
-                  </span>
-                )}
                 {items.length > 1 && (
                   <Button type="button" size="sm" variant="ghost" onClick={() => removerItem(idx)} className="h-7 text-destructive hover:text-destructive">
                     <Trash2 className="h-4 w-4" />
@@ -305,8 +257,6 @@ export function SelectorPrecoTV({ empresaId, items, onItemsChange, onTotaisChang
                     className="w-20 px-2 py-0.5 border rounded text-xs font-medium text-foreground bg-background"
                   />
                 </div>
-                <span>· Material R$ {Number(item.valor_material).toFixed(2)}</span>
-                {item.custo_suporte > 0 && <span>· Suporte R$ {Number(item.custo_suporte).toFixed(2)}</span>}
               </div>
             )}
           </div>
@@ -319,8 +269,6 @@ export function SelectorPrecoTV({ empresaId, items, onItemsChange, onTotaisChang
         </Button>
         <div className="text-sm font-medium">
           Totais: Mão de obra <span className="text-primary">R$ {totais.totalMaoObra.toFixed(2)}</span>
-          {" · "}Material R$ {totais.totalMaterial.toFixed(2)}
-          {totais.totalCustoSuporte > 0 && ` · Suporte R$ ${totais.totalCustoSuporte.toFixed(2)}`}
         </div>
       </div>
     </div>
