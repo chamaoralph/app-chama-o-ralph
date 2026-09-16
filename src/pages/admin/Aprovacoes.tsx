@@ -98,6 +98,8 @@ interface AprovacaoModal {
   percentual_mao_obra: number
   /** Instalador marcou (ou o admin está marcando agora, na aprovação) que usou o suporte fixo universal da empresa. */
   usou_suporte_garantia_total: boolean
+  /** Admin marcou que os acessórios deste serviço foram vendidos a preço de custo — zera o ganho (lucro) de acessórios do instalador e da empresa. */
+  vender_preco_custo: boolean
 }
 
 // Acessório incluído na COTAÇÃO (cotacoes.itens_extras), não na finalização.
@@ -181,6 +183,7 @@ export default function Aprovacoes() {
     ganho_acessorios_empresa: '',
     percentual_mao_obra: 50,
     usou_suporte_garantia_total: false,
+    vender_preco_custo: false,
   })
   // Quanto do custo_suporte do modal veio do toggle manual "usou suporte" marcado
   // pelo admin (não pelo instalador) — guardado pra poder tirar de volta se ele
@@ -216,8 +219,9 @@ export default function Aprovacoes() {
     const recebido = parseFloat(aprovacaoModal.valor_recebido_cliente) || 0
     const reembolsoInstalador = parseFloat(aprovacaoModal.valor_reembolso_despesas) || 0
     const reembolsoEmpresa = parseFloat(aprovacaoModal.custo_suporte) || 0
-    const ganhoInstalador = parseFloat(aprovacaoModal.ganho_acessorios_instalador) || 0
-    const ganhoEmpresa = parseFloat(aprovacaoModal.ganho_acessorios_empresa) || 0
+    // Vendido a preço de custo: sem lucro de acessórios pra ninguém.
+    const ganhoInstalador = aprovacaoModal.vender_preco_custo ? 0 : (parseFloat(aprovacaoModal.ganho_acessorios_instalador) || 0)
+    const ganhoEmpresa = aprovacaoModal.vender_preco_custo ? 0 : (parseFloat(aprovacaoModal.ganho_acessorios_empresa) || 0)
 
     const valorTotalMaoObra = recebido - (reembolsoInstalador + reembolsoEmpresa + ganhoInstalador + ganhoEmpresa)
     const maoObraInstalador = valorTotalMaoObra * (aprovacaoModal.percentual_mao_obra / 100)
@@ -235,6 +239,7 @@ export default function Aprovacoes() {
     aprovacaoModal.ganho_acessorios_instalador,
     aprovacaoModal.ganho_acessorios_empresa,
     aprovacaoModal.percentual_mao_obra,
+    aprovacaoModal.vender_preco_custo,
   ])
 
   async function fetchServicos() {
@@ -335,6 +340,7 @@ export default function Aprovacoes() {
       ganho_acessorios_empresa: String(servico.ganho_acessorios_empresa ?? '0'),
       percentual_mao_obra: servico.percentual_mao_obra ?? 50,
       usou_suporte_garantia_total: servico.usou_suporte_garantia_total ?? false,
+      vender_preco_custo: false,
     })
     setCustoGarantiaAdicionadoManualmente(0)
   }
@@ -379,7 +385,8 @@ export default function Aprovacoes() {
   async function confirmarAprovacao() {
     const { servicoId, valor_total, valor_mao_obra_instalador, recebimento_cliente,
             valor_recebido_cliente, valor_reembolso_despesas, custo_suporte,
-            usou_suporte_garantia_total } = aprovacaoModal
+            usou_suporte_garantia_total, vender_preco_custo,
+            ganho_acessorios_instalador, ganho_acessorios_empresa } = aprovacaoModal
     if (!servicoId) return
 
     try {
@@ -438,6 +445,8 @@ export default function Aprovacoes() {
         valor_reembolso_despesas: parseFloat(valor_reembolso_despesas) || 0,
         custo_suporte: parseFloat(custo_suporte) || 0,
         usou_suporte_garantia_total: usouSuporteGarantiaFinal,
+        ganho_acessorios_instalador: vender_preco_custo ? 0 : (parseFloat(ganho_acessorios_instalador) || 0),
+        ganho_acessorios_empresa: vender_preco_custo ? 0 : (parseFloat(ganho_acessorios_empresa) || 0),
       }
 
       // Suporte Fixo Universal usado na Garantia Total: o instalador pega da
@@ -1171,30 +1180,44 @@ export default function Aprovacoes() {
             </div>
             {(parseFloat(aprovacaoModal.ganho_acessorios_instalador) > 0 ||
               parseFloat(aprovacaoModal.ganho_acessorios_empresa) > 0) && (
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="ap-ganho-acessorios-instalador">Ganho Acessórios Instalador (R$)</Label>
-                  <Input
-                    id="ap-ganho-acessorios-instalador"
-                    type="number"
-                    readOnly
-                    disabled
-                    className="bg-gray-100"
-                    value={aprovacaoModal.ganho_acessorios_instalador}
+              <>
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    id="ap-vender-preco-custo"
+                    checked={aprovacaoModal.vender_preco_custo}
+                    onCheckedChange={(checked) =>
+                      setAprovacaoModal(prev => ({ ...prev, vender_preco_custo: checked === true }))
+                    }
                   />
+                  <Label htmlFor="ap-vender-preco-custo" className="text-xs font-normal leading-tight cursor-pointer">
+                    Acessórios vendidos a preço de custo (sem ganho/lucro para instalador ou empresa)
+                  </Label>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="ap-ganho-acessorios-empresa">Ganho Acessórios Empresa (R$)</Label>
-                  <Input
-                    id="ap-ganho-acessorios-empresa"
-                    type="number"
-                    readOnly
-                    disabled
-                    className="bg-gray-100"
-                    value={aprovacaoModal.ganho_acessorios_empresa}
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="ap-ganho-acessorios-instalador">Ganho Acessórios Instalador (R$)</Label>
+                    <Input
+                      id="ap-ganho-acessorios-instalador"
+                      type="number"
+                      readOnly
+                      disabled
+                      className="bg-gray-100"
+                      value={aprovacaoModal.vender_preco_custo ? '0.00' : aprovacaoModal.ganho_acessorios_instalador}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="ap-ganho-acessorios-empresa">Ganho Acessórios Empresa (R$)</Label>
+                    <Input
+                      id="ap-ganho-acessorios-empresa"
+                      type="number"
+                      readOnly
+                      disabled
+                      className="bg-gray-100"
+                      value={aprovacaoModal.vender_preco_custo ? '0.00' : aprovacaoModal.ganho_acessorios_empresa}
+                    />
+                  </div>
                 </div>
-              </div>
+              </>
             )}
           </div>
           <DialogFooter>
