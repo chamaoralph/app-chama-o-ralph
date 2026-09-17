@@ -53,9 +53,7 @@ Deno.serve(async (req) => {
       if (limiteFinal < 1) limiteFinal = LIMITE_PADRAO;
       if (limiteFinal > LIMITE_MAXIMO) limiteFinal = LIMITE_MAXIMO;
 
-      const agora = Date.now();
-      const janelaInicio = new Date(agora - 45 * 24 * 60 * 60 * 1000).toISOString();
-      const janelaFim = new Date(agora - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const janelaFim = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
       // 1. Buscar avaliações elegíveis (sem join)
       const { data: avaliacoes, error: aErr } = await supabase
@@ -65,7 +63,6 @@ Deno.serve(async (req) => {
         .eq("status", "respondida")
         .gte("nota", 4)
         .is("upsell_enviado_em", null)
-        .gte("respondido_em", janelaInicio)
         .lte("respondido_em", janelaFim)
         .order("respondido_em", { ascending: true })
         .limit(limiteFinal);
@@ -102,6 +99,7 @@ Deno.serve(async (req) => {
           avaliacao_id: a.id,
           cliente_nome: cliente.nome,
           cliente_telefone: cliente.telefone,
+          respondido_em: a.respondido_em,
         };
       });
 
