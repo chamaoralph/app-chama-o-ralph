@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
         .gte("nota", 4)
         .is("upsell_enviado_em", null)
         .lte("respondido_em", janelaFim)
-        .order("respondido_em", { ascending: true })
+        .order("respondido_em", { ascending: false })
         .limit(limiteFinal);
 
       if (aErr) throw aErr;
