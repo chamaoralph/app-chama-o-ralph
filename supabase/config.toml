@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.registrar-avaliacao]
 verify_jwt = false
+
+[functions.fila-upsell]
+verify_jwt = false

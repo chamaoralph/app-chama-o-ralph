@@ -106,6 +106,7 @@ export type Database = {
           respondido_em: string | null
           servico_id: string
           status: string
+          upsell_enviado_em: string | null
         }
         Insert: {
           cliente_id: string
@@ -119,6 +120,7 @@ export type Database = {
           respondido_em?: string | null
           servico_id: string
           status?: string
+          upsell_enviado_em?: string | null
         }
         Update: {
           cliente_id?: string
@@ -132,6 +134,7 @@ export type Database = {
           respondido_em?: string | null
           servico_id?: string
           status?: string
+          upsell_enviado_em?: string | null
         }
         Relationships: [
           {
