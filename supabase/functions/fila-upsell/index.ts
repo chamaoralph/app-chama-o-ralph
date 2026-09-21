@@ -127,7 +127,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === "marcar_enviados") {
-      const { ids } = body;
+      const { ids, versao } = body;
 
       if (!Array.isArray(ids)) {
         return new Response(JSON.stringify({ error: "ids must be an array" }), {
@@ -143,9 +143,16 @@ Deno.serve(async (req) => {
         });
       }
 
+      const updateData: { upsell_enviado_em: string; upsell_versao?: number } = {
+        upsell_enviado_em: new Date().toISOString(),
+      };
+      if (Number.isInteger(versao)) {
+        updateData.upsell_versao = versao;
+      }
+
       const { data, error } = await supabase
         .from("avaliacoes")
-        .update({ upsell_enviado_em: new Date().toISOString() })
+        .update(updateData)
         .in("id", ids)
         .select("id");
 

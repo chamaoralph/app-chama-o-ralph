@@ -40,6 +40,7 @@ interface UpsellResultado {
   nota: number | null;
   upsell_enviado_em: string;
   dias_desde_envio: number | null;
+  upsell_versao: number | null;
   upsell_reacao: string | null;
   upsell_reacao_em: string | null;
   nao_perturbe: boolean;
@@ -196,6 +197,31 @@ export default function Upsell() {
     };
   }, [resultados]);
 
+  const resumoPorVersao = useMemo(() => {
+    const grupos = new Map<
+      number | null,
+      { versao: number | null; enviados: number; respostas: number; orcamentos: number; fechados: number }
+    >();
+
+    for (const r of resultados) {
+      const key = r.upsell_versao ?? null;
+      if (!grupos.has(key)) {
+        grupos.set(key, { versao: key, enviados: 0, respostas: 0, orcamentos: 0, fechados: 0 });
+      }
+      const g = grupos.get(key)!;
+      g.enviados += 1;
+      if (r.upsell_reacao != null && r.upsell_reacao !== "sem_resposta") g.respostas += 1;
+      if (r.cotacao_gerada_id != null) g.orcamentos += 1;
+      if (r.cotacao_gerada_status === "aprovada") g.fechados += 1;
+    }
+
+    return [...grupos.values()].sort((a, b) => {
+      if (a.versao == null) return 1;
+      if (b.versao == null) return -1;
+      return a.versao - b.versao;
+    });
+  }, [resultados]);
+
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -276,6 +302,47 @@ export default function Upsell() {
           </Card>
         </div>
 
+        {/* Resumo por versão */}
+        {resumoPorVersao.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Desempenho por versão do texto</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Versão</TableHead>
+                      <TableHead>Enviados</TableHead>
+                      <TableHead>Respostas</TableHead>
+                      <TableHead>Orçamentos</TableHead>
+                      <TableHead>Fechados</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {resumoPorVersao.map((g) => (
+                      <TableRow key={g.versao ?? "sem-versao"}>
+                        <TableCell>
+                          {g.versao != null ? (
+                            <Badge variant="outline">v{g.versao}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">Sem versão</span>
+                          )}
+                        </TableCell>
+                        <TableCell>{g.enviados}</TableCell>
+                        <TableCell>{g.respostas}</TableCell>
+                        <TableCell>{g.orcamentos}</TableCell>
+                        <TableCell>{g.fechados}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Filtros */}
         <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
           <div className="flex-1">
@@ -323,6 +390,7 @@ export default function Upsell() {
                       <TableHead>Telefone</TableHead>
                       <TableHead>Envio</TableHead>
                       <TableHead>Dias</TableHead>
+                      <TableHead>Versão</TableHead>
                       <TableHead>Nota</TableHead>
                       <TableHead>Reação</TableHead>
                       <TableHead>Cotação gerada</TableHead>
@@ -357,6 +425,13 @@ export default function Upsell() {
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline">{row.dias_desde_envio ?? "—"}d</Badge>
+                        </TableCell>
+                        <TableCell>
+                          {row.upsell_versao != null ? (
+                            <Badge variant="outline">v{row.upsell_versao}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">—</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           {row.nota != null ? (
