@@ -142,6 +142,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           <Link to="/admin/avaliacoes" className="block px-4 py-2 rounded hover:bg-gray-800 transition-colors">
             ⭐ Avaliações
           </Link>
+          <Link to="/admin/upsell" className="block px-4 py-2 rounded hover:bg-gray-800 transition-colors">
+            📈 Upsell D+30
+          </Link>
           <Link to="/admin/configuracoes" className="block px-4 py-2 rounded hover:bg-gray-800 transition-colors">
             ⚙️ Configurações
           </Link>

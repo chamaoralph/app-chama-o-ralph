@@ -21,7 +21,8 @@ import {
   Settings,
   GraduationCap,
   Package,
-  Star
+  Star,
+  Send
 } from "lucide-react";
 import {
   Drawer,
@@ -56,6 +57,7 @@ const moreItems = [
   { to: "/admin/rentabilidade-instaladores", icon: DollarSign, label: "Rentabilidade" },
   { to: "/admin/aprovacoes", icon: CheckCircle, label: "Aprovações" },
   { to: "/admin/avaliacoes", icon: Star, label: "Avaliações" },
+  { to: "/admin/upsell", icon: Send, label: "Upsell D+30" },
   { to: "/admin/configuracoes", icon: Settings, label: "Configurações" },
 ];
 
