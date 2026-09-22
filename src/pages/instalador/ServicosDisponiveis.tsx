@@ -203,28 +203,33 @@ export default function ServicosDisponiveis() {
   async function fetchServicos() {
     try {
       setLoading(true)
-      const { data, error } = await supabase
-        .from('servicos')
-        .select(`
-          id,
-          codigo,
-          tipo_servico,
-          data_servico_agendada,
-          endereco_completo,
-          valor_mao_obra_instalador,
-          descricao,
-          acessorios_vendidos,
-          clientes!servicos_cliente_id_fkey (
-            nome,
-            telefone,
-            bairro
-          )
-        `)
-        .eq('status', 'disponivel')
-        .order('data_servico_agendada', { ascending: true })
+      // RPC (SECURITY DEFINER) em vez de consulta direta: só ela consegue
+      // checar a cascata de TODOS os instaladores (a RLS de
+      // cascata_notificacoes só deixa cada um ver a própria linha) e
+      // aplicar a regra de "só aparece quando chegar a vez dele". Se
+      // falhar, mostra o erro em vez de cair pra consulta antiga — senão
+      // a cascata fica furada sem ninguém perceber.
+      const { data, error } = await (supabase.rpc as any)('servicos_disponiveis_para_mim')
 
       if (error) throw error
-      setServicos(data || [])
+
+      const servicosMapeados: Servico[] = (data || []).map((s: any) => ({
+        id: s.id,
+        codigo: s.codigo,
+        tipo_servico: s.tipo_servico,
+        data_servico_agendada: s.data_servico_agendada,
+        endereco_completo: s.endereco_completo,
+        valor_mao_obra_instalador: s.valor_mao_obra_instalador,
+        descricao: s.descricao,
+        acessorios_vendidos: s.acessorios_vendidos,
+        clientes: {
+          nome: s.cliente_nome,
+          telefone: s.cliente_telefone,
+          bairro: s.cliente_bairro,
+        },
+      }))
+
+      setServicos(servicosMapeados)
     } catch (err) {
       console.error('Erro ao carregar serviços:', err)
       setError('Erro ao carregar serviços disponíveis')

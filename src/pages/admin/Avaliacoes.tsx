@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Star, MessageSquare, Clock, Filter, ClipboardCheck } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -121,7 +121,7 @@ export default function Avaliacoes() {
       });
     } catch (err) {
       console.error("Erro ao buscar avaliações:", err);
-      toast.error("Erro ao carregar avaliações");
+      toast({ title: "Erro ao carregar avaliações", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -134,20 +134,20 @@ export default function Avaliacoes() {
       .eq("id", id);
 
     if (error) {
-      toast.error("Erro ao atualizar");
+      toast({ title: "Erro ao atualizar", variant: "destructive" });
       return;
     }
     setAvaliacoes((prev) =>
       prev.map((a) => (a.id === id ? { ...a, publicada: !current } : a))
     );
-    toast.success(!current ? "Avaliação publicada" : "Publicação removida");
+    toast({ title: !current ? "Avaliação publicada" : "Publicação removida" });
   }
 
   function abrirDialogRegistro(avaliacao: Avaliacao) {
     setAvaliacaoSelecionada(avaliacao);
-    setDialogStatus("respondida");
-    setDialogNota(5);
-    setDialogComentario("");
+    setDialogStatus(avaliacao.status === "nao_avaliou" ? "nao_avaliou" : "respondida");
+    setDialogNota(avaliacao.nota ?? 5);
+    setDialogComentario(avaliacao.comentario ?? "");
     setDialogOpen(true);
   }
 
@@ -155,14 +155,25 @@ export default function Avaliacoes() {
     if (!avaliacaoSelecionada) return;
     setSalvando(true);
 
-    const updateData: any = {
-      status: dialogStatus,
-      respondido_em: new Date().toISOString(),
-    };
+    const jaTinhaNota = avaliacaoSelecionada.nota != null;
+
+    const updateData: any = { status: dialogStatus };
+
+    if (jaTinhaNota && avaliacaoSelecionada.respondido_em) {
+      // preserva o respondido_em original: só a nota está sendo corrigida
+    } else {
+      updateData.respondido_em = new Date().toISOString();
+    }
 
     if (dialogStatus === "respondida") {
       updateData.nota = dialogNota;
-      updateData.comentario = dialogComentario.trim() || null;
+      const comentarioBase = dialogComentario.trim() || null;
+      if (jaTinhaNota) {
+        const linha = `Nota alterada pelo admin de ${avaliacaoSelecionada.nota} para ${dialogNota} em ${format(new Date(), "dd/MM/yyyy")}`;
+        updateData.comentario = comentarioBase ? `${comentarioBase}\n${linha}` : linha;
+      } else {
+        updateData.comentario = comentarioBase;
+      }
     }
 
     const { error } = await supabase
@@ -173,7 +184,7 @@ export default function Avaliacoes() {
     setSalvando(false);
 
     if (error) {
-      toast.error("Erro ao registrar avaliação");
+      toast({ title: "Erro ao registrar avaliação", variant: "destructive" });
       return;
     }
 
@@ -200,11 +211,14 @@ export default function Avaliacoes() {
     });
 
     setDialogOpen(false);
-    toast.success(
-      dialogStatus === "respondida"
-        ? "Avaliação registrada com sucesso!"
-        : "Marcada como 'Não avaliou'"
-    );
+    toast({
+      title:
+        dialogStatus === "respondida"
+          ? jaTinhaNota
+            ? "Nota alterada com sucesso!"
+            : "Avaliação registrada com sucesso!"
+          : "Marcada como 'Não avaliou'",
+    });
   }
 
   function statusBadge(status: string) {
@@ -354,17 +368,15 @@ export default function Avaliacoes() {
                       />
                     </TableCell>
                     <TableCell>
-                      {a.status === "pendente" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => abrirDialogRegistro(a)}
-                          className="gap-1"
-                        >
-                          <ClipboardCheck className="h-4 w-4" />
-                          Registrar
-                        </Button>
-                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => abrirDialogRegistro(a)}
+                        className="gap-1"
+                      >
+                        <ClipboardCheck className="h-4 w-4" />
+                        {a.status === "pendente" ? "Registrar" : "Alterar nota"}
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}

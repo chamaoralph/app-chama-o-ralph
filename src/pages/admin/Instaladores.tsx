@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { AdminLayout } from '@/components/layout/AdminLayout'
 import { supabase } from '@/integrations/supabase/client'
-import { Users, UserCheck, UserX, Mail, Copy, Trash2, Plus, Clock, CheckCircle, XCircle, ChevronLeft, ChevronRight, TrendingUp, Wrench, DollarSign } from 'lucide-react'
+import { Users, UserCheck, UserX, Mail, Copy, Trash2, Plus, Clock, CheckCircle, XCircle, ChevronLeft, ChevronRight, TrendingUp, Wrench, DollarSign, Trophy } from 'lucide-react'
 import { startOfMonth, endOfMonth, format, subMonths, addMonths } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Badge } from '@/components/ui/badge'
@@ -46,6 +46,20 @@ interface Convite {
   used_at: string | null
 }
 
+interface RankingInstalador {
+  posicao: number
+  instalador_id: string
+  nome: string
+  servicos_considerados: number
+  recorrencias: number
+  upsells: number
+  reclamacoes: number
+  notas_ruins: number
+  pontos: number
+  indice: number
+  elegivel: boolean
+}
+
 export default function Instaladores() {
   const [instaladores, setInstaladores] = useState<Instalador[]>([])
   const [loading, setLoading] = useState(true)
@@ -67,6 +81,11 @@ export default function Instaladores() {
   const [novoEmail, setNovoEmail] = useState('')
   const [criandoConvite, setCriandoConvite] = useState(false)
 
+  // Estado para Ranking de Prioridade
+  const [ranking, setRanking] = useState<RankingInstalador[]>([])
+  const [loadingRanking, setLoadingRanking] = useState(true)
+  const [erroRanking, setErroRanking] = useState<string | null>(null)
+
   const totalInstaladores = instaladores.length
   const totalAtivos = instaladores.filter(i => i.ativo).length
   const totalInativos = instaladores.filter(i => !i.ativo).length
@@ -80,6 +99,7 @@ export default function Instaladores() {
   useEffect(() => {
     carregarInstaladores()
     carregarConvites()
+    carregarRanking()
   }, [])
 
   useEffect(() => {
@@ -146,6 +166,36 @@ export default function Instaladores() {
       setLoading(false)
     }
   }
+  async function carregarRanking() {
+    try {
+      setLoadingRanking(true)
+      setErroRanking(null)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: userData } = await supabase
+        .from('usuarios')
+        .select('empresa_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!userData) return
+
+      const { data, error } = await (supabase.rpc as any)('ranking_instaladores', {
+        p_empresa_id: userData.empresa_id
+      })
+
+      if (error) throw error
+
+      setRanking((data as RankingInstalador[]) || [])
+    } catch (error: any) {
+      console.error('Erro ao carregar ranking de prioridade:', error)
+      setErroRanking(error?.message || 'Não foi possível carregar o ranking de prioridade')
+    } finally {
+      setLoadingRanking(false)
+    }
+  }
+
   async function carregarDesempenho() {
     try {
       setLoadingDesempenho(true)
@@ -480,6 +530,66 @@ export default function Instaladores() {
                 <option value="ativos">Ativos</option>
                 <option value="inativos">Inativos</option>
               </select>
+            </div>
+
+            {/* Ranking de Prioridade */}
+            <div className="bg-card rounded-lg shadow p-6 space-y-4">
+              <div>
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <Trophy className="h-5 w-5" />
+                  Ranking de prioridade
+                </h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Regra: recorrência +2, upsell +2, nota de 1 a 3 −1 pontos — considerando os últimos 1000 serviços concluídos de cada instalador.
+                </p>
+              </div>
+
+              {loadingRanking ? (
+                <div className="p-8 text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                </div>
+              ) : erroRanking ? (
+                <div className="p-4 text-center text-sm text-destructive bg-destructive/10 rounded-md">
+                  {erroRanking}
+                </div>
+              ) : ranking.length === 0 ? (
+                <div className="p-4 text-center text-sm text-muted-foreground">
+                  Nenhum dado de ranking disponível ainda.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {ranking.map((item) => (
+                    <div
+                      key={item.instalador_id}
+                      className={`flex items-center justify-between gap-4 rounded-md border p-3 ${!item.elegivel ? 'opacity-70' : ''}`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-sm font-semibold text-muted-foreground w-7 shrink-0 text-center">
+                          {item.posicao}º
+                        </span>
+                        <div className="min-w-0">
+                          <div className="font-medium truncate">{item.nome}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {item.recorrencias} recorrências · {item.upsells} upsells · {item.notas_ruins} notas ruins · {item.servicos_considerados} serviços considerados
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        {item.elegivel ? (
+                          <>
+                            <div className="text-2xl font-bold text-primary">{item.indice}</div>
+                            <div className="text-xs text-muted-foreground">pontos por 100 serviços</div>
+                          </>
+                        ) : (
+                          <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">
+                            Histórico insuficiente
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Tabela */}

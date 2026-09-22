@@ -11,3 +11,9 @@ verify_jwt = false
 
 [functions.registrar-avaliacao]
 verify_jwt = false
+
+[functions.montar-cascata]
+verify_jwt = false
+
+[functions.fila-cascata]
+verify_jwt = false
